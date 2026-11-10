@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 12 · Ridge and LASSO · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 12: lectures 36–40 on Bayesian linear regression, ridge regression, the geometry of regularization, LASSO and subgradients.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 12 of 18</span><span class="sep">·</span><a href="part-11.html">← Part 11</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Ridge and LASSO: priors, penalties and sparse weights</h1>
+    <p class="lede">Notes for lectures 36 to 40. A Gaussian prior on the weights turns maximum likelihood into ridge regression, and a picture of loss ellipses meeting a constraint region shows why ridge only shrinks the weights while the L1 penalty of LASSO can set some of them exactly to zero. The part ends with subgradients, the tool for solving LASSO, and a summary of the whole regression unit.</p>
+    <div class="meta">
+      <span><b>Part 12</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>79 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L36 · 16:09</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=dMB1c5NADnE&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L37 · 9:53</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L38 · 27:22</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L39 · 10:36</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L40 · 15:29</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 36</h4>
+      <ul>
+        <li><a href="#bayes-setup">A Bayesian model</a></li>
+        <li><a href="#gaussian-prior">A conjugate Gaussian prior</a></li>
+        <li><a href="#map-estimate">Posterior and MAP</a></li>
+        <li><a href="#same-estimator">The L35 estimator, explained</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 37</h4>
+      <ul>
+        <li><a href="#ridge">Ridge regression</a></li>
+        <li><a href="#pull-to-zero">Why pull towards zero?</a></li>
+        <li><a href="#lambda-strength">λ and the prior variance</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 38</h4>
+      <ul>
+        <li><a href="#constrained-form">Ridge as a constraint</a></li>
+        <li><a href="#loss-contours">Equal-loss ellipses</a></li>
+        <li><a href="#ridge-geometry">Where ridge lands</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 39</h4>
+      <ul>
+        <li><a href="#lasso">The L1 penalty</a></li>
+        <li><a href="#diamond">The diamond's corners</a></li>
+        <li><a href="#sparsity">Is a corner guaranteed?</a></li>
+        <li><a href="#lasso-name">What LASSO stands for</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 40</h4>
+      <ul>
+        <li><a href="#no-closed-form">Why still use ridge?</a></li>
+        <li><a href="#subgradients">Subgradients</a></li>
+        <li><a href="#solving-lasso">Solving LASSO</a></li>
+        <li><a href="#regression-recap">Regression, start to finish</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>Put a Gaussian prior \(\mathcal{N}(\mathbf{0}, \gamma^2 I)\) on \(\mathbf{w}\) and keep the Gaussian noise model. The <b>MAP estimate</b> is \((XX^\top + \tfrac{1}{\gamma^2} I)^{-1}X\mathbf{y}\): exactly the estimator proposed in L35, with \(\lambda = 1/\gamma^2\).</li>
+        <li><dfn>Ridge regression</dfn> minimizes \(\sum_i(\mathbf{w}^\top\mathbf{x}_i - y_i)^2 + \lambda\lVert\mathbf{w}\rVert^2\). The regularizer pulls \(\mathbf{w}\) towards zero, hoping to avoid leaning on redundant features. \(\lambda\) is a hyperparameter, set by cross-validation.</li>
+        <li>Geometry: ridge is least squares restricted to the disc \(\lVert\mathbf{w}\rVert^2 \le \theta\). Points of equal loss are ellipses around \(\hat{\mathbf{w}}_{\text{ML}}\), and \(\hat{\mathbf{w}}_{\text{R}}\) is where the growing ellipses first touch the disc. It is shorter, but its entries are usually not exactly zero.</li>
+        <li><dfn>LASSO</dfn> swaps in the L1 norm \(\lVert\mathbf{w}\rVert_1 = \sum_j|w_j|\). Its region is a diamond with corners on the axes, so first contact is often at a corner: some weights become exactly 0, which selects features.</li>
+        <li>LASSO has no closed form, since \(|w_j|\) is not differentiable at 0. Its objective is convex, so <b>subgradient descent</b> (or a special method such as IRLS) solves it. Ridge keeps its closed form.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 36 ============ -->
+    <section id="bayes-setup">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L36 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;t=95s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L36 · 1:35 the likelihood</a>
+        </div>
+        <h2>A Bayesian model for linear regression</h2>
+      </div>
+      <p>At the end of <a href="part-11.html#new-estimator">Part 11</a> (L35), a new estimator \(\hat{\mathbf{w}}_{\text{new}} = (XX^\top + \lambda I)^{-1}X\mathbf{y}\) was proposed: for a suitable \(\lambda\) it has a smaller mean squared error than the maximum likelihood estimator, and \(\lambda\) is chosen by cross-validation. It looked like a lucky guess. L36 shows where it comes from, using the Bayesian approach of <a href="part-08.html#prior">Part 8</a>.</p>
+      <p>The Bayesian recipe has three pieces: a <dfn>prior</dfn> over the parameter, the usual <dfn>likelihood</dfn> of the data, and the <dfn>posterior</dfn> obtained by combining them. The parameter here is the weight vector \(\mathbf{w} \in \mathbb{R}^d\). It ranges over a continuous space, so the prior must be a density over all of \(\mathbb{R}^d\).</p>
+      <p>The likelihood is the model from Part 11: each label is the linear prediction plus Gaussian noise.</p>
+      <div class="eq">\[ y \mid \mathbf{x} \;\sim\; \mathcal{N}\big(\mathbf{w}^\top\mathbf{x},\ \sigma^2\big), \qquad \text{with } \sigma^2 = 1 \text{ from here on} \]</div>
+      <p class="note">The lecture sets the noise variance to 1 only to keep the algebra less messy. Everything below goes through with a general \(\sigma^2\).</p>
+    </section>
+
+    <section id="gaussian-prior">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;t=125s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L36 · 2:05</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;t=277s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L36 · 4:37 the prior on w</a>
+        </div>
+        <h2>A conjugate prior: the Gaussian</h2>
+      </div>
+      <p>Which prior? A suitable one makes the posterior easy to compute. In <a href="part-08.html#beta-posterior">Part 8</a>, coin tosses had a Bernoulli likelihood, we used a beta prior, and the posterior was again a beta distribution. Because prior and posterior had the same functional form, updating the belief after seeing data was quick.</p>
+      <p>A prior with this property has a name. Given a likelihood, a prior is <dfn>conjugate</dfn> to it if prior × likelihood gives a posterior of the same form as the prior. The beta prior is conjugate to the Bernoulli likelihood.</p>
+      <p>Our likelihood is Gaussian, which is \(e\) raised to some power. Multiply it by a prior that is also \(e\) to some power and the exponents add, so the posterior is again \(e\) to some power. The natural choice is a Gaussian prior:</p>
+      <div class="eq">\[ \mathbf{w} \sim \mathcal{N}\big(\mathbf{0},\ \gamma^2 I\big), \qquad \gamma^2 I = \begin{bmatrix} \gamma^2 & & 0 \\ & \ddots & \\ 0 & & \gamma^2 \end{bmatrix} \in \mathbb{R}^{d \times d} \]</div>
+      <p>The mean \(\mathbf{0}\) is the zero vector in \(\mathbb{R}^d\), and the covariance has \(\gamma^2\) on the diagonal and zeros elsewhere. So each component \(w_j\) is Gaussian with mean 0 and variance \(\gamma^2\), and the components are independent. To draw a \(\mathbf{w}\) from this prior, sample each of \(w_1, \dots, w_d\) separately from \(\mathcal{N}(0, \gamma^2)\).</p>
+    </section>
+
+    <section id="map-estimate">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;t=368s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L36 · 6:08 posterior</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;t=583s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L36 · 9:43 MAP</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;t=739s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L36 · 12:19 gradient</a>
+        </div>
+        <h2>The posterior and the MAP estimate</h2>
+      </div>
+      <p>Given data \((\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\), Bayes' rule gives the posterior up to a constant:</p>
+      <div class="eq">\[ p(\mathbf{w} \mid \text{data}) \;\propto\; \underbrace{p(\text{data} \mid \mathbf{w})}_{\text{likelihood}} \; \underbrace{p(\mathbf{w})}_{\text{prior}} \]</div>
+      <p>The points are generated independently, so the likelihood is a product over \(i\). With noise variance 1, the chance of seeing \(y_i\) at \(\mathbf{x}_i\) is proportional to \(\exp\!\big(-(y_i - \mathbf{w}^\top\mathbf{x}_i)^2/2\big)\); the factors \(1/\sqrt{2\pi}\) are dropped into the proportionality sign. The prior is a product over the \(d\) independent components, and the sum of squares in its exponent is the squared length of \(\mathbf{w}\):</p>
+      <div class="eq">\[ p(\mathbf{w}) \;\propto\; \prod_{j=1}^{d} \exp\!\Big(-\frac{w_j^2}{2\gamma^2}\Big) = \exp\!\Big(-\frac{1}{2\gamma^2}\sum_{j=1}^{d} w_j^2\Big) = \exp\!\Big(-\frac{\lVert\mathbf{w}\rVert^2}{2\gamma^2}\Big) \]</div>
+      <div class="eq">\[ p(\mathbf{w} \mid \text{data}) \;\propto\; \prod_{i=1}^{n} \exp\!\Big(-\frac{(y_i - \mathbf{w}^\top\mathbf{x}_i)^2}{2}\Big) \cdot \exp\!\Big(-\frac{\lVert\mathbf{w}\rVert^2}{2\gamma^2}\Big) \]</div>
+      <p>The <dfn>maximum a posteriori (MAP)</dfn> estimate is the \(\mathbf{w}\) that maximizes the posterior. The missing constants do not move the maximizer, and log is increasing, so we can maximize the log instead. The log turns the product into a sum. Flipping the sign turns the max into a min:</p>
+      <div class="eq">\[ \hat{\mathbf{w}}_{\text{MAP}} = \arg\max_{\mathbf{w}} \; \sum_{i=1}^{n} -\frac{(y_i - \mathbf{w}^\top\mathbf{x}_i)^2}{2} \;-\; \frac{\lVert\mathbf{w}\rVert^2}{2\gamma^2} \;=\; \arg\min_{\mathbf{w}} \; \underbrace{\frac12\sum_{i=1}^{n} (y_i - \mathbf{w}^\top\mathbf{x}_i)^2 + \frac{1}{2\gamma^2}\lVert\mathbf{w}\rVert^2}_{f(\mathbf{w})} \]</div>
+      <p>Maximum likelihood had only the first term. The prior adds a second one: \(\lVert\mathbf{w}\rVert^2\) scaled by \(1/(2\gamma^2)\).</p>
+      <p>To minimize \(f\), take the gradient and set it to zero. The lecture states the gradient and asks you to verify it. Write the data as \(X \in \mathbb{R}^{d\times n}\) with the points \(\mathbf{x}_i\) as columns and \(\mathbf{y} \in \mathbb{R}^n\), so the first term is \(\tfrac12\lVert X^\top\mathbf{w} - \mathbf{y}\rVert^2\). Its gradient is \(X(X^\top\mathbf{w} - \mathbf{y})\), as in <a href="part-10.html#normal-equations">Part 10</a>, and the gradient of \(\tfrac{1}{2\gamma^2}\mathbf{w}^\top\mathbf{w}\) is \(\mathbf{w}/\gamma^2\):</p>
+      <div class="eq">\[ \nabla f(\mathbf{w}) = XX^\top\mathbf{w} - X\mathbf{y} + \frac{1}{\gamma^2}\,\mathbf{w} = \mathbf{0} \quad\Longrightarrow\quad \Big(XX^\top + \frac{1}{\gamma^2} I\Big)\mathbf{w} = X\mathbf{y} \]</div>
+      <div class="result">
+        <span class="lbl">MAP estimate under a Gaussian prior</span>
+        \[ \hat{\mathbf{w}}_{\text{MAP}} = \Big(XX^\top + \frac{1}{\gamma^2} I\Big)^{-1} X\mathbf{y} \qquad\text{compare}\qquad \hat{\mathbf{w}}_{\text{ML}} = \big(XX^\top\big)^{-1} X\mathbf{y} \]
+        <p>The prior's only effect is to add \(1/\gamma^2\) to every diagonal entry of \(XX^\top\).</p>
+      </div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 250" role="img" aria-label="Flow: a Gaussian prior on w and a Gaussian likelihood multiply into the posterior; taking minus log gives the MAP objective, half the squared error plus norm of w squared over two gamma squared; setting its gradient to zero gives the estimator X X transpose plus I over gamma squared, inverse, times X y.">
+            <defs>
+              <marker id="p12a-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p12a-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <rect class="d-box" x="8" y="12" width="218" height="78" rx="8"/>
+            <text class="d-row" x="22" y="32">Prior</text>
+            <text class="d-t" x="22" y="55">w ~ N(0, γ²I)</text>
+            <text class="d-s" x="22" y="76">p(w) ∝ exp(−‖w‖² / 2γ²)</text>
+
+            <rect class="d-box" x="8" y="108" width="218" height="98" rx="8"/>
+            <text class="d-row" x="22" y="128">Likelihood</text>
+            <text class="d-t" x="22" y="151">yᵢ | xᵢ ~ N(wᵀxᵢ, 1)</text>
+            <text class="d-s" x="22" y="172">n independent points:</text>
+            <text class="d-s" x="22" y="191">∏ᵢ exp(−(yᵢ − wᵀxᵢ)² / 2)</text>
+
+            <line class="d-ln" x1="226" y1="51" x2="260" y2="90" marker-end="url(#p12a-ah)"/>
+            <line class="d-ln" x1="226" y1="157" x2="260" y2="124" marker-end="url(#p12a-ah)"/>
+
+            <rect class="d-box" x="262" y="52" width="180" height="110" rx="8"/>
+            <text class="d-row" x="276" y="72">Posterior</text>
+            <text class="d-t" x="276" y="95">∝ likelihood × prior</text>
+            <text class="d-s" x="276" y="118">= exp(−½ Σᵢ (yᵢ − wᵀxᵢ)²</text>
+            <text class="d-s" x="296" y="137">− ‖w‖² / 2γ²)</text>
+
+            <line class="d-ln" x1="442" y1="107" x2="490" y2="107" marker-end="url(#p12a-ah)"/>
+            <text class="d-s" x="466" y="99" text-anchor="middle">−log</text>
+
+            <rect class="d-box" x="492" y="52" width="180" height="110" rx="8"/>
+            <text class="d-row" x="506" y="72">MAP objective</text>
+            <text class="d-s" x="506" y="93">maximizing the posterior</text>
+            <text class="d-s" x="506" y="110">means minimizing</text>
+            <text class="d-t" x="506" y="131">½ Σᵢ (yᵢ − wᵀxᵢ)²</text>
+            <text class="d-t" x="506" y="151" style="fill: var(--accent)">+ ‖w‖² / 2γ²</text>
+
+            <line class="d-ln-acc" x1="582" y1="162" x2="582" y2="184" marker-end="url(#p12a-ah-acc)"/>
+            <text class="d-s" x="590" y="178">gradient = 0</text>
+
+            <rect class="d-box-acc" x="352" y="188" width="320" height="56" rx="8"/>
+            <text class="d-t" x="366" y="211">ŵ<tspan dy="4" style="font-size:9.5px">MAP</tspan><tspan dy="-4"> = (XXᵀ + I/γ²)⁻¹ Xy</tspan></text>
+            <text class="d-s" x="366" y="232">the L35 estimator, with λ = 1/γ²</text>
+          </svg>
+        </div>
+        <figcaption><b>From a Gaussian prior to a penalized least-squares problem.</b> Both factors are exponentials, so their exponents add. The likelihood contributes the squared error and the prior contributes \(\lVert\mathbf{w}\rVert^2/2\gamma^2\) (blue), the only new term compared with maximum likelihood.</figcaption>
+      </figure>
+      <p class="note">Standard result, not derived in the lecture: if the noise variance \(\sigma^2\) is kept, the same steps give \((XX^\top + \tfrac{\sigma^2}{\gamma^2} I)^{-1}X\mathbf{y}\).</p>
+    </section>
+
+    <section id="same-estimator">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;t=799s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L36 · 13:19</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=DG7KvatwL2Q&amp;t=861s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L36 · 14:21 conclusion</a>
+        </div>
+        <h2>The L35 estimator, now with a reason</h2>
+      </div>
+      <p>The MAP estimate is exactly \(\hat{\mathbf{w}}_{\text{new}}\) from L35, with \(1/\gamma^2\) in place of \(\lambda\). There it was pulled out of a hat and justified by its mean squared error (<a href="part-11.html#existence">Part 11</a>). Here it comes out of a completely different line of thought: impose a prior on \(\mathbf{w}\) and ask for the most probable \(\mathbf{w}\) after seeing the data.</p>
+      <p>Only the name of the constant changes. In L35 we cross-validated \(\lambda\); here we would cross-validate \(\gamma^2\) in the same way. Either way it is a single number, and we pick the value that best fits held-out data.</p>
+      <p class="rule-of-thumb">MAP estimation for linear regression with the Gaussian prior \(\mathcal{N}(\mathbf{0}, \gamma^2 I)\) is the same as the estimator \((XX^\top + \lambda I)^{-1}X\mathbf{y}\) with \(\lambda = 1/\gamma^2\).</p>
+      <p>The route so far: solve linear regression as an optimization problem (<a href="part-10.html">Part 10</a>); read it as maximum likelihood under Gaussian noise (Part 11); take the Bayesian version of that estimation problem; arrive at a new estimator that is better motivated and may well do better in practice.</p>
+    </section>
+
+    <!-- ============ LECTURE 37 ============ -->
+    <section id="ridge">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=dMB1c5NADnE&amp;t=40s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L37 · 0:40</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=dMB1c5NADnE&amp;t=111s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L37 · 1:51 regularizer</a>
+        </div>
+        <h2>Ridge regression</h2>
+      </div>
+      <p>L37 puts the two estimators side by side. Plain linear regression, which is also the maximum likelihood estimator, and the MAP estimator, written \(\hat{\mathbf{w}}_{\text{R}}\):</p>
+      <div class="eq">\[ \hat{\mathbf{w}}_{\text{ML}} = \arg\min_{\mathbf{w}} \sum_{i=1}^{n} \big(\mathbf{w}^\top\mathbf{x}_i - y_i\big)^2 \qquad\qquad \hat{\mathbf{w}}_{\text{R}} = \arg\min_{\mathbf{w}} \sum_{i=1}^{n} \big(\mathbf{w}^\top\mathbf{x}_i - y_i\big)^2 + \lambda\lVert\mathbf{w}\rVert^2 \]</div>
+      <p>The R stands for <dfn>ridge</dfn>, a name with roots in classical statistics that the lecture does not go into. The problem on the right is called <dfn>ridge regression</dfn>. (Multiply the MAP objective by 2 to get exactly this form, with \(\lambda = 1/\gamma^2\).)</p>
+      <div class="result">
+        <span class="lbl">Ridge regression</span>
+        \[ \hat{\mathbf{w}}_{\text{R}} = \arg\min_{\mathbf{w}} \;\underbrace{\sum_{i=1}^{n}\big(\mathbf{w}^\top\mathbf{x}_i - y_i\big)^2}_{\text{loss}} + \underbrace{\lambda\lVert\mathbf{w}\rVert^2}_{\text{regularizer}} \;=\; \big(XX^\top + \lambda I\big)^{-1}X\mathbf{y} \]
+      </div>
+      <p>The first term is the original loss. The second is a <dfn>regularizer</dfn>: a penalty, added to the loss, for choosing some kinds of \(\mathbf{w}\) over others. Doing Bayesian modelling with a prior on \(\mathbf{w}\) is one way of saying that we prefer some \(\mathbf{w}\)'s; the regularizer is the same preference written as a penalty. The prior's variance turns into \(\lambda\). Such a number, which we fix by cross-validation instead of learning it from the loss, is a <dfn>hyperparameter</dfn>.</p>
+    </section>
+
+    <section id="pull-to-zero">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=dMB1c5NADnE&amp;t=177s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L37 · 2:57</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=dMB1c5NADnE&amp;t=275s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L37 · 4:35 redundant features</a>
+        </div>
+        <h2>Why pull the weights towards zero?</h2>
+      </div>
+      <p>The prior has mean zero, so its mode, the single most probable \(\mathbf{w}\), is the zero vector. In the objective this shows up as the regularizer pulling the answer towards zero: it penalizes the length \(\lVert\mathbf{w}\rVert^2\), so it wants every component small. The loss term pulls the other way, towards a good fit. If several \(\mathbf{w}\)'s have the same loss, ridge prefers the one with the smallest length.</p>
+      <p>The regularizer cannot win outright, since \(\mathbf{w} = \mathbf{0}\) predicts nothing. Why push towards zero at all? Real data sets can have 10,000 or even a million features, and many of them may be redundant. When the label is a linear combination of the features, redundant features mean that many different combinations explain it equally well.</p>
+
+      <h3>The height and weight example <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=dMB1c5NADnE&amp;t=339s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L37 · 5:39</a></h3>
+      <p>Take three features: \(f_1\) = height, \(f_2\) = weight, and \(f_3 = 2\times\text{height} + 3\times\text{weight}\), as if some sensor recorded that combination. The label is a noisy version of \(3\times\text{height} + 4\times\text{weight}\). Several weight vectors reproduce it exactly:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Weights \((w_1, w_2, w_3)\)</th><th>Prediction</th><th>Uses \(f_3\)?</th></tr></thead>
+          <tbody>
+            <tr><td>\((1, 1, 1)\)</td><td>\(h + w + (2h + 3w) = 3h + 4w\)</td><td>Yes</td></tr>
+            <tr><td>\((0, c_1, c_2)\), e.g. \((0, -\tfrac12, \tfrac32)\)</td><td>\(-\tfrac12 w + \tfrac32(2h + 3w) = 3h + 4w\)</td><td>Yes</td></tr>
+            <tr><td>\((3, 4, 0)\)</td><td>\(3h + 4w\)</td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">The lecture leaves \(c_1, c_2\) unspecified; \(c_1 = -\tfrac12,\ c_2 = \tfrac32\) is the solution of \(2c_2 = 3,\ c_1 + 3c_2 = 4\).</p>
+      <p>The lecture's argument: we are probably better off not picking up redundant features, as \((3, 4, 0)\) does by ignoring \(f_3\). So push as many weights to zero as possible, assuming most features are redundant, while keeping the ones needed to keep the loss small. That is what the zero-mean prior is trying to encourage.</p>
+      <p class="callout">A worked check on these numbers (not in the lecture). Every exact fit has the form \((3 - 2t,\ 4 - 3t,\ t)\); \(t = 0, 1, \tfrac32\) give the three rows. Their squared lengths are 25, 3 and 2.5, and \(\lVert\mathbf{w}\rVert^2 = 25 - 36t + 14t^2\) is smallest at \(t = 9/7\): \(\mathbf{w} = (\tfrac37, \tfrac17, \tfrac97)\), with no zero entry. (This is also the least-norm solution that the pseudo-inverse of <a href="part-10.html#normal-equations">Part 10</a> would return.) So among equally good fits, the squared-length penalty spreads weight over all three features instead of dropping one. This gap between "towards zero" and "exactly zero" is what L38 makes precise and what LASSO (L39) addresses. For comparison, the smallest \(\lVert\mathbf{w}\rVert_1\) among these fits is at \(t = 4/3\): \((\tfrac13, 0, \tfrac43)\), which drops a feature.</p>
+    </section>
+
+    <section id="lambda-strength">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=dMB1c5NADnE&amp;t=436s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L37 · 7:16</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=dMB1c5NADnE&amp;t=531s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L37 · 8:51 open questions</a>
+        </div>
+        <h2>λ measures how strongly we believe the prior</h2>
+      </div>
+      <p>\(\lambda\) plays the role of \(1/\gamma^2\). Suppose we strongly believe that most features are redundant, so most weights should be near zero. Then the prior should have a small variance \(\gamma^2\), with its mass packed around zero. Small \(\gamma^2\) means large \(\lambda\), and the minimization pays a large penalty for any \(\mathbf{w}\) with a large length. A weak belief means large \(\gamma^2\), small \(\lambda\), and the loss term dominates.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 250" role="img" aria-label="Left: two Gaussian prior densities for one weight, a narrow one with gamma 0.6 and a wide one with gamma 1.5. Right: the matching penalties lambda w squared, a steep parabola for lambda about 2.8 and a flat one for lambda about 0.44.">
+            <text class="d-h" x="50" y="22">Prior on one weight w<tspan dy="4" style="font-size:10px">j</tspan></text>
+            <line class="d-rule" x1="50" y1="205" x2="300" y2="205"/>
+            <line class="d-rule" x1="175" y1="40" x2="175" y2="205"/>
+            <text class="d-al" x="50" y="220" text-anchor="middle">−4</text><text class="d-al" x="112.5" y="220" text-anchor="middle">−2</text><text class="d-al" x="175" y="220" text-anchor="middle">0</text><text class="d-al" x="237.5" y="220" text-anchor="middle">2</text><text class="d-al" x="300" y="220" text-anchor="middle">4</text>
+            <text class="d-al" x="300" y="236" text-anchor="end">w<tspan dy="3" style="font-size:9px">j</tspan></text>
+            <path class="d-ln" d="M50 203.2 L56.3 202.5 L62.5 201.5 L68.8 200.2 L75 198.6 L81.3 196.5 L87.5 194 L93.8 191 L100 187.6 L106.3 183.6 L112.5 179.2 L118.8 174.5 L125 169.5 L131.3 164.4 L137.5 159.5 L143.8 154.8 L150 150.6 L156.3 147.1 L162.5 144.5 L168.8 142.9 L175 142.3 L181.3 142.9 L187.5 144.5 L193.8 147.1 L200 150.6 L206.3 154.8 L212.5 159.5 L218.8 164.4 L225 169.5 L231.3 174.5 L237.5 179.2 L243.8 183.6 L250 187.6 L256.3 191 L262.5 194 L268.8 196.5 L275 198.6 L281.3 200.2 L287.5 201.5 L293.8 202.5 L300 203.2" style="stroke-width:2"/>
+            <path class="d-ln-acc" d="M50 205 L100 204.9 L106.3 204.8 L109.4 204.7 L112.5 204.4 L115.6 204 L118.8 203.3 L121.9 202.2 L125 200.5 L128.1 198.1 L131.3 194.7 L134.4 190 L137.5 183.8 L140.6 175.8 L143.8 165.9 L146.9 154.1 L150 140.6 L153.1 125.6 L156.3 109.9 L159.4 94.2 L162.5 79.5 L165.6 66.7 L168.8 56.7 L171.9 50.4 L175 48.3 L178.1 50.4 L181.3 56.7 L184.4 66.7 L187.5 79.5 L190.6 94.2 L193.8 109.9 L196.9 125.6 L200 140.6 L203.1 154.1 L206.3 165.9 L209.4 175.8 L212.5 183.8 L215.6 190 L218.8 194.7 L221.9 198.1 L225 200.5 L228.1 202.2 L231.3 203.3 L234.4 204 L237.5 204.4 L240.6 204.7 L243.8 204.8 L246.9 204.9 L250 204.9 L300 205" style="stroke-width:2.2"/>
+            <text class="d-s" x="186" y="52" style="fill: var(--accent)">γ = 0.6: mass near 0</text>
+            <text class="d-s" x="236" y="166">γ = 1.5</text>
+
+            <line class="d-rule" x1="345" y1="14" x2="345" y2="236"/>
+
+            <text class="d-h" x="390" y="22">Penalty λw<tspan dy="4" style="font-size:10px">j</tspan><tspan dy="-4">² with λ = 1/γ²</tspan></text>
+            <line class="d-rule" x1="390" y1="205" x2="640" y2="205"/>
+            <line class="d-rule" x1="515" y1="40" x2="515" y2="205"/>
+            <text class="d-al" x="390" y="220" text-anchor="middle">−4</text><text class="d-al" x="452.5" y="220" text-anchor="middle">−2</text><text class="d-al" x="515" y="220" text-anchor="middle">0</text><text class="d-al" x="577.5" y="220" text-anchor="middle">2</text><text class="d-al" x="640" y="220" text-anchor="middle">4</text>
+            <text class="d-al" x="640" y="236" text-anchor="end">w<tspan dy="3" style="font-size:9px">j</tspan></text>
+            <text class="d-al" x="509" y="126" text-anchor="end">4</text><text class="d-al" x="509" y="44" text-anchor="end">8</text>
+            <path class="d-ln" d="M390 58.3 L398.3 77.2 L406.7 94.8 L415 111.1 L423.3 126.1 L431.7 139.8 L440 152.2 L448.3 163.3 L456.7 173.1 L465 181.5 L473.3 188.7 L481.7 194.6 L490 199.1 L498.3 202.4 L506.7 204.3 L515 205 L523.3 204.3 L531.7 202.4 L540 199.1 L548.3 194.6 L556.7 188.7 L565 181.5 L573.3 173.1 L581.7 163.3 L590 152.2 L598.3 139.8 L606.7 126.1 L615 111.1 L623.3 94.8 L631.7 77.2 L640 58.3" style="stroke-width:2"/>
+            <path class="d-ln-acc" d="M462 40 L465.5 61.3 L469 81.1 L472.6 99.4 L476.1 116.3 L479.6 131.7 L483.2 145.6 L486.7 158.1 L490.3 169.1 L493.8 178.6 L497.3 186.7 L500.9 193.3 L504.4 198.4 L507.9 202.1 L511.5 204.3 L515 205 L518.5 204.3 L522.1 202.1 L525.6 198.4 L529.1 193.3 L532.7 186.7 L536.2 178.6 L539.7 169.1 L543.3 158.1 L546.8 145.6 L550.4 131.7 L553.9 116.3 L557.4 99.4 L561 81.1 L564.5 61.3 L568 40" style="stroke-width:2.2"/>
+            <text class="d-s" x="574" y="52" style="fill: var(--accent)">λ ≈ 2.8</text>
+            <text class="d-s" x="596" y="178">λ ≈ 0.44</text>
+          </svg>
+        </div>
+        <figcaption><b>A confident prior is a steep penalty.</b> Up to a constant, the penalty on each weight is \(-2\log\) of its prior density, \(w_j^2/\gamma^2 = \lambda w_j^2\). The narrow prior (\(\gamma = 0.6\)) gives \(\lambda \approx 2.8\) and punishes even moderate weights hard; the wide prior (\(\gamma = 1.5\)) gives \(\lambda \approx 0.44\). Both panels drawn to scale.</figcaption>
+      </figure>
+
+      <p>So the two terms of the objective balance how much loss we accept against how much redundancy we want to avoid.</p>
+      <p>L37 closes with questions. Why not directly try to make as many weights as possible exactly zero? Is ridge the only way to regularize? Would understanding ridge geometrically lead to better algorithms, or to a different formulation of linear regression? The answer to all of them is yes, and it leads to a modified version of linear regression (LASSO, in L39). The first step is the geometry of ridge.</p>
+    </section>
+
+    <!-- ============ LECTURE 38 ============ -->
+    <section id="constrained-form">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=122s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L38 · 2:02</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=307s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L38 · 5:07 equivalence</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=523s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L38 · 8:43 the disc</a>
+        </div>
+        <h2>Ridge as a constrained problem</h2>
+      </div>
+      <p>L38 asks how the solutions of linear regression and ridge regression relate, and whether seeing that relation clearly suggests another way to regularize. Recall that \(\lVert\mathbf{w}\rVert^2 = \sum_{j} w_j^2\) is the squared L2 norm, the squared length of the vector \(\mathbf{w}\).</p>
+      <p>To draw pictures, take two features, say height and weight. Then \(\mathbf{w} = (w_1, w_2)\) and the <dfn>parameter space</dfn> is the whole plane, negative values included. Solve plain linear regression (equivalently maximum likelihood with Gaussian noise) and mark \(\hat{\mathbf{w}}_{\text{ML}}\) in the plane. Where is \(\hat{\mathbf{w}}_{\text{R}}\)?</p>
+      <p>The lecture uses an equivalence that it states without proof:</p>
+      <div class="eq">\[ \text{(A)}\;\; \min_{\mathbf{w}\in\mathbb{R}^d} \sum_{i=1}^{n}\big(\mathbf{w}^\top\mathbf{x}_i - y_i\big)^2 + \lambda\lVert\mathbf{w}\rVert^2 \qquad\qquad \text{(B)}\;\; \min_{\mathbf{w}\in\mathbb{R}^d} \sum_{i=1}^{n}\big(\mathbf{w}^\top\mathbf{x}_i - y_i\big)^2 \;\text{ subject to }\; \lVert\mathbf{w}\rVert^2 \le \theta \]</div>
+      <div class="result">
+        <span class="lbl">Penalty form = constraint form (stated, not proved)</span>
+        <p>For every \(\lambda > 0\) there is a \(\theta\), depending on \(\lambda\), such that problems (A) and (B) have the same optimal solution.</p>
+      </div>
+      <p>In (A), \(\mathbf{w}\) is unconstrained and pays a penalty. In (B), the loss is the same with no penalty, but \(\mathbf{w}\) may only come from a restricted set. In two dimensions that set is \(w_1^2 + w_2^2 \le \theta\): with equality it is a circle centred at the origin of radius \(\sqrt\theta\), so the set is the circle together with its inside. Ridge searches for the lowest-loss \(\mathbf{w}\) in this disc. \(\hat{\mathbf{w}}_{\text{ML}}\) was found with no restriction on length, so it may well lie outside it.</p>
+      <p class="note">Standard context: the general tool behind such equivalences is constrained optimization with Lagrange multipliers, which the course develops for support vector machines in <a href="part-16.html">Part 16</a>.</p>
+    </section>
+
+    <section id="loss-contours">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=645s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L38 · 10:45</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=830s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L38 · 13:50 the set S<sub>c</sub></a>
+          <a class="ts" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=1108s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L38 · 18:28 circle or ellipse</a>
+        </div>
+        <h2>Points of equal loss form ellipses</h2>
+      </div>
+      <p>To find where in the disc ridge lands, look more closely at \(\hat{\mathbf{w}}_{\text{ML}}\). Call the objective \(f(\mathbf{w}) = \sum_i(\mathbf{w}^\top\mathbf{x}_i - y_i)^2\). Its value at \(\hat{\mathbf{w}}_{\text{ML}}\) need not be zero: the points may not have an exact linear relationship, so even the best \(\mathbf{w}\) suffers some loss. But by design \(f(\hat{\mathbf{w}}_{\text{ML}})\) is the smallest possible value; no \(\mathbf{w}\) has strictly less loss.</p>
+      <p>Now fix a constant \(c > 0\) and collect every \(\mathbf{w}\) whose loss is exactly \(c\) more than the minimum. If \(\hat{\mathbf{w}}_{\text{ML}}\) has loss 100, then \(S_{10}\) is the set of \(\mathbf{w}\)'s with loss 110.</p>
+      <div class="eq">\[ S_c = \big\{\mathbf{w} : f(\mathbf{w}) = f(\hat{\mathbf{w}}_{\text{ML}}) + c\big\}, \qquad f(\mathbf{w}) = \lVert X^\top\mathbf{w} - \mathbf{y}\rVert^2 \]</div>
+      <p>In vector form, with \(X\) holding the data points as columns, \(X^\top\mathbf{w}\) is the vector of predictions \(\mathbf{w}^\top\mathbf{x}_i\). Every \(\mathbf{w} \in S_c\) satisfies</p>
+      <div class="eq">\[ \lVert X^\top\mathbf{w} - \mathbf{y}\rVert^2 = \lVert X^\top\hat{\mathbf{w}}_{\text{ML}} - \mathbf{y}\rVert^2 + c \]</div>
+      <p>The lecture leaves the simplification as an exercise (expand both sides into four terms each; some cancel). The result is</p>
+      <div class="eq">\[ \big(\mathbf{w} - \hat{\mathbf{w}}_{\text{ML}}\big)^\top XX^\top \big(\mathbf{w} - \hat{\mathbf{w}}_{\text{ML}}\big) = c' \]</div>
+      <p>where \(c'\) is a constant that depends on \(c\), the data and \(\hat{\mathbf{w}}_{\text{ML}}\), but not on \(\mathbf{w}\). We read this as an equation in \(\mathbf{w}\).</p>
+      <h3>Completing the algebra</h3>
+      <p>One clean way to do the exercise: split the residual vector in two and expand the squared length.</p>
+      <div class="eq">\[ X^\top\mathbf{w} - \mathbf{y} = X^\top(\mathbf{w} - \hat{\mathbf{w}}_{\text{ML}}) + (X^\top\hat{\mathbf{w}}_{\text{ML}} - \mathbf{y}) \]</div>
+      <div class="eq">\[ f(\mathbf{w}) = \big(\mathbf{w}-\hat{\mathbf{w}}_{\text{ML}}\big)^\top XX^\top\big(\mathbf{w}-\hat{\mathbf{w}}_{\text{ML}}\big) + 2\big(\mathbf{w}-\hat{\mathbf{w}}_{\text{ML}}\big)^\top X\big(X^\top\hat{\mathbf{w}}_{\text{ML}} - \mathbf{y}\big) + f(\hat{\mathbf{w}}_{\text{ML}}) \]</div>
+      <p>The middle term vanishes, because \(\hat{\mathbf{w}}_{\text{ML}}\) satisfies the normal equations \(XX^\top\hat{\mathbf{w}}_{\text{ML}} = X\mathbf{y}\) from Part 10. So</p>
+      <div class="eq">\[ f(\mathbf{w}) - f(\hat{\mathbf{w}}_{\text{ML}}) = (\mathbf{w}-\hat{\mathbf{w}}_{\text{ML}})^\top XX^\top(\mathbf{w}-\hat{\mathbf{w}}_{\text{ML}}) \]</div>
+      <p>and the constant \(c'\) is in fact \(c\) itself.</p>
+      <h3>What shape is this?</h3>
+      <p>If \(XX^\top\) were the identity, the equation would read \(\lVert\mathbf{w} - \hat{\mathbf{w}}_{\text{ML}}\rVert^2 = c'\): a circle centred at \(\hat{\mathbf{w}}_{\text{ML}}\). In general \(XX^\top\) is some other matrix. It linearly transforms \(\mathbf{w} - \hat{\mathbf{w}}_{\text{ML}}\) before the dot product, which stretches the circle into an <dfn>ellipse</dfn>, still centred at \(\hat{\mathbf{w}}_{\text{ML}}\).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 250" role="img" aria-label="Left: when X X transpose is the identity, the sets of extra loss c, 2c and 4c are concentric circles around w hat ML. Right: for a general X X transpose they are concentric tilted ellipses around w hat ML.">
+            <text class="d-h" x="40" y="24">If XXᵀ = I</text>
+            <text class="d-s" x="40" y="42">‖w − ŵ‖² = c: circles</text>
+            <circle class="d-ln" cx="170" cy="140" r="40"/>
+            <circle class="d-ln" cx="170" cy="140" r="56.6"/>
+            <circle class="d-ln" cx="170" cy="140" r="80"/>
+            <text class="d-s" x="200" y="106">c</text>
+            <text class="d-s" x="212" y="94">2c</text>
+            <text class="d-s" x="229" y="77">4c</text>
+            <circle class="pt-new" cx="170" cy="140" r="4.5"/>
+            <text class="d-t" x="164" y="160" text-anchor="end">ŵ<tspan dy="4" style="font-size:9.5px">ML</tspan></text>
+
+            <line class="d-rule" x1="330" y1="14" x2="330" y2="236"/>
+
+            <text class="d-h" x="370" y="24">General XXᵀ</text>
+            <text class="d-s" x="370" y="42">(w − ŵ)ᵀXXᵀ(w − ŵ) = c: ellipses</text>
+            <ellipse class="d-ln" cx="500" cy="140" rx="40" ry="20" transform="rotate(45 500 140)"/>
+            <ellipse class="d-ln" cx="500" cy="140" rx="56.6" ry="28.3" transform="rotate(45 500 140)"/>
+            <ellipse class="d-ln" cx="500" cy="140" rx="80" ry="40" transform="rotate(45 500 140)"/>
+            <text class="d-s" x="535" y="173">c</text>
+            <text class="d-s" x="547" y="185">2c</text>
+            <text class="d-s" x="564" y="202">4c</text>
+            <circle class="pt-new" cx="500" cy="140" r="4.5"/>
+            <text class="d-t" x="494" y="130" text-anchor="end" style="paint-order: stroke; stroke: var(--surface); stroke-width: 4px">ŵ<tspan dy="4" style="font-size:9.5px">ML</tspan></text>
+          </svg>
+        </div>
+        <figcaption><b>Sets of equal extra loss.</b> Each curve holds the \(\mathbf{w}\)'s whose loss exceeds the minimum by \(c\), \(2c\) and \(4c\). With \(XX^\top = I\) they are circles; with a general \(XX^\top\) (drawn for one with eigenvalues 4 and 1) the same circles are squeezed into ellipses. Larger extra loss means a larger concentric curve.</figcaption>
+      </figure>
+      <p>So the \(\mathbf{w}\)'s that make, say, 10 units more error than \(\hat{\mathbf{w}}_{\text{ML}}\) lie on an elliptical contour around it. Asking for 20 units more gives a larger concentric ellipse, and so on: the loss grows as we move outward from \(\hat{\mathbf{w}}_{\text{ML}}\) in any direction.</p>
+    </section>
+
+    <section id="ridge-geometry">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=1233s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L38 · 20:33</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=1353s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L38 · 22:33 first contact</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=1446s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L38 · 24:06 conclusions</a>
+        </div>
+        <h2>Where the ridge solution lands</h2>
+      </div>
+      <p>Put the two pictures together. \(\hat{\mathbf{w}}_{\text{ML}}\) sits outside the disc \(\lVert\mathbf{w}\rVert^2 \le \theta\), surrounded by its ellipses of extra loss. Grow the ellipse. Small ones miss the disc entirely; at some size the ellipse first touches it. That point of first contact is \(\hat{\mathbf{w}}_{\text{R}}\).</p>
+      <p>The reason: any \(\mathbf{w}\) other than \(\hat{\mathbf{w}}_{\text{ML}}\) costs extra loss, so ridge must pay something. It also has to stay inside the disc. Moving outward from \(\hat{\mathbf{w}}_{\text{ML}}\), the first point of the disc we reach is the feasible point with the least extra loss, which is exactly what problem (B) asks for.</p>
+
+      <figure>
+        <div class="fig-split">
+          <svg class="dg" viewBox="0 0 250 290" role="img" aria-label="Parameter plane with the disc of radius 2 around the origin shaded, w hat ML outside it at about (0.88, 3.28), three concentric ellipses around w hat ML, and the largest touching the disc at w hat R, about (0.98, 1.75). Arrows from the origin show w hat R is shorter.">
+            <defs>
+              <marker id="p12r-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p12r-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <line class="d-rule" x1="10" y1="196.8" x2="240" y2="196.8"/>
+            <line class="d-rule" x1="96.2" y1="8" x2="96.2" y2="284"/>
+            <circle cx="96.2" cy="196.8" r="68" style="fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6"/>
+            <line class="d-ln d-dash" x1="96.2" y1="196.8" x2="48.1" y2="244.9" style="stroke-width:1"/>
+            <text class="d-s" x="78" y="236" text-anchor="end">2</text>
+            <text class="d-al" x="238" y="190" text-anchor="end">w₁</text>
+            <text class="d-al" x="102" y="17">w₂</text>
+            <text class="d-al" x="101" y="210">0</text>
+            <text class="d-s" x="100" y="252" text-anchor="middle">‖w‖² ≤ θ = 4</text>
+            <ellipse class="d-ln d-dash" cx="126.1" cy="85.1" rx="41.6" ry="20.8" transform="rotate(45 126.1 85.1)"/>
+            <ellipse class="d-ln d-dash" cx="126.1" cy="85.1" rx="63.6" ry="31.8" transform="rotate(45 126.1 85.1)"/>
+            <ellipse class="d-ln-acc" cx="126.1" cy="85.1" rx="79.7" ry="39.9" transform="rotate(45 126.1 85.1)" style="stroke-width:2"/>
+            <line class="d-ln" x1="96.2" y1="196.8" x2="124.4" y2="91.4" marker-end="url(#p12r-ah)"/>
+            <line class="d-ln-acc" x1="96.2" y1="196.8" x2="126.2" y2="143.1" marker-end="url(#p12r-ah-acc)" style="stroke-width:2.2"/>
+            <circle class="pt-new" cx="126.1" cy="85.1" r="5"/>
+            <circle class="pt-tree" cx="129.4" cy="137.4" r="5.5"/>
+            <text class="d-t" x="133" y="79" style="paint-order: stroke; stroke: var(--surface); stroke-width: 3px">ŵ<tspan dy="4" style="font-size:9.5px">ML</tspan></text>
+            <text class="d-t" x="138" y="156" style="fill: var(--accent); paint-order: stroke; stroke: var(--surface); stroke-width: 3px">ŵ<tspan dy="4" style="font-size:9.5px">R</tspan></text>
+          </svg>
+          <div class="tbl-wrap">
+            <table class="mini">
+              <thead><tr><th>In this picture</th><th class="num">Value</th></tr></thead>
+              <tbody>
+                <tr><td>\(\hat{\mathbf{w}}_{\text{ML}}\)</td><td class="num">(0.88, 3.28)</td></tr>
+                <tr><td>its length</td><td class="num">3.40</td></tr>
+                <tr><td>constraint</td><td class="num">‖w‖² ≤ 4</td></tr>
+                <tr><td>\(\hat{\mathbf{w}}_{\text{R}}\), first contact</td><td class="num">(0.98, 1.75)</td></tr>
+                <tr><td>its length</td><td class="num">2.00</td></tr>
+                <tr><td>extra loss at \(\hat{\mathbf{w}}_{\text{R}}\)</td><td class="num">5.50</td></tr>
+                <tr><td>matching \(\lambda\) in (A)</td><td class="num">2.12</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <figcaption><b>Ridge is the first contact between the loss ellipses and the disc.</b> An illustrative loss \(f(\hat{\mathbf{w}}_{\text{ML}}) + (\mathbf{w}-\hat{\mathbf{w}}_{\text{ML}})^\top A(\mathbf{w}-\hat{\mathbf{w}}_{\text{ML}})\), with \(A = \begin{bmatrix}2.5 & 1.5\\ 1.5 & 2.5\end{bmatrix}\) standing in for \(XX^\top\), drawn to scale. The accent ellipse is the first to reach the disc. \(\hat{\mathbf{w}}_{\text{R}}\) is much shorter than \(\hat{\mathbf{w}}_{\text{ML}}\), yet neither of its coordinates is zero. (Length shrinks; single coordinates need not: here \(w_1\) even grows slightly.)</figcaption>
+      </figure>
+
+      <h3>What the picture says</h3>
+      <ul>
+        <li><b>Ridge pushes the weights towards zero.</b> It searches inside a disc, so \(\hat{\mathbf{w}}_{\text{R}}\) is a shorter vector than \(\hat{\mathbf{w}}_{\text{ML}}\).</li>
+        <li><b>It does not necessarily make any weight exactly zero.</b> The ellipse can touch the round boundary anywhere, and in a typical picture both coordinates of the contact point are nonzero.</li>
+      </ul>
+      <p>Why exact zeros matter <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=1540s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>25:40</a>: if a feature's weight is exactly 0, the feature is not useful and can be thrown away. If the weight is merely small, we are stuck deciding whether to keep it or not.</p>
+      <p>The motivating question for L39 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=rCfjaEYxaC8&amp;t=1570s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>26:10</a>: the regularizer decides the region in which we search for \(\mathbf{w}\). Can we change that region so that the growing ellipses are more likely to first touch it at a point where some coordinates are exactly zero?</p>
+    </section>
+
+    <!-- ============ LECTURE 39 ============ -->
+    <section id="lasso">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=36s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 0:36</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=80s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 1:20 the L1 norm</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=148s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 2:28 constrained form</a>
+        </div>
+        <h2>Swap the penalty: the L1 norm</h2>
+      </div>
+      <p>The goal is a <dfn>sparse</dfn> solution: one with many entries exactly zero. The proposal is to regularize with the L1 norm instead of the squared L2 norm. The L1 norm of a vector just adds up the absolute values of its components:</p>
+      <div class="eq">\[ \lVert\mathbf{w}\rVert_1 = \sum_{j=1}^{d} |w_j| \]</div>
+      <div class="eq">\[ \min_{\mathbf{w}\in\mathbb{R}^d} \sum_{i=1}^{n}\big(\mathbf{w}^\top\mathbf{x}_i - y_i\big)^2 + \lambda\lVert\mathbf{w}\rVert_1 \quad\Longleftrightarrow\quad \min_{\mathbf{w}\in\mathbb{R}^d} \sum_{i=1}^{n}\big(\mathbf{w}^\top\mathbf{x}_i - y_i\big)^2 \;\text{ subject to }\; \lVert\mathbf{w}\rVert_1 \le \theta \]</div>
+      <p>The same kind of equivalence holds: for a given \(\lambda\) there is a \(\theta\) for which the two problems agree. It is generally a different \(\theta\) from the ridge case; the lecture reuses the letter on purpose. What matters is that L1 regularization is also a constrained problem, now with a constraint on the L1 norm of \(\mathbf{w}\).</p>
+    </section>
+
+    <section id="diamond">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=212s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 3:32 the region</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=285s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 4:45 contours hit</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=347s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 5:47 a corner</a>
+        </div>
+        <h2>The diamond and its corners</h2>
+      </div>
+      <p>In two dimensions \(|w_1| + |w_2| \le \theta\) is a <dfn>diamond</dfn>: a square turned by 45°, with its four corners on the axes at \((\pm\theta, 0)\) and \((0, \pm\theta)\). It replaces the disc as the region where we search for \(\mathbf{w}\).</p>
+      <p>Keep \(\hat{\mathbf{w}}_{\text{ML}}\) and its ellipses, and grow them as before. The circle bulges outward between the axes, so an ellipse tends to meet it on the bulge; that point was \(\hat{\mathbf{w}}_{\text{R}}\). The diamond is flat there. The ellipse grows past where it would have met the circle and is more likely to first touch at a corner. Call the contact point \(\hat{\mathbf{w}}_{\text{L}}\), the L1-regularized solution.</p>
+      <p>At a corner, one weight is nonzero and the other is exactly 0: the solution uses only one feature. In two dimensions that is the only kind of sparsity available, since setting both weights to zero is meaningless. The only points of the diamond with a zero coordinate are its four corners.</p>
+
+      <figure id="geo-fig">
+        <div class="controls">
+          <label for="geo-s">Region size</label>
+          <input type="range" id="geo-s" min="0.3" max="4.8" step="0.05" value="2">
+          <output id="geo-s-out" for="geo-s">‖w‖₁ ≤ 2.00</output>
+          <button class="btn" id="geo-shape" type="button" aria-pressed="false">Show the L2 circle (ridge)</button>
+        </div>
+        <div class="controls">
+          <label for="geo-a">Direction of ŵ<sub>ML</sub></label>
+          <input type="range" id="geo-a" min="0" max="90" step="1" value="75">
+          <output id="geo-a-out" for="geo-a">75°</output>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Solution w</span><span class="v mine" id="geo-w">–</span></div>
+          <div><span class="k">Extra loss over the minimum</span><span class="v" id="geo-extra">–</span></div>
+          <div><span class="k">Matching λ</span><span class="v" id="geo-lam">–</span></div>
+        </div>
+        <div class="status" id="geo-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="geo-svg" viewBox="0 0 400 400" role="img" aria-label="Parameter plane with a diamond or disc constraint region around the origin, dashed loss ellipses around w hat ML, and the solid ellipse that first touches the region; the touching point is marked. With the diamond it is usually a corner on an axis."></svg></div>
+        <figcaption><b>Circle or diamond: where does the first contact happen?</b> Same illustrative loss as the ridge figure (\(A\) standing in for \(XX^\top\), \(\lVert\hat{\mathbf{w}}_{\text{ML}}\rVert = 3.4\)). Dashed curves are fixed loss contours; the solid one is the contour that first touches the region, and its extra loss is the readout. Shrink the region or turn \(\hat{\mathbf{w}}_{\text{ML}}\): the diamond often lands on a corner, where one weight is exactly 0, while the circle practically never does. "Matching λ" is the penalty in the unconstrained form that gives the same solution, so a smaller region means a larger \(\lambda\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="sparsity">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=413s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 6:53</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=443s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 7:23 an intuitive argument</a>
+        </div>
+        <h2>Is a corner guaranteed?</h2>
+      </div>
+      <p>No. In two dimensions, a different position of \(\hat{\mathbf{w}}_{\text{ML}}\) or differently shaped ellipses can make the first contact happen on a flat edge, with both weights nonzero. (In the widget above, turn \(\hat{\mathbf{w}}_{\text{ML}}\) towards 45° and the diamond solution leaves the corner.) What people typically observe in high dimensions is that an L1 regularizer is more likely to give sparse solutions than an L2 regularizer: the L2 region has a bulge, while the L1 region is flat, so the contours move past the bulge and hit a flat point where many components can be zero.</p>
+      <p>This is an intuitive argument, not a proof. When L1 regularization is guaranteed to give a sparse solution is proved in advanced courses; this course does not do it.</p>
+
+      <figure id="path-fig">
+        <div class="controls">
+          <label for="path-lam">Penalty λ (log scale)</label>
+          <input type="range" id="path-lam" min="-1" max="3.5" step="0.01" value="1.5">
+          <output id="path-lam-out" for="path-lam">λ = 31.6</output>
+          <button class="btn" id="path-sweep" type="button">Sweep λ from small to large</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">LASSO weights exactly 0</span><span class="v mine" id="path-lz">–</span></div>
+          <div><span class="k">Ridge weights exactly 0</span><span class="v" id="path-rz">–</span></div>
+          <div><span class="k">Smallest ridge |wⱼ|</span><span class="v" id="path-rmin">–</span></div>
+        </div>
+        <div class="status" id="path-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="path-svg" viewBox="0 0 640 320" role="img" aria-label="Bar chart of six weights. For each weight, a ridge bar and a LASSO bar, with a dashed mark at the least-squares value. As lambda grows the ridge bars shrink but stay nonzero, while LASSO bars drop to exactly zero one by one."></svg></div>
+        <figcaption><b>Six features, synthetic data</b> (40 points, generated for this page with a seeded random number generator). The label depends on features 1, 3 and 5; feature 4 is a noisy copy of feature 1, feature 6 a noisy copy of feature 3, and feature 2 is pure noise. Both methods minimize \(\sum_i(\mathbf{w}^\top\mathbf{x}_i - y_i)^2\) plus \(\lambda\) times their penalty. Ridge uses its closed form; LASSO has none (L40), so it is computed numerically by coordinate descent, a standard solver not covered in the lectures. As \(\lambda\) grows, LASSO drops the irrelevant features to exactly 0 and keeps 1, 3 and 5. Ridge shrinks everything and even spreads weight onto the copy, feature 4, as the worked check in L37 predicted.</figcaption>
+      </figure>
+    </section>
+
+    <section id="lasso-name">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=477s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 7:57</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=581s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L39 · 9:41 selection</a>
+        </div>
+        <h2>What LASSO stands for</h2>
+      </div>
+      <p>Linear regression with an L1 regularizer is called <dfn>LASSO</dfn>, an acronym for <b>L</b>east <b>A</b>bsolute <b>S</b>hrinkage and <b>S</b>election <b>O</b>perator. Each word describes something we have already seen.</p>
+      <ul class="kinds">
+        <li><b>Least:</b> we minimize a loss.</li>
+        <li><b>Absolute:</b> the penalty is the L1 norm, a sum of absolute values.</li>
+        <li><b>Shrinkage:</b> we only search among \(\mathbf{w}\)'s of smaller length, so \(\mathbf{w}\) is shrunk. Ridge is a shrinkage method too; anything that restricts the length of the parameter is. LASSO shrinks using absolute values.</li>
+        <li><b>Selection:</b> the aim is more than smaller weights. Pushing many components to exactly 0 leaves nonzero weights only on the features that matter for the loss, so those features are selected and the rest left out.</li>
+        <li><b>Operator:</b> a fancy word for the regularizer.</li>
+      </ul>
+      <p>LASSO is very popular for linear regression <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=f9KWAixPUCc&amp;t=616s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:16</a>, especially when there are a lot of features and we expect most of them to be useless or redundant: LASSO pushes their weights to exactly 0.</p>
+    </section>
+
+    <!-- ============ LECTURE 40 ============ -->
+    <section id="no-closed-form">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=0s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 0:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=62s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 1:02 no closed form</a>
+        </div>
+        <h2>If LASSO gives zeros, why ever use ridge?</h2>
+      </div>
+      <p>If LASSO pushes weights to exactly zero, why would anyone still use ridge? The first point the lecture makes: ridge has a closed-form solution and LASSO does not.</p>
+      <div class="eq">\[ \hat{\mathbf{w}}_{\text{R}} = \big(XX^\top + \lambda I\big)^{-1}X\mathbf{y} \qquad\text{versus}\qquad \hat{\mathbf{w}}_{\text{L}} = \;?\]</div>
+      <p>For LASSO we cannot take the gradient, set it to zero and solve, because the penalty \(|w_j|\) is not differentiable at \(w_j = 0\). The problem has to be solved some other way.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>Ridge</th><th>LASSO</th></tr></thead>
+          <tbody>
+            <tr><td>Penalty</td><td>\(\lambda\lVert\mathbf{w}\rVert^2 = \lambda\sum_j w_j^2\)</td><td>\(\lambda\lVert\mathbf{w}\rVert_1 = \lambda\sum_j |w_j|\)</td></tr>
+            <tr><td>Where it came from</td><td>MAP with prior \(\mathcal{N}(\mathbf{0}, \gamma^2 I)\), \(\lambda = 1/\gamma^2\) (L36)</td><td>Changing the search region to one with corners (L39)</td></tr>
+            <tr><td>Region in 2-D</td><td>Disc</td><td>Diamond</td></tr>
+            <tr><td>Exact zeros</td><td>Not necessarily; shrinks towards 0</td><td>Often; corners lie on the axes</td></tr>
+            <tr><td>Closed form</td><td>\((XX^\top + \lambda I)^{-1}X\mathbf{y}\)</td><td>None; not differentiable at 0</td></tr>
+            <tr><td>How to solve</td><td>Closed form; (stochastic) gradient descent for large \(n, d\)</td><td>Subgradient descent; special methods such as IRLS</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="subgradients">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=93s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 1:33</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=156s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 2:36 a kink</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=250s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 4:10 |x|</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=340s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 5:40 definition</a>
+        </div>
+        <h2>Subgradients</h2>
+      </div>
+      <p>Gradient methods follow the negative gradient direction (<a href="part-10.html">Part 10</a>). When a function is not differentiable everywhere, an iterative method still works if a <dfn>subgradient</dfn> exists at every point. Where the gradient exists, it is the subgradient. Where it does not, a subgradient is the slope of a line through the point that stays entirely below the function: the function is lower-bounded by it everywhere.</p>
+      <p>Take a piecewise linear function. At a point where two pieces meet, there is no gradient, but many lines through that point stay below the whole function; the slope of each one is a subgradient, so there are many. At a point in the middle of a piece, only one line works, the piece itself extended. When there is only one subgradient, it is the gradient. In one dimension, think of a subgradient as a slope.</p>
+      <p>This matters because the L1 penalty in one dimension is the absolute value \(|x|\): two linear pieces joined at 0, not differentiable there. Any line through the origin with slope between −1 and 1 stays below \(|x|\). So at 0 every value in \([-1, 1]\) is a subgradient of \(|x|\); slope −1 and slope 1 are the two pieces themselves.</p>
+      <div class="result">
+        <span class="lbl">Definition: subgradient</span>
+        <p>A vector \(\mathbf{g} \in \mathbb{R}^d\) is a subgradient of \(f : \mathbb{R}^d \to \mathbb{R}\) at the point \(\mathbf{x} \in \mathbb{R}^d\) if</p>
+        \[ f(\mathbf{z}) \;\ge\; f(\mathbf{x}) + \mathbf{g}^\top(\mathbf{z} - \mathbf{x}) \qquad\text{for every } \mathbf{z} \in \mathbb{R}^d \]
+        <p>The right-hand side is the linearization of \(f\) at \(\mathbf{x}\) built from \(\mathbf{g}\). The condition says the whole function lies on or above it.</p>
+      </div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 265" role="img" aria-label="Left: a convex piecewise linear function with a kink; several dashed lines through the kink stay below it, while at a smooth point only the tangent does. Middle: a line of slope g through the kink at x; at another point z the function value f of z lies above the line value f of x plus g times z minus x. Right: absolute value of x with dashed lines through the origin of slopes minus a half, zero and a half, all below it.">
+            <text class="d-h" x="20" y="22">Kink: many lines</text>
+            <line class="d-rule" x1="20" y1="215" x2="200" y2="215"/>
+            <line class="d-rule" x1="52.7" y1="45" x2="52.7" y2="215"/>
+            <path class="d-ln-acc d-dash" d="M36.4 144.8 L134.5 211.3"/>
+            <path class="d-ln-acc d-dash" d="M36.4 178 L134.5 178"/>
+            <path class="d-ln-acc d-dash" d="M36.4 194.7 L134.5 161.4"/>
+            <path class="d-ln d-dash" d="M131.3 203.9 L200 48.7"/>
+            <path class="d-ln" d="M20 104.1 L85.5 178 L161.8 134.9 L200 48.7" style="stroke-width:2.2"/>
+            <circle class="pt-new" cx="85.5" cy="178" r="4.5"/>
+            <circle class="pt-plain" cx="183.6" cy="85.7" r="4"/>
+            <text class="d-s" x="176" y="80" text-anchor="end">smooth: one line</text>
+            <text class="d-al" x="85.5" y="229" text-anchor="middle">x</text>
+            <text class="d-s" x="20" y="246">dashed blue: lines through the</text>
+            <text class="d-s" x="20" y="260">kink that stay below f</text>
+
+            <line class="d-rule" x1="225" y1="10" x2="225" y2="258"/>
+
+            <text class="d-h" x="250" y="22">The subgradient condition</text>
+            <line class="d-rule" x1="250" y1="215" x2="430" y2="215"/>
+            <line class="d-rule" x1="282.7" y1="45" x2="282.7" y2="215"/>
+            <path class="d-ln-acc" d="M250 200.2 L430 139.2"/>
+            <path class="d-ln" d="M250 104.1 L315.5 178 L391.8 134.9 L430 48.7" style="stroke-width:2.2"/>
+            <line class="d-ln" x1="266.4" y1="122.6" x2="266.4" y2="194.7" style="stroke-dasharray: 2 3"/>
+            <circle class="pt-plain" cx="266.4" cy="122.6" r="3.5"/>
+            <circle class="c-proxy" cx="266.4" cy="194.7" r="3.5" style="fill: var(--surface); stroke: var(--accent); stroke-width: 1.8"/>
+            <circle class="pt-new" cx="315.5" cy="178" r="4.5"/>
+            <text class="d-s" x="273" y="119">f(z)</text>
+            <text class="d-s" x="273" y="208" style="fill: var(--accent)">f(x) + g(z − x)</text>
+            <text class="d-al" x="266.4" y="229" text-anchor="middle">z</text>
+            <text class="d-al" x="315.5" y="229" text-anchor="middle">x</text>
+            <text class="d-s" x="250" y="246">blue line: slope g through (x, f(x));</text>
+            <text class="d-s" x="250" y="260">f is above it at every z</text>
+
+            <line class="d-rule" x1="455" y1="10" x2="455" y2="258"/>
+
+            <text class="d-h" x="480" y="22">|x| at 0</text>
+            <line class="d-rule" x1="480" y1="156.6" x2="660" y2="156.6"/>
+            <line class="d-rule" x1="570" y1="45" x2="570" y2="215"/>
+            <path class="d-ln-acc d-dash" d="M480 103.4 L660 209.7"/>
+            <path class="d-ln-acc d-dash" d="M480 156.6 L660 156.6"/>
+            <path class="d-ln-acc d-dash" d="M480 209.7 L660 103.4"/>
+            <path class="d-ln" d="M480 50.3 L570 156.6 L660 50.3" style="stroke-width:2.2"/>
+            <circle class="pt-new" cx="570" cy="156.6" r="4.5"/>
+            <text class="d-al" x="525" y="171" text-anchor="middle">−1</text>
+            <text class="d-al" x="615" y="171" text-anchor="middle">1</text>
+            <text class="d-s" x="658" y="42" text-anchor="end">slope 1</text>
+            <text class="d-s" x="482" y="42">slope −1</text>
+            <text class="d-s" x="480" y="246">dashed: slopes −½, 0, ½ at 0;</text>
+            <text class="d-s" x="480" y="260">any slope in [−1, 1] works</text>
+          </svg>
+        </div>
+        <figcaption><b>Subgradients are slopes of lines that stay below the function.</b> At a kink there are many (left), at a smooth point only the tangent. The middle panel is the definition with one subgradient \(g\) at the kink \(x\): at any other point \(z\) the function is at least the line's value. For \(|x|\) at 0 (right) the subgradients fill the interval \([-1, 1]\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="solving-lasso">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=470s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 7:50</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=532s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 8:52 LASSO is convex</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=563s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 9:23 IRLS</a>
+        </div>
+        <h2>Solving LASSO</h2>
+      </div>
+      <p>Why subgradients are useful: if the function to minimize is <b>convex</b>, <dfn>subgradient descent</dfn> can be used instead of gradient descent, and it also converges. The function does not need to be differentiable. Move along the negative of a subgradient instead of the negative gradient. Where several subgradients exist, it does not matter which one is picked; an arbitrary one will do.</p>
+      <ol class="algo">
+        <li class="algo-title">Subgradient descent</li>
+        <li>Start from some \(\mathbf{w}^{0}\).</li>
+        <li>At step \(t\), pick any subgradient \(\mathbf{g}^{t}\) of the objective at \(\mathbf{w}^{t}\) (the gradient, wherever it exists).</li>
+        <li>Update \(\mathbf{w}^{t+1} = \mathbf{w}^{t} - \eta_t\,\mathbf{g}^{t}\) with a step size \(\eta_t\). The lecture does not go into how to choose it.</li>
+        <li>Repeat. For a convex objective the iterates approach the minimum.</li>
+      </ol>
+      <p>The LASSO problem is convex: the squared loss is a convex quadratic, the L1 norm is a convex function, and a sum of convex functions is convex (convexity was introduced in <a href="part-09.html#convexity">Part 9</a>). So LASSO is a convex optimization problem, and subgradient descent can find its minimum.</p>
+      <p class="note">Standard, not stated in the lecture: one subgradient of the LASSO objective at \(\mathbf{w}\) is \(2X(X^\top\mathbf{w} - \mathbf{y}) + \lambda\mathbf{s}\), where \(s_j = \operatorname{sign}(w_j)\) when \(w_j \ne 0\) and \(s_j\) is any number in \([-1, 1]\) when \(w_j = 0\).</p>
+      <p>Subgradient descent is by no means the only way. LASSO has special structure, a squared loss plus an L1 penalty, and special-purpose methods exploit it. One example is <dfn>IRLS</dfn>, iteratively reweighted least squares. The idea is that we can solve least squares easily, in closed form, so IRLS uses least squares as a black box, repeatedly, to solve the LASSO problem. The course does not cover IRLS.</p>
+      <p class="rule-of-thumb">LASSO has no closed form. It gives sparse solutions, yet it needs an optimizer such as subgradient descent or a special method like IRLS. Ridge has a closed form; use it for small \(n\) and \(d\), and stochastic gradient descent when \(n\) or \(d\) is large.</p>
+      <p class="note">The interactive above solves LASSO by coordinate descent, another special-purpose method; it is used there only to draw the picture.</p>
+    </section>
+
+    <section id="regression-recap">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=718s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 11:58 summary</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=813s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 13:33 other regularizers</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=79eeNk7InHk&amp;t=905s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L40 · 15:05 next</a>
+        </div>
+        <h2>Regression, start to finish</h2>
+      </div>
+      <p>L40 closes the regression unit with a high-level summary.</p>
+      <ol>
+        <li><b>Least squares.</b> Minimize the squared loss; it has a closed-form solution and a geometric interpretation (<a href="part-10.html">Part 10</a>).</li>
+        <li><b>Computation.</b> Concerns about the cost of the closed form led to gradient descent and stochastic gradient descent (Part 10).</li>
+        <li><b>Probabilistic view.</b> With Gaussian noise, least squares is the maximum likelihood estimator (<a href="part-11.html">Part 11</a>).</li>
+        <li><b>Bayesian counterpart.</b> A zero-mean Gaussian prior on \(\mathbf{w}\) gives the L2-regularized version, ridge regression (L36, L37).</li>
+        <li><b>Geometry.</b> The L2 regularizer pushes weights close to zero but not exactly to zero. The geometry of the problem suggested an L1 regularizer instead: LASSO, squared loss plus an L1 penalty (L38, L39).</li>
+        <li><b>Solving LASSO.</b> Subgradients and subgradient descent, or special techniques such as IRLS (L40).</li>
+      </ol>
+      <p>People use many other regularizers. The <dfn>elastic net</dfn> penalty mixes the LASSO and ridge penalties (in its usual form, \(\lambda_1\lVert\mathbf{w}\rVert_1 + \lambda_2\lVert\mathbf{w}\rVert^2\)). There is a whole cottage industry of regularizers for solutions with a particular structure. One example is group structure: features are collected from many sources, and you know some of them should be selected together or not at all. Such domain-specific constraints can be turned into regularizers, and the problem solved in regularized form.</p>
+      <p class="rule-of-thumb">Ridge and LASSO are the basic, most commonly used regularizers. If your domain knowledge says something about the structure of the solution you expect, consider turning it into a more meaningful regularizer of your own.</p>
+      <p>This completes regression. The course now turns to supervised learning from the classification point of view, starting in <a href="part-13.html">Part 13</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Conjugate prior</dt><dd>A prior that, multiplied by a given likelihood, gives a posterior of the same form: beta for Bernoulli, Gaussian for Gaussian.</dd></div>
+        <div><dt>Gaussian prior \(\mathcal{N}(\mathbf{0}, \gamma^2 I)\)</dt><dd>Each weight independent with mean 0 and variance \(\gamma^2\); prefers short \(\mathbf{w}\).</dd></div>
+        <div><dt>MAP estimate</dt><dd>The \(\mathbf{w}\) that maximizes the posterior. Here \((XX^\top + \tfrac{1}{\gamma^2}I)^{-1}X\mathbf{y}\).</dd></div>
+        <div><dt>Ridge regression</dt><dd>Squared loss plus \(\lambda\lVert\mathbf{w}\rVert^2\); solution \((XX^\top + \lambda I)^{-1}X\mathbf{y}\).</dd></div>
+        <div><dt>Regularizer</dt><dd>A penalty added to the loss that makes some kinds of \(\mathbf{w}\) preferable to others.</dd></div>
+        <div><dt>Hyperparameter \(\lambda\)</dt><dd>The strength of the penalty, playing the role of \(1/\gamma^2\); chosen by cross-validation.</dd></div>
+        <div><dt>Constrained form</dt><dd>Minimize the loss subject to \(\lVert\mathbf{w}\rVert^2 \le \theta\) (or \(\lVert\mathbf{w}\rVert_1 \le \theta\)); same solution as the penalty form for a matching \(\theta\).</dd></div>
+        <div><dt>Loss contour</dt><dd>The set of \(\mathbf{w}\) with loss \(f(\hat{\mathbf{w}}_{\text{ML}}) + c\): the ellipse \((\mathbf{w}-\hat{\mathbf{w}}_{\text{ML}})^\top XX^\top(\mathbf{w}-\hat{\mathbf{w}}_{\text{ML}}) = c\).</dd></div>
+        <div><dt>L1 norm</dt><dd>\(\lVert\mathbf{w}\rVert_1 = \sum_j|w_j|\). Its region in 2-D is a diamond with corners on the axes.</dd></div>
+        <div><dt>Sparse solution</dt><dd>A weight vector with many entries exactly 0, so those features can be dropped.</dd></div>
+        <div><dt>LASSO</dt><dd>Least Absolute Shrinkage and Selection Operator: squared loss plus \(\lambda\lVert\mathbf{w}\rVert_1\).</dd></div>
+        <div><dt>Subgradient</dt><dd>A \(\mathbf{g}\) with \(f(\mathbf{z}) \ge f(\mathbf{x}) + \mathbf{g}^\top(\mathbf{z}-\mathbf{x})\) for all \(\mathbf{z}\); the gradient where \(f\) is differentiable.</dd></div>
+        <div><dt>Subgradient descent</dt><dd>Step along the negative of any subgradient. Converges for convex functions, so it can solve LASSO.</dd></div>
+        <div><dt>Elastic net</dt><dd>A regularizer that mixes the LASSO and ridge penalties.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>With noise variance 1 and prior \(\mathbf{w} \sim \mathcal{N}(\mathbf{0}, \gamma^2 I)\), which ridge \(\lambda\) does the MAP estimate correspond to? What happens as \(\gamma^2 \to \infty\)?</span><span class="tog"></span></summary>
+          <p>\(\lambda = 1/\gamma^2\). As \(\gamma^2 \to \infty\) the prior becomes flat, \(\lambda \to 0\), and \(\hat{\mathbf{w}}_{\text{MAP}} \to (XX^\top)^{-1}X\mathbf{y} = \hat{\mathbf{w}}_{\text{ML}}\).</p></details>
+        <details><summary><span class="q">Q2</span><span>One feature, two points: \(x = (1, 2)\), \(y = (2, 3)\). Find \(\hat w_{\text{ML}}\) and the ridge solution for \(\lambda = 1\) and \(\lambda = 3\).</span><span class="tog"></span></summary>
+          <p>\(XX^\top = 1 + 4 = 5\) and \(X\mathbf{y} = 2 + 6 = 8\). So \(\hat w_{\text{ML}} = 8/5 = 1.6\), \(\hat w_{\text{R}} = 8/6 \approx 1.33\) for \(\lambda = 1\), and \(8/8 = 1\) for \(\lambda = 3\). Larger \(\lambda\) shrinks the weight towards 0, but no finite \(\lambda\) makes it exactly 0.</p></details>
+        <details><summary><span class="q">Q3</span><span>You strongly believe most of your 10,000 features are redundant. Should the prior variance \(\gamma^2\) be small or large, and what does that do to \(\lambda\)?</span><span class="tog"></span></summary>
+          <p>Small \(\gamma^2\): the prior packs its mass near zero. Then \(\lambda = 1/\gamma^2\) is large, and any \(\mathbf{w}\) with a large length pays a heavy penalty.</p></details>
+        <details><summary><span class="q">Q4</span><span>In the height and weight example, compute \(\lVert\mathbf{w}\rVert^2\) for \((1, 1, 1)\) and \((3, 4, 0)\). Which one does the ridge penalty prefer, and what does that tell you?</span><span class="tog"></span></summary>
+          <p>3 and 25. Both fit equally well, and ridge prefers \((1, 1, 1)\), which uses the redundant feature. The squared-length penalty spreads weight around instead of zeroing features out. That is the motivation for LASSO.</p></details>
+        <details><summary><span class="q">Q5</span><span>Suppose \(XX^\top = \begin{bmatrix}4 & 0\\ 0 & 1\end{bmatrix}\) and \(\hat{\mathbf{w}}_{\text{ML}} = (1, 1)\). Describe the set of \(\mathbf{w}\) whose loss is 4 more than the minimum.</span><span class="tog"></span></summary>
+          <p>\(4(w_1 - 1)^2 + (w_2 - 1)^2 = 4\): an ellipse centred at \((1, 1)\) with semi-axis 1 along \(w_1\) and 2 along \(w_2\).</p></details>
+        <details><summary><span class="q">Q6</span><span>In two dimensions, why does the L1 constraint make zero weights more likely than the L2 constraint? Is it guaranteed?</span><span class="tog"></span></summary>
+          <p>The L1 region is a diamond whose corners lie on the axes, and a growing ellipse tends to reach a corner first; the L2 disc bulges between the axes, so contact usually happens at a point with both coordinates nonzero. It is not guaranteed: depending on \(\hat{\mathbf{w}}_{\text{ML}}\) and the ellipse shape, the contact can be on a flat edge. In high dimensions L1 is observed to give sparser solutions.</p></details>
+        <details><summary><span class="q">Q7</span><span>What are the subgradients of \(f(x) = |x|\) at \(x = 0\) and at \(x = -2\)? Check directly that \(g = 0.5\) is a subgradient at 0.</span><span class="tog"></span></summary>
+          <p>At 0: every \(g \in [-1, 1]\). At \(-2\) the function is differentiable, so the only subgradient is the slope \(-1\). For \(g = 0.5\) at 0 we need \(|z| \ge 0 + 0.5(z - 0)\) for all \(z\), which holds since \(|z| \ge z \ge 0.5z\) for \(z \ge 0\) and \(|z| \ge 0 \ge 0.5z\) for \(z &lt; 0\).</p></details>
+        <details><summary><span class="q">Q8</span><span>Give the lecture's main reason for still using ridge, and say how LASSO is solved instead.</span><span class="tog"></span></summary>
+          <p>Ridge has the closed form \((XX^\top + \lambda I)^{-1}X\mathbf{y}\). LASSO's penalty is not differentiable at 0, so there is no closed form. Since its objective is convex, subgradient descent converges to the minimum; special methods such as IRLS also work.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-11.html"><span class="dir">← Part 11</span><span class="nm">Kernel and probabilistic regression</span></a><a class="next" href="index.html"><span class="dir">Part 13 · coming</span><span class="nm">Classification: k-NN and decision trees</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set, ms) => { const t0 = performance.now(), dur = reduce ? 0 : (ms || 420); const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+  const subLabel = (el, main, sub) => { el.textContent = ''; mk('tspan', {}, el).textContent = main; mk('tspan', { dy: 4, style: 'font-size: 9.5px' }, el).textContent = sub; };
+
+  /* ---------- Constraint region (circle or diamond) meets the loss ellipses ---------- */
+  (() => {
+    const svg = document.getElementById('geo-svg'); if (!svg) return;
+    const A = [[2.5, 1.5], [1.5, 2.5]], RHO = 3.4, r2 = Math.SQRT1_2;
+    const lo = -2.5, hi = 5, P = 24, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    axes(svg, sx, sy, lo, hi, 1);
+    mk('text', { x: sx(hi) - 2, y: sy(0) - 6, 'text-anchor': 'end', class: 'c-note' }, svg).textContent = 'w₁';
+    mk('text', { x: sx(0) + 6, y: sy(hi) + 12, class: 'c-note' }, svg).textContent = 'w₂';
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'geo-clip' }, defs); mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P }, cp);
+    const g = mk('g', { 'clip-path': 'url(#geo-clip)' }, svg);
+    const regionStyle = 'fill: var(--accent-soft); fill-opacity: .75; stroke: var(--accent); stroke-width: 1.6';
+    const disc = mk('circle', { cx: sx(0), cy: sy(0), style: regionStyle }, g);
+    const dia = mk('polygon', { style: regionStyle }, g);
+    const levels = [1, 4, 9, 16];
+    const refs = levels.map(() => mk('path', { style: 'fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4' }, g));
+    const hit = mk('path', { style: 'fill: none; stroke: var(--accent); stroke-width: 2.2' }, g);
+    const mlDot = mk('circle', { r: 6, class: 'c-pt-hi' }, svg);
+    const mlLbl = mk('text', { class: 'c-note', style: 'paint-order: stroke; stroke: var(--surface); stroke-width: 3px' }, svg);
+    const solDot = mk('circle', { r: 6, style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 2' }, svg);
+    const solLbl = mk('text', { class: 'c-lbl', style: 'paint-order: stroke; stroke: var(--surface); stroke-width: 3px' }, svg);
+    subLabel(mlLbl, 'ŵ', 'ML');
+    const quad = d => A[0][0] * d[0] * d[0] + 2 * A[0][1] * d[0] * d[1] + A[1][1] * d[1] * d[1];
+    const Av = d => [A[0][0] * d[0] + A[0][1] * d[1], A[1][0] * d[0] + A[1][1] * d[1]];
+    /* Level set (w - wh)^T A (w - wh) = c. A has eigenvalue 4 along (1, 1) and 1 along (1, -1). */
+    const ell = (c, wh) => { let d = ''; const a = Math.sqrt(c) / 2, b = Math.sqrt(c); for (let k = 0; k <= 96; k++) { const t = k / 96 * 2 * Math.PI, u = a * Math.cos(t), v = b * Math.sin(t); d += (k ? 'L' : 'M') + sx(wh[0] + (u + v) * r2).toFixed(1) + ' ' + sy(wh[1] + (u - v) * r2).toFixed(1); } return d + 'Z'; };
+    const solveCircle = (wh, s) => {
+      if (Math.hypot(wh[0], wh[1]) <= s) return { w: wh.slice(), lam: 0, bind: false };
+      const at = lam => { const a = A[0][0] + lam, b = A[0][1], d = A[1][1] + lam, det = a * d - b * b, r = Av(wh); return [(d * r[0] - b * r[1]) / det, (a * r[1] - b * r[0]) / det]; };
+      let lamLo = 0, lamHi = 1; while (Math.hypot(...at(lamHi)) > s) lamHi *= 2;
+      for (let k = 0; k < 80; k++) { const m = (lamLo + lamHi) / 2; if (Math.hypot(...at(m)) > s) lamLo = m; else lamHi = m; }
+      const lam = (lamLo + lamHi) / 2; return { w: at(lam), lam, bind: true };
+    };
+    const solveDiamond = (wh, s) => {
+      if (Math.abs(wh[0]) + Math.abs(wh[1]) <= s) return { w: wh.slice(), lam: 0, bind: false };
+      const C = [[s, 0], [0, s], [-s, 0], [0, -s]]; let best = Infinity, bw = null;
+      for (let i = 0; i < 4; i++) {
+        const p = C[i], q = C[(i + 1) % 4], D = [q[0] - p[0], q[1] - p[1]], E = [p[0] - wh[0], p[1] - wh[1]], AD = Av(D);
+        let t = -(AD[0] * E[0] + AD[1] * E[1]) / (AD[0] * D[0] + AD[1] * D[1]); t = Math.max(0, Math.min(1, t));
+        const w = t === 0 ? p.slice() : t === 1 ? q.slice() : [p[0] + t * D[0], p[1] + t * D[1]];
+        const v = quad([w[0] - wh[0], w[1] - wh[1]]); if (v < best - 1e-12) { best = v; bw = w; }
+      }
+      const gr = Av([wh[0] - bw[0], wh[1] - bw[1]]), j = Math.abs(bw[0]) >= Math.abs(bw[1]) ? 0 : 1;
+      return { w: bw, lam: 2 * gr[j] * Math.sign(bw[j]), bind: true };
+    };
+    const sIn = document.getElementById('geo-s'), aIn = document.getElementById('geo-a'), btn = document.getElementById('geo-shape');
+    const sOut = document.getElementById('geo-s-out'), aOut = document.getElementById('geo-a-out');
+    const wOut = document.getElementById('geo-w'), eOut = document.getElementById('geo-extra'), lOut = document.getElementById('geo-lam'), status = document.getElementById('geo-status');
+    const fmt = v => (v === 0 ? '0' : v.toFixed(2));
+    let l1 = true;
+    const draw = () => {
+      const s = parseFloat(sIn.value), al = parseFloat(aIn.value) * Math.PI / 180, wh = [RHO * Math.cos(al), RHO * Math.sin(al)];
+      disc.setAttribute('r', (s * S).toFixed(1)); disc.setAttribute('display', l1 ? 'none' : 'inline');
+      dia.setAttribute('points', [[s, 0], [0, s], [-s, 0], [0, -s]].map(p => sx(p[0]).toFixed(1) + ',' + sy(p[1]).toFixed(1)).join(' ')); dia.setAttribute('display', l1 ? 'inline' : 'none');
+      levels.forEach((c, i) => refs[i].setAttribute('d', ell(c, wh)));
+      const sol = l1 ? solveDiamond(wh, s) : solveCircle(wh, s), w = sol.w, extra = quad([w[0] - wh[0], w[1] - wh[1]]);
+      hit.setAttribute('d', sol.bind ? ell(extra, wh) : '');
+      mlDot.setAttribute('cx', sx(wh[0])); mlDot.setAttribute('cy', sy(wh[1]));
+      mlLbl.setAttribute('x', sx(wh[0]) + 9); mlLbl.setAttribute('y', sy(wh[1]) - 9);
+      solDot.setAttribute('display', sol.bind ? 'inline' : 'none'); solLbl.setAttribute('display', sol.bind ? 'inline' : 'none');
+      solDot.setAttribute('cx', sx(w[0])); solDot.setAttribute('cy', sy(w[1]));
+      solLbl.setAttribute('x', sx(w[0]) + 10); solLbl.setAttribute('y', sy(w[1]) + 18); subLabel(solLbl, 'ŵ', l1 ? 'L' : 'R');
+      sOut.textContent = l1 ? `‖w‖₁ ≤ ${s.toFixed(2)}` : `‖w‖² ≤ ${(s * s).toFixed(2)}`;
+      aOut.textContent = Math.round(parseFloat(aIn.value)) + '°';
+      wOut.textContent = `(${fmt(w[0])}, ${fmt(w[1])})`;
+      eOut.textContent = extra.toFixed(2); lOut.textContent = sol.lam.toFixed(2);
+      const zero = w.findIndex(v => v === 0);
+      if (!sol.bind) status.textContent = 'The least-squares solution already lies inside the region, so the constraint does not bind: the answer is ŵ itself (λ = 0).';
+      else if (l1 && zero >= 0) status.textContent = `First contact at a corner of the diamond: w${zero === 0 ? '₁' : '₂'} is exactly 0, so only feature ${zero === 0 ? 2 : 1} is used.`;
+      else if (l1) status.textContent = 'First contact on a flat edge: both weights are nonzero. A corner is likely, not guaranteed.';
+      else status.textContent = 'First contact on the circle: the solution is shorter than ŵ, but neither weight is exactly 0.';
+    };
+    draw();
+    sIn.addEventListener('input', draw); aIn.addEventListener('input', draw);
+    btn.addEventListener('click', () => { l1 = !l1; btn.setAttribute('aria-pressed', String(!l1)); btn.textContent = l1 ? 'Show the L2 circle (ridge)' : 'Show the L1 diamond (LASSO)'; draw(); });
+  })();
+
+  /* ---------- Ridge vs LASSO weights on seeded synthetic data ---------- */
+  (() => {
+    const svg = document.getElementById('path-svg'); if (!svg) return;
+    let seed = 77;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const n = 40, d = 6, wTrue = [2.5, 0, -1.5, 0, 1, 0];
+    const rows = [], y = [];
+    for (let i = 0; i < n; i++) { const f = []; for (let j = 0; j < d; j++) f.push(normal()); f[3] = 0.85 * f[0] + 0.5 * f[3]; f[5] = 0.8 * f[2] + 0.6 * f[5]; rows.push(f); y.push(f.reduce((s, v, j) => s + v * wTrue[j], 0) + 0.8 * normal()); }
+    /* G = X X^T and b = X y in the lecture's notation (points as columns of X). */
+    const G = [...Array(d)].map((_, a) => [...Array(d)].map((_, c) => rows.reduce((s, f) => s + f[a] * f[c], 0)));
+    const b = [...Array(d)].map((_, a) => rows.reduce((s, f, i) => s + f[a] * y[i], 0));
+    const solve = (M, r) => { const m = M.map((row, i) => [...row, r[i]]); for (let c = 0; c < d; c++) { let p = c; for (let k = c + 1; k < d; k++) if (Math.abs(m[k][c]) > Math.abs(m[p][c])) p = k; [m[c], m[p]] = [m[p], m[c]]; for (let k = c + 1; k < d; k++) { const fct = m[k][c] / m[c][c]; for (let j = c; j <= d; j++) m[k][j] -= fct * m[c][j]; } } const x = Array(d).fill(0); for (let c = d - 1; c >= 0; c--) { let s = m[c][d]; for (let j = c + 1; j < d; j++) s -= m[c][j] * x[j]; x[c] = s / m[c][c]; } return x; };
+    const ridge = lam => solve(G.map((row, i) => row.map((v, j) => v + (i === j ? lam : 0))), b);
+    let warm = Array(d).fill(0);
+    const lasso = lam => { const w = warm.slice(); for (let it = 0; it < 5000; it++) { let mx = 0; for (let j = 0; j < d; j++) { let rho = b[j]; for (let k = 0; k < d; k++) if (k !== j) rho -= G[j][k] * w[k]; const t = lam / 2, nw = rho > t ? (rho - t) / G[j][j] : rho < -t ? (rho + t) / G[j][j] : 0; mx = Math.max(mx, Math.abs(nw - w[j])); w[j] = nw; } if (mx < 1e-12) break; } warm = w; return w; };
+    const wml = ridge(0);
+    const L = 56, Rt = 624, top = 40, bot = 270, lo = -2, hi = 3, gw = (Rt - L) / d;
+    const sy = v => bot - (v - lo) / (hi - lo) * (bot - top);
+    const grid = mk('g', { class: 'c-grid' }, svg);
+    for (let v = lo; v <= hi; v++) { mk('line', { x1: L, x2: Rt, y1: sy(v), y2: sy(v) }, grid); mk('text', { x: L - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v; }
+    mk('line', { x1: L, x2: Rt, y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('rect', { x: L, y: 12, width: 11, height: 11, style: 'fill: var(--ink-2)' }, svg); mk('text', { x: L + 16, y: 22, class: 'c-note' }, svg).textContent = 'Ridge';
+    mk('rect', { x: L + 74, y: 12, width: 11, height: 11, style: 'fill: var(--accent)' }, svg); mk('text', { x: L + 90, y: 22, class: 'c-note' }, svg).textContent = 'LASSO';
+    mk('line', { x1: L + 152, x2: L + 172, y1: 17.5, y2: 17.5, style: 'stroke: var(--muted); stroke-width: 1.6; stroke-dasharray: 4 3' }, svg); mk('text', { x: L + 178, y: 22, class: 'c-note' }, svg).textContent = 'least squares (λ = 0)';
+    const sub = ['₁', '₂', '₃', '₄', '₅', '₆'];
+    const bars = wTrue.map((wt, j) => {
+      const gx = L + j * gw;
+      mk('line', { x1: gx + 10, x2: gx + gw - 10, y1: sy(wml[j]), y2: sy(wml[j]), style: 'stroke: var(--muted); stroke-width: 1.6; stroke-dasharray: 4 3' }, svg);
+      const rb = mk('rect', { x: gx + 17, width: 26, style: 'fill: var(--ink-2)' }, svg);
+      const lb = mk('rect', { x: gx + 51, width: 26, style: 'fill: var(--accent)' }, svg);
+      const z = mk('circle', { cx: gx + 64, cy: sy(0), r: 4.5, class: 'c-proxy' }, svg);
+      const zt = mk('text', { x: gx + 64, y: sy(0) - 9, 'text-anchor': 'middle', class: 'c-lbl' }, svg); zt.textContent = '0';
+      mk('text', { x: gx + gw / 2, y: 292, 'text-anchor': 'middle', class: 'c-note' }, svg).textContent = 'w' + sub[j];
+      mk('text', { x: gx + gw / 2, y: 308, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = j === 3 ? '≈ copy of 1' : j === 5 ? '≈ copy of 3' : 'true ' + String(wt).replace('-', '−');
+      return { rb, lb, z, zt };
+    });
+    const setBar = (r, v) => { const y0 = sy(0), y1 = sy(v); r.setAttribute('y', Math.min(y0, y1).toFixed(1)); r.setAttribute('height', Math.abs(y1 - y0).toFixed(1)); };
+    const slider = document.getElementById('path-lam'), out = document.getElementById('path-lam-out');
+    const lz = document.getElementById('path-lz'), rz = document.getElementById('path-rz'), rmin = document.getElementById('path-rmin'), status = document.getElementById('path-status');
+    const fmtLam = v => v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : v.toFixed(0);
+    const draw = () => {
+      const lam = Math.pow(10, parseFloat(slider.value)), wr = ridge(lam), wl = lasso(lam);
+      bars.forEach((bb, j) => { setBar(bb.rb, wr[j]); setBar(bb.lb, wl[j]); const z = wl[j] === 0; bb.z.setAttribute('display', z ? 'inline' : 'none'); bb.zt.setAttribute('display', z ? 'inline' : 'none'); });
+      const kz = wl.filter(v => v === 0).length, mn = Math.min(...wr.map(Math.abs));
+      out.textContent = 'λ = ' + fmtLam(lam);
+      lz.textContent = kz + ' of 6'; rz.textContent = wr.filter(v => v === 0).length + ' of 6';
+      rmin.textContent = mn >= 0.001 ? mn.toFixed(3) : mn.toExponential(1);
+      const kept = wl.map((v, j) => (v === 0 ? '' : 'w' + sub[j])).filter(Boolean);
+      status.textContent = kz === 0 ? 'Small λ: both fits sit near least squares, and no weight is exactly zero.'
+        : kz < 6 ? `LASSO keeps ${kept.join(', ')} and sets ${kz} weight${kz > 1 ? 's' : ''} exactly to 0. Every ridge weight is still nonzero.`
+        : 'λ is large enough that LASSO sets every weight to 0. The ridge weights are tiny but still not zero.';
+    };
+    draw();
+    slider.addEventListener('input', draw);
+    document.getElementById('path-sweep').addEventListener('click', () => { warm = Array(d).fill(0); tween(parseFloat(slider.min), parseFloat(slider.max), v => { slider.value = v.toFixed(2); draw(); }, 3200); });
+  })();
+})();
+</script>
+</body>
+</html>
