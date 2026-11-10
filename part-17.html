@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 17 · Ensembles: bagging and boosting · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 17: lectures 66–68 on overfitting, underfitting, the bias–variance trade-off, bagging, random forests and AdaBoost.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 17 of 18</span></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Ensembles: bagging, random forests and boosting</h1>
+    <p class="lede">Notes for lectures 66 to 68. Overfitting, underfitting and the bias–variance trade-off motivate combining many weak learners, and the lectures build two ways to do it: bagging and random forests average overfit trees grown on bootstrap samples to cut variance, while AdaBoost reweights the data so that each new decision stump concentrates on the points the earlier ones got wrong.</p>
+    <div class="meta">
+      <span><b>Part 17</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>84 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L66 · 19:41</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L67 · 31:34</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L68 · 32:45</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 66</h4>
+      <ul>
+        <li><a href="#ensembles">Weak and strong learners</a></li>
+        <li><a href="#fitting">Overfitting and underfitting</a></li>
+        <li><a href="#bias-variance">Bias and variance</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 67</h4>
+      <ul>
+        <li><a href="#averaging">Why averaging helps</a></li>
+        <li><a href="#many-datasets">Bagging, ideally</a></li>
+        <li><a href="#bootstrap">Bootstrapping</a></li>
+        <li><a href="#bag-coverage">What a bag contains</a></li>
+        <li><a href="#random-forest">Random forests</a></li>
+        <li><a href="#two-steps">Two open choices</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 68</h4>
+      <ul>
+        <li><a href="#boosting">Boosting and stumps</a></li>
+        <li><a href="#adaboost">The AdaBoost algorithm</a></li>
+        <li><a href="#alpha">Choosing αₜ</a></li>
+        <li><a href="#training-error">Training error goes to 0</a></li>
+        <li><a href="#test-error">Test error after that</a></li>
+        <li><a href="#in-practice">Bagging vs boosting</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>An <dfn>ensemble</dfn> (meta-classifier) combines many runs of a <b>weak learner</b>, one that is only somewhat better than random, into a <b>strong learner</b>.</li>
+        <li><b>Overfitting</b> mistakes noise for structure and gives <b>high variance</b>: redraw the data and the predictions jump. <b>Underfitting</b> mistakes structure for noise and gives <b>high bias</b>. Raising model complexity lowers bias and raises variance.</li>
+        <li><b>Bagging</b> = bootstrap (draw \(n\) points with replacement, \(M\) times) + aggregation (\(h^*(\mathbf{x}) = \operatorname{sign}\big(\tfrac1M\sum_i h_i(\mathbf{x})\big)\), a majority vote). A bag holds about 63% of the distinct points. Averaging overfit trees cuts variance and leaves bias roughly unchanged.</li>
+        <li><b>Random forests</b> bag full-depth trees and also sample about \(\sqrt d\) features at every split, which decorrelates the trees.</li>
+        <li><b>AdaBoost</b> keeps weights \(D_t\) on the points. Each round it trains a stump on \(D_t\), multiplies the weights of its mistakes by \(e^{\alpha_t}\) and the rest by \(e^{-\alpha_t}\), renormalizes, and finally outputs \(\operatorname{sign}\big(\sum_t \alpha_t h_t(\mathbf{x})\big)\) with \(\alpha_t = \tfrac12\ln\frac{1-\varepsilon_t}{\varepsilon_t}\).</li>
+        <li>AdaBoost's training error reaches zero after a number of rounds that grows like \(\log n\) and shrinks as the weak learner improves, and test error often keeps falling after that. Bagging trains in parallel; boosting is serial.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 66 ============ -->
+    <section id="ensembles">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L66 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=126s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L66 · 2:06 meta-classifiers</a>
+        </div>
+        <h2>From single classifiers to ensembles</h2>
+      </div>
+      <p>The supervised algorithms so far come in two families. <b>Generative</b> models assume a form for \(P(\mathbf{x}, y)\) and estimate its parameters: naive Bayes and Gaussian naive Bayes, also called Gaussian discriminant analysis (<a href="part-14.html">Part 14</a>). <b>Discriminative</b> models go straight for the decision: k-nearest neighbours and decision trees (<a href="part-13.html">Part 13</a>), the perceptron and logistic regression (<a href="part-15.html">Part 15</a>) and support vector machines (<a href="part-16.html">Part 16</a>). <a href="part-18.html">Part 18</a> places many of these in one loss-plus-regularization framework.</p>
+      <p>This part is about <dfn>meta-classifiers</dfn>, also called <dfn>ensemble classifiers</dfn>. A meta-classifier sits on top of an existing learning algorithm. It runs that algorithm many times and combines the resulting classifiers into a single, better one.</p>
+
+      <h3>Weak and strong learners <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=190s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L66 · 3:10</a></h3>
+      <p>The course keeps the definition informal. A <dfn>weak learner</dfn> is a classification algorithm that does better than random on test data, perhaps only a little better. For binary labels, tossing a fair coin is the random baseline and has a 50% error rate. A weak learner might reach 55% or 60% accuracy.</p>
+      <p>The goal of an ensemble is to convert a weak learner into a <dfn>strong learner</dfn>. Why start from weak learners instead of building a good learner directly? The lecture gives two kinds of weak learner, and each leads to one of the two methods in this part:</p>
+      <ul>
+        <li>learners that are weak because they <b>overfit</b>, handled by <b>bagging</b> (L67);</li>
+        <li>learners that are weak because they <b>underfit</b>, handled by <b>boosting</b> (L68).</li>
+      </ul>
+    </section>
+
+    <section id="fitting">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=280s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L66 · 4:40</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=405s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L66 · 6:45 regression example</a>
+        </div>
+        <h2>Overfitting and underfitting</h2>
+      </div>
+      <p>Labels come from <b>structure plus noise</b>. The true relationship between input and output has some structure (linear, tree-shaped, a sine curve), and the observed labels carry random noise on top of it. A learner has to recover the structure from noisy data, and it can go wrong in two opposite directions.</p>
+      <ul class="kinds">
+        <li><b>Overfitting:</b> the learner treats noise as if it were structure. The lecture's example is a decision tree split again and again until every leaf is pure and the training error is 0 (<a href="part-13.html">Part 13</a> warned against this). The last splits only follow the noise.</li>
+        <li><b>Underfitting:</b> the learner treats structure as if it were noise. It is too conservative and misses part of the real relationship.</li>
+      </ul>
+
+      <h3>A regression example</h3>
+      <p>Regression makes the picture easy to see, and the same ideas apply to classification. Let the true structure linking \(x\) to \(y\) be a sine curve, and let the data points scatter around it because of noise. We never see the true curve; as designers we only choose which family of models to search.</p>
+      <ul>
+        <li><b>A straight line underfits</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=499s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:19</a>. The best line treats the rise and fall of the sine as noise, although they are real structure. Its training error is not zero. The classification version is a linear classifier used when the label really depends on a quadratic or cubic function of the input.</li>
+        <li><b>A high-degree polynomial overfits</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=621s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:21</a>. The lecture draws a degree-8 polynomial that passes through every training point, so its training error is 0. It treats the noise as structure.</li>
+      </ul>
+      <p>Neither does well at a new test point <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=652s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:52</a>. Both predictions miss the true value, for opposite reasons.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 316" role="img" aria-label="Two panels with the same nine noisy points scattered around a dashed sine curve. Left: the best straight line misses the peak and predicts 0.62 at the test x where the truth is 1. Right: a degree-8 polynomial passes through every point and predicts 1.41 at the test x.">
+            <defs><clipPath id="p17-clip-b"><rect x="380" y="44" width="280" height="200"/></clipPath></defs>
+            <text class="d-h" x="40" y="18">Underfit: the best straight line</text>
+            <text class="d-s" x="40" y="34">mean squared training error 0.28</text>
+            <text class="d-h" x="380" y="18">Overfit: a degree-8 polynomial</text>
+            <text class="d-s" x="380" y="34">training error 0: it passes through all 9 points</text>
+            <rect class="d-plot" x="40" y="44" width="280" height="200"/>
+            <line class="d-rule" x1="40" y1="144" x2="320" y2="144"/>
+            <line class="d-rule" x1="110" y1="44" x2="110" y2="244" style="stroke-dasharray: 2 3"/>
+            <path class="d-ln d-dash" d="M40 144 L44.7 138.2 L49.3 132.4 L54 126.8 L58.7 121.4 L63.3 116.2 L68 111.3 L72.7 106.8 L77.3 102.7 L82 99.1 L86.7 95.9 L91.3 93.2 L96 91.2 L100.7 89.7 L105.3 88.7 L110 88.4 L114.7 88.7 L119.3 89.7 L124 91.2 L128.7 93.2 L133.3 95.9 L138 99.1 L142.7 102.7 L147.3 106.8 L152 111.3 L156.7 116.2 L161.3 121.4 L166 126.8 L170.7 132.4 L175.3 138.2 L180 144 L184.7 149.8 L189.3 155.6 L194 161.2 L198.7 166.6 L203.3 171.8 L208 176.7 L212.7 181.2 L217.3 185.3 L222 188.9 L226.7 192.1 L231.3 194.8 L236 196.8 L240.7 198.3 L245.3 199.3 L250 199.6 L254.7 199.3 L259.3 198.3 L264 196.8 L268.7 194.8 L273.3 192.1 L278 188.9 L282.7 185.3 L287.3 181.2 L292 176.7 L296.7 171.8 L301.3 166.6 L306 161.2 L310.7 155.6 L315.3 149.8 L320 144" style="stroke: var(--muted)"/>
+            <line class="d-ln-acc" x1="40" y1="77" x2="320" y2="207.6" style="stroke-width:2.2"/>
+            <circle class="pt-plain" cx="63.2" cy="120.9" r="4"/><circle class="pt-plain" cx="81" cy="87.6" r="4"/><circle class="pt-plain" cx="115.4" cy="67.2" r="4"/><circle class="pt-plain" cx="144.3" cy="105.3" r="4"/><circle class="pt-plain" cx="164.7" cy="142.8" r="4"/><circle class="pt-plain" cx="202.5" cy="174.7" r="4"/><circle class="pt-plain" cx="245.1" cy="204" r="4"/><circle class="pt-plain" cx="280.9" cy="213.9" r="4"/><circle class="pt-plain" cx="302.8" cy="154.6" r="4"/>
+            <circle class="pt-new" cx="110" cy="88.4" r="5"/><circle class="c-proxy" cx="110" cy="109.6" r="5"/>
+            <rect class="d-plot" x="380" y="44" width="280" height="200"/>
+            <line class="d-rule" x1="380" y1="144" x2="660" y2="144"/>
+            <line class="d-rule" x1="450" y1="44" x2="450" y2="244" style="stroke-dasharray: 2 3"/>
+            <path class="d-ln d-dash" d="M380 144 L384.7 138.2 L389.3 132.4 L394 126.8 L398.7 121.4 L403.3 116.2 L408 111.3 L412.7 106.8 L417.3 102.7 L422 99.1 L426.7 95.9 L431.3 93.2 L436 91.2 L440.7 89.7 L445.3 88.7 L450 88.4 L454.7 88.7 L459.3 89.7 L464 91.2 L468.7 93.2 L473.3 95.9 L478 99.1 L482.7 102.7 L487.3 106.8 L492 111.3 L496.7 116.2 L501.3 121.4 L506 126.8 L510.7 132.4 L515.3 138.2 L520 144 L524.7 149.8 L529.3 155.6 L534 161.2 L538.7 166.6 L543.3 171.8 L548 176.7 L552.7 181.2 L557.3 185.3 L562 188.9 L566.7 192.1 L571.3 194.8 L576 196.8 L580.7 198.3 L585.3 199.3 L590 199.6 L594.7 199.3 L599.3 198.3 L604 196.8 L608.7 194.8 L613.3 192.1 L618 188.9 L622.7 185.3 L627.3 181.2 L632 176.7 L636.7 171.8 L641.3 166.6 L646 161.2 L650.7 155.6 L655.3 149.8 L660 144" style="stroke: var(--muted)"/>
+            <path class="d-ln-acc" d="M380 277.3 L382 271.3 L384 244.1 L386 220.8 L388 201.1 L390 184.2 L392 169.9 L394 157.8 L396 147.4 L398 138.6 L400 131 L402 124.4 L404 118.7 L406 113.7 L408 109.2 L410 105.1 L412 101.4 L414 98 L416 94.8 L418 91.8 L420 89 L422 86.3 L424 83.7 L426 81.3 L428 79 L430 76.8 L432 74.8 L434 72.9 L436 71.2 L438 69.8 L440 68.5 L442 67.4 L444 66.6 L446 66.1 L448 65.8 L450 65.8 L452 66.1 L454 66.6 L456 67.5 L458 68.6 L460 70 L462 71.7 L464 73.6 L466 75.9 L468 78.3 L470 81 L472 83.9 L474 87 L476 90.3 L478 93.7 L480 97.3 L482 100.9 L484 104.7 L486 108.5 L488 112.3 L490 116.2 L492 120 L494 123.9 L496 127.6 L498 131.3 L500 134.9 L502 138.4 L504 141.7 L506 144.9 L508 148 L510 150.9 L512 153.6 L514 156.1 L516 158.5 L518 160.6 L520 162.6 L522 164.4 L524 166 L526 167.5 L528 168.8 L530 169.9 L532 171 L534 171.9 L536 172.6 L538 173.3 L540 174 L542 174.6 L544 175.1 L546 175.6 L548 176.2 L550 176.8 L552 177.4 L554 178 L556 178.8 L558 179.7 L560 180.6 L562 181.7 L564 183 L566 184.3 L568 185.8 L570 187.5 L572 189.3 L574 191.2 L576 193.3 L578 195.5 L580 197.8 L582 200.2 L584 202.7 L586 205.2 L588 207.7 L590 210.2 L592 212.6 L594 214.9 L596 217 L598 219 L600 220.7 L602 222.2 L604 223.3 L606 224.1 L608 224.4 L610 224.3 L612 223.6 L614 222.4 L616 220.7 L618 218.3 L620 215.4 L622 211.9 L624 207.8 L626 203.1 L628 197.9 L630 192.3 L632 186.3 L634 180.1 L636 173.9 L638 167.7 L640 161.8 L642 156.5 L644 152 L646 148.8 L648 147.1 L650 147.6 L652 150.6 L654 156.7 L656 166.7 L658 181.2 L660 201.2" clip-path="url(#p17-clip-b)" style="stroke-width:2.2"/>
+            <circle class="pt-plain" cx="403.2" cy="120.9" r="4"/><circle class="pt-plain" cx="421" cy="87.6" r="4"/><circle class="pt-plain" cx="455.4" cy="67.2" r="4"/><circle class="pt-plain" cx="484.3" cy="105.3" r="4"/><circle class="pt-plain" cx="504.7" cy="142.8" r="4"/><circle class="pt-plain" cx="542.5" cy="174.7" r="4"/><circle class="pt-plain" cx="585.1" cy="204" r="4"/><circle class="pt-plain" cx="620.9" cy="213.9" r="4"/><circle class="pt-plain" cx="642.8" cy="154.6" r="4"/>
+            <circle class="pt-new" cx="450" cy="88.4" r="5"/><circle class="c-proxy" cx="450" cy="65.8" r="5"/>
+            <text class="d-al" x="40" y="260">0</text><text class="d-al" x="320" y="260" text-anchor="end">x = 1</text><text class="d-al" x="110" y="260" text-anchor="middle">test x = 0.25</text>
+            <text class="d-al" x="380" y="260">0</text><text class="d-al" x="660" y="260" text-anchor="end">x = 1</text><text class="d-al" x="450" y="260" text-anchor="middle">test x = 0.25</text>
+            <text class="d-s" x="40" y="280">at the test x it predicts 0.62; the truth is 1.00</text>
+            <text class="d-s" x="380" y="280">at the test x it predicts 1.41; the truth is 1.00</text>
+            <circle class="pt-plain" cx="46" cy="302" r="4"/><text class="d-s" x="56" y="306">training point</text>
+            <line class="d-ln d-dash" x1="150" y1="302" x2="178" y2="302" style="stroke: var(--muted)"/><text class="d-s" x="184" y="306">true structure, sin 2πx</text>
+            <circle class="pt-new" cx="338" cy="302" r="5"/><text class="d-s" x="348" y="306">true value at the test x</text>
+            <circle class="c-proxy" cx="500" cy="302" r="5"/><text class="d-s" x="510" y="306">model's prediction there</text>
+          </svg>
+        </div>
+        <figcaption><b>Both extremes miss the test point.</b> Synthetic data generated for this page (seeded): nine points \(y = \sin 2\pi x + \text{noise}\), the same data set the widget further down starts on as draw 11. The line is too simple to bend up to the peak; the polynomial bends to every noisy point, including the high one just right of the test \(x\).</figcaption>
+      </figure>
+
+      <h3>Complexity knobs from earlier parts <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=713s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L66 · 11:53</a></h3>
+      <ul>
+        <li><b>k in k-NN.</b> Small \(k\) gives a very complicated decision boundary. As \(k\) grows the boundary smooths out, and at \(k = n\) the classifier outputs one value over the whole space.</li>
+        <li><b>Depth of a decision tree.</b> At depth 1 the tree asks about a single feature–threshold pair, which is too simple for good test accuracy. Grown until it is as pure as possible, it fits the noise.</li>
+      </ul>
+      <p>At either end of these knobs the result is a weak learner that does poorly on test data.</p>
+    </section>
+
+    <section id="bias-variance">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=805s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L66 · 13:25</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=958s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L66 · 15:58 high variance</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=1050s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L66 · 17:30 high bias</a>
+        </div>
+        <h2>Variance, bias and the trade-off</h2>
+      </div>
+      <p>Start with the overfit model. Draw a fresh data set of the same size from the same distribution. The noise is random, so the labels come out a little different. Fit a degree-8 polynomial again: it still has zero training error, but it is a different polynomial, because it follows the new noise. Repeat this many times and look only at the prediction \(\hat y\) at one test point. It lands in very different places from one data set to the next.</p>
+      <p>The model is too sensitive to the data. This is <dfn>high variance</dfn>: a small change in the training data causes a large change in the predictions.</p>
+      <p>The underfit line behaves the other way <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=988s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:28</a>. Redrawing the data moves the best line only slightly, so its predictions at the test point stay in a narrow range: low variance. They are still wrong, every time, because a line has missed the structure. This is <dfn>high bias</dfn>. Bias measures how well the assumed structure can represent the truth. A line is far from a sine curve, so its bias is high. A degree-8 polynomial can imitate a sine closely, so its bias is low, and it pays for that with high variance.</p>
+
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>Underfit (too simple)</th><th>Overfit (too complex)</th></tr></thead>
+          <tbody>
+            <tr><td>Mistake</td><td>treats structure as noise</td><td>treats noise as structure</td></tr>
+            <tr><td>Training error</td><td>not zero</td><td>zero, or close to it</td></tr>
+            <tr><td>Redraw the data</td><td>predictions barely move</td><td>predictions jump around</td></tr>
+            <tr><td>Main problem</td><td><b>high bias</b>, low variance</td><td>low bias, <b>high variance</b></td></tr>
+            <tr><td>Examples</td><td>a line for a sine; \(k = n\) in k-NN; a depth-1 tree</td><td>a degree-8 polynomial; small \(k\); a tree grown to purity</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="result">
+        <span class="lbl">The bias–variance trade-off</span>
+        <p>Without defining it formally, the lecture says the test error is always a mix of bias and variance. Very simple model classes have large error from high bias. As complexity grows, bias goes down and variance goes up <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=1111s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:31</a>.</p>
+      </div>
+      <p>Every hyperparameter tuned by cross-validation so far (<a href="part-11.html">Part 11</a>) can be read as a setting on this trade-off: \(k\) in k-NN, the depth of a decision tree, and the regularization weight \(\lambda\) in regularized logistic regression or in support vector machines. Each one chooses between searching a larger, more complex class of models and a smaller, simpler one. Ensembles take a different route: they handle the trade-off by combining many classifiers <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VcrPtcJWvDE&amp;t=1171s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:31</a>.</p>
+
+      <figure id="bv-fig">
+        <div class="controls">
+          <label for="bv-deg">Polynomial degree</label>
+          <input type="range" id="bv-deg" min="1" max="8" step="1" value="8">
+          <output id="bv-deg-out" for="bv-deg">degree 8</output>
+          <button class="btn" id="bv-next" type="button">Next data set</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Training error, this draw</span><span class="v mine" id="bv-train">–</span></div>
+          <div><span class="k">Bias at test x</span><span class="v" id="bv-bias">–</span></div>
+          <div><span class="k">Spread at test x</span><span class="v" id="bv-spread">–</span></div>
+        </div>
+        <div class="status" id="bv-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="bv-svg" viewBox="0 0 640 350" role="img" aria-label="A dashed sine curve, one highlighted data set of nine points with its fitted polynomial, thirty faint fits from other redrawn data sets, and a strip of predictions at the test x equal to 0.25 for two hundred redrawn data sets."></svg></div>
+        <figcaption><b>Redraw the data, refit, and watch the test point.</b> Synthetic data generated for this page (seeded): 200 data sets of nine points each, \(y = \sin 2\pi x\) plus Gaussian noise (standard deviation 0.3), one point per ninth of the interval. Faint curves are fits to 30 of the data sets, and the dots at the test \(x = 0.25\) are the predictions from all 200; dots beyond the chart sit on its edge. Bias is the average prediction there minus the truth 1.00, and spread is the standard deviation of the predictions. Degree 1 is wrong in the same way every time; degree 8 is right on average but swings from draw to draw.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============ LECTURE 67 ============ -->
+    <section id="averaging">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=61s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 1:01 estimating a mean</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=384s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 6:24 averaging</a>
+        </div>
+        <h2>Why averaging helps</h2>
+      </div>
+      <p>The first ensemble method is <dfn>bagging</dfn>, short for <b>b</b>ootstrap <b>agg</b>regat<b>ing</b> (bootstrap aggregation). Its idea comes from maximum likelihood estimation (<a href="part-08.html">Part 8</a>). Let \(x_1, \dots, x_n\) be independent samples from a Gaussian with unknown mean \(\mu\) and known variance 1. In the lecture's example \(\mu = 5.5\) and the samples are \(5,\ 7.3,\ 6.7,\ 8.2,\ \dots\), ending with \(9\).</p>
+      <p>Estimation lets us pick any function of the data as the estimator. Compare these:</p>
+      <div class="eq">\[ \hat\mu_1 = x_1 = 5, \qquad \hat\mu_2 = x_2 = 7.3, \qquad \dots, \qquad \hat\mu_n = x_n = 9, \qquad \hat\mu_{\text{ML}} = \frac1n\sum_{i=1}^n x_i \]</div>
+      <p>The data are random, so every estimator is a random variable. An estimator \(\hat\theta\) of \(\theta\) is <dfn>unbiased</dfn> if \(\mathbb{E}[\hat\theta] = \theta\): on average it equals the truth <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=189s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:09</a>. Every estimator above is unbiased. Each \(x_j\) is a sample from a Gaussian with mean \(\mu\), and expectation is linear:</p>
+      <div class="eq">\[ \mathbb{E}[\hat\mu_j] = \mathbb{E}[x_j] = \mu \quad (j = 1, \dots, n), \qquad \mathbb{E}[\hat\mu_{\text{ML}}] = \frac1n\sum_{i=1}^n \mathbb{E}[x_i] = \frac1n \cdot n\mu = \mu \]</div>
+      <p>So unbiasedness alone cannot tell them apart, yet \(\hat\mu_1\) is clearly worse. Draw a fresh sample \(x_1', \dots, x_n'\) and \(\hat\mu_1\) jumps to wherever \(x_1'\) happens to fall, while the average hardly moves. The size of this fluctuation is measured by variance.</p>
+      <div class="result">
+        <span class="lbl">Main idea</span>
+        <p><b>Averaging reduces variance</b> when the quantities averaged are independent (or at least uncorrelated), as \(x_1, \dots, x_n\) are here. The mean stays the same and the fluctuation shrinks. Standard calculation, not done in the lecture: \(\operatorname{Var}(\hat\mu_1) = 1\) while \(\operatorname{Var}(\hat\mu_{\text{ML}}) = 1/n\).</p>
+      </div>
+      <p>Bagging applies the same idea to classifiers.</p>
+    </section>
+
+    <section id="many-datasets">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=448s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 7:28</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=643s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 10:43 majority vote</a>
+        </div>
+        <h2>Bagging with many independent data sets</h2>
+      </div>
+      <p>Suppose someone gives us \(M\) data sets \(D_1, \dots, D_M\), each holding \(n\) feature–label pairs drawn independently from the same distribution \(P\):</p>
+      <div class="eq">\[ D_1 = \{(\mathbf{x}^1_1, y^1_1), \dots, (\mathbf{x}^1_n, y^1_n)\}, \quad \dots, \quad D_M, \qquad \mathbf{x}^j_i \in \mathbb{R}^d,\ \ y^j_i \in \{-1, +1\} \]</div>
+      <p>Run the weak learner on each one. Here the weak learner is a decision tree grown to full depth, so each tree overfits. This gives classifiers \(h_1, \dots, h_M\), each a map \(h_i : \mathbb{R}^d \to \{-1, +1\}\), where \(h_i(\mathbf{x}_{\text{test}})\) is the \(i\)-th tree's prediction. Each tree has low bias and high variance: change its data set a little and its predictions change a lot.</p>
+      <p>Reduce the variance by averaging, as with the estimator:</p>
+      <div class="eq">\[ h^*(\mathbf{x}) = \operatorname{sign}\Big(\frac1M\sum_{i=1}^M h_i(\mathbf{x})\Big), \qquad \operatorname{sign}(z) = \begin{cases} +1 & z \ge 0 \\ -1 & \text{otherwise} \end{cases} \]</div>
+      <p>The average of \(\pm1\) votes lies between \(-1\) and \(+1\). It is positive when most of the \(h_i\) say \(+1\) and negative when most say \(-1\), so \(h^*\) is a <dfn>majority vote</dfn> (a tie counts as \(+1\) under this definition of sign).</p>
+      <p>The hope: the individual trees have low bias but high variance; the aggregate keeps the low bias and has much lower variance, and low bias with low variance is what gives low error <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=709s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:49</a>. The catch is that nobody hands us \(M\) independent data sets. We have one.</p>
+    </section>
+
+    <section id="bootstrap">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=741s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 12:21</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=872s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 14:32 sampling with replacement</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1002s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 16:42 train and aggregate</a>
+        </div>
+        <h2>Bootstrapping: many bags from one data set</h2>
+      </div>
+      <p>The input is a single data set \(D = \{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}\) with \(\mathbf{x}_i \in \mathbb{R}^d\) and \(y_i \in \{-1, +1\}\). The obvious way to get \(M\) data sets is to cut \(D\) into \(M\) disjoint pieces. The pieces are independent, but they are small: the more pieces, the fewer points each has, and a learner trained on a handful of points has too little information to learn from. We want many data sets without dividing the data, which sounds contradictory. The way out is to let points repeat.</p>
+      <p><dfn>Bootstrapping</dfn> is sampling with replacement. Each data set it creates is called a <dfn>bag</dfn> (hence "bagging"). To build a bag from \(D = \{\mathbf{x}_1, \dots, \mathbf{x}_5\}\), reach into \(D\) with your eyes closed and pick a point uniformly at random, note it, put it back, mix, and pick again, until the bag holds as many points as \(D\), here 5. In the lecture the first bag came out as \(\mathbf{x}_3, \mathbf{x}_4, \mathbf{x}_5, \mathbf{x}_3, \mathbf{x}_5\) and a second as \(\mathbf{x}_1, \mathbf{x}_1, \mathbf{x}_5, \mathbf{x}_4, \mathbf{x}_1\). Since every draw is uniform, anything can happen: repeats, and points missing altogether.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 270" role="img" aria-label="Bagging pipeline. A data set D of five points feeds three bags drawn with replacement: bag 1 holds x3, x4, x5, x3, x5 and leaves out x1 and x2; bag 2 holds x1, x1, x5, x4, x1 and leaves out x2 and x3; bag M is another five draws. A full-depth tree is trained on each bag, giving h1, h2 and hM, and their votes are combined into h-star, the sign of the average vote.">
+            <defs><marker id="p17-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-row" x="10" y="18">1 · Bootstrap</text>
+            <text class="d-row" x="388" y="18">2 · Train</text>
+            <text class="d-row" x="548" y="18">3 · Aggregate</text>
+
+            <rect class="d-box" x="10" y="112" width="124" height="80" rx="8"/>
+            <text class="d-t" x="22" y="133">D, n = 5</text>
+            <rect class="pill" x="18" y="144" width="21" height="20" rx="5"/><text class="d-s" x="28.5" y="158" text-anchor="middle" style="fill: var(--ink)">x₁</text>
+            <rect class="pill" x="41" y="144" width="21" height="20" rx="5"/><text class="d-s" x="51.5" y="158" text-anchor="middle" style="fill: var(--ink)">x₂</text>
+            <rect class="pill" x="64" y="144" width="21" height="20" rx="5"/><text class="d-s" x="74.5" y="158" text-anchor="middle" style="fill: var(--ink)">x₃</text>
+            <rect class="pill" x="87" y="144" width="21" height="20" rx="5"/><text class="d-s" x="97.5" y="158" text-anchor="middle" style="fill: var(--ink)">x₄</text>
+            <rect class="pill" x="110" y="144" width="21" height="20" rx="5"/><text class="d-s" x="120.5" y="158" text-anchor="middle" style="fill: var(--ink)">x₅</text>
+            <text class="d-s" x="22" y="182">the one data set</text>
+
+            <line class="d-ln" x1="136" y1="146" x2="168" y2="54" marker-end="url(#p17-ah)"/>
+            <line class="d-ln" x1="136" y1="150" x2="168" y2="138" marker-end="url(#p17-ah)"/>
+            <line class="d-ln" x1="136" y1="158" x2="168" y2="232" marker-end="url(#p17-ah)"/>
+
+            <text class="d-t" x="176" y="56">D₁</text>
+            <rect class="pill" x="200" y="40" width="22" height="22" rx="5"/><text class="d-s" x="211" y="55" text-anchor="middle" style="fill: var(--ink)">x₃</text>
+            <rect class="pill" x="225" y="40" width="22" height="22" rx="5"/><text class="d-s" x="236" y="55" text-anchor="middle" style="fill: var(--ink)">x₄</text>
+            <rect class="pill" x="250" y="40" width="22" height="22" rx="5"/><text class="d-s" x="261" y="55" text-anchor="middle" style="fill: var(--ink)">x₅</text>
+            <rect class="pill" x="275" y="40" width="22" height="22" rx="5"/><text class="d-s" x="286" y="55" text-anchor="middle" style="fill: var(--ink)">x₃</text>
+            <rect class="pill" x="300" y="40" width="22" height="22" rx="5"/><text class="d-s" x="311" y="55" text-anchor="middle" style="fill: var(--ink)">x₅</text>
+            <text class="d-s" x="200" y="78">left out: x₁, x₂</text>
+
+            <text class="d-t" x="176" y="144">D₂</text>
+            <rect class="pill" x="200" y="128" width="22" height="22" rx="5"/><text class="d-s" x="211" y="143" text-anchor="middle" style="fill: var(--ink)">x₁</text>
+            <rect class="pill" x="225" y="128" width="22" height="22" rx="5"/><text class="d-s" x="236" y="143" text-anchor="middle" style="fill: var(--ink)">x₁</text>
+            <rect class="pill" x="250" y="128" width="22" height="22" rx="5"/><text class="d-s" x="261" y="143" text-anchor="middle" style="fill: var(--ink)">x₅</text>
+            <rect class="pill" x="275" y="128" width="22" height="22" rx="5"/><text class="d-s" x="286" y="143" text-anchor="middle" style="fill: var(--ink)">x₄</text>
+            <rect class="pill" x="300" y="128" width="22" height="22" rx="5"/><text class="d-s" x="311" y="143" text-anchor="middle" style="fill: var(--ink)">x₁</text>
+            <text class="d-s" x="200" y="166">left out: x₂, x₃</text>
+
+            <text class="d-t" x="244" y="198">⋮</text>
+            <text class="d-t" x="174" y="240">D<tspan dy="4" style="font-size: 10px">M</tspan></text>
+            <rect class="d-off" x="200" y="224" width="122" height="22" rx="5"/><text class="d-s t-off" x="261" y="239" text-anchor="middle">5 more draws</text>
+
+            <line class="d-ln" x1="326" y1="51" x2="384" y2="51" marker-end="url(#p17-ah)"/>
+            <line class="d-ln" x1="326" y1="139" x2="384" y2="139" marker-end="url(#p17-ah)"/>
+            <line class="d-ln" x1="326" y1="235" x2="384" y2="235" marker-end="url(#p17-ah)"/>
+            <rect class="d-box" x="388" y="37" width="118" height="28" rx="6"/><text class="d-t" x="447" y="56" text-anchor="middle">tree → h₁</text>
+            <rect class="d-box" x="388" y="125" width="118" height="28" rx="6"/><text class="d-t" x="447" y="144" text-anchor="middle">tree → h₂</text>
+            <rect class="d-box" x="388" y="221" width="118" height="28" rx="6"/><text class="d-t" x="447" y="240" text-anchor="middle">tree → h<tspan dy="4" style="font-size: 10px">M</tspan></text>
+            <text class="d-s" x="388" y="92">full depth, overfits its bag</text>
+
+            <line class="d-ln" x1="508" y1="55" x2="546" y2="128" marker-end="url(#p17-ah)"/>
+            <line class="d-ln" x1="508" y1="139" x2="546" y2="148" marker-end="url(#p17-ah)"/>
+            <line class="d-ln" x1="508" y1="231" x2="546" y2="176" marker-end="url(#p17-ah)"/>
+            <rect class="d-box-acc" x="550" y="110" width="124" height="84" rx="8"/>
+            <text class="d-t" x="562" y="132">h*(x) =</text>
+            <text class="d-s" x="562" y="150">sign of the average</text>
+            <text class="d-s" x="562" y="166">vote (1/M) Σ hᵢ(x)</text>
+            <text class="d-s" x="562" y="184">= majority vote</text>
+            <text class="d-s" x="10" y="264">Bags 1 and 2 are the lecture's draws. Every bag has n points; some repeat and some are missing.</text>
+          </svg>
+        </div>
+        <figcaption><b>Bootstrap, train, aggregate.</b> Each bag is \(n\) uniform draws with replacement from the single data set \(D\), so the bags differ from each other and from \(D\). One weak learner is trained per bag, and the final classifier is the sign of their average vote.</figcaption>
+      </figure>
+
+      <ol class="algo">
+        <li class="algo-title">Bagging (bootstrap aggregation)</li>
+        <li>Input: one data set \(D = \{(\mathbf{x}_i, y_i)\}_{i=1}^n\) and the number of bags \(M\).</li>
+        <li><b>Bootstrap.</b> For \(j = 1, \dots, M\), build bag \(D_j\) by drawing \(n\) points from \(D\) uniformly at random with replacement.</li>
+        <li><b>Train.</b> Run the weak learner on each bag to get \(h_j\). A full-depth decision tree is the usual choice, but any learner can be used.</li>
+        <li><b>Aggregate.</b> Output \(h^*(\mathbf{x}) = \operatorname{sign}\big(\frac1M\sum_{j=1}^M h_j(\mathbf{x})\big)\).</li>
+      </ol>
+      <p>The two steps give the method its name <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1037s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>17:17</a>: bootstrapping turns one data set into \(M\), and aggregation turns \(M\) classifiers into one. The result is a <dfn>bagging classifier</dfn>.</p>
+    </section>
+
+    <section id="bag-coverage">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1072s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 17:52</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1199s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 19:59 why it works</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1264s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 21:04 variance falls</a>
+        </div>
+        <h2>What each bag contains, and why bagging works</h2>
+      </div>
+      <p>How much repetition is there in a bag? Fix one point \(\mathbf{x}_j\). A single uniform draw picks it with probability \(1/n\), so it misses \(\mathbf{x}_j\) with probability \(1 - 1/n\). The bag is \(n\) independent draws, and \(\mathbf{x}_j\) is absent only if every one of them misses it:</p>
+      <div class="eq">\[ P(\mathbf{x}_j \notin D_i) = \Big(1 - \frac1n\Big)^n \;\xrightarrow{\,n \to \infty\,}\; \frac1e \approx 0.368, \qquad P(\mathbf{x}_j \in D_i) = 1 - \Big(1 - \frac1n\Big)^n \;\to\; 1 - \frac1e \approx 0.632 \]</div>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>n</th><th class="num">P(point left out)</th><th class="num">P(point in the bag)</th></tr></thead>
+          <tbody>
+            <tr><td>5</td><td class="num">0.328</td><td class="num">0.672</td></tr>
+            <tr><td>10</td><td class="num">0.349</td><td class="num">0.651</td></tr>
+            <tr><td>100</td><td class="num">0.366</td><td class="num">0.634</td></tr>
+            <tr><td>large n</td><td class="num">1/e ≈ 0.368</td><td class="num">1 − 1/e ≈ 0.632</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>So on average a bag contains about two-thirds of the distinct points (the lecture rounds this to "about 67%", which is the value at \(n = 5\); for large \(n\) it settles at 63.2%). Roughly 37% of the data is missing from any one bag, and the empty slots are filled by repeats.</p>
+      <p>Why does this help? An overfit tree fits the noise specific to its own bag, repeats included. But different bags repeat and omit different points, so different trees fit different noise. When their votes are averaged, the noise tends to cancel. Each tree is still a complex, low-bias classifier, so the combination keeps the low bias while its variance falls. In practice, plotting bias and variance as more trees are added shows the variance coming down and the bias staying roughly flat.</p>
+      <div class="result">
+        <span class="lbl">Main message</span>
+        <p><b>Bagging reduces variance.</b> The reduction is large when the weak learners are uncorrelated with each other <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1294s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:34</a>, so a lot of practical work goes into making the learners as decorrelated as possible.</p>
+      </div>
+      <p class="note">Standard result, not in the lecture: if \(M\) predictors each have variance \(\sigma^2\) and every pair has correlation \(\rho\), their average has variance \(\rho\sigma^2 + (1-\rho)\sigma^2/M\). More bags shrink only the second term; only lowering \(\rho\) shrinks the first. This is why decorrelation matters.</p>
+    </section>
+
+    <section id="random-forest">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1324s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 22:04</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1394s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 23:14 feature bagging</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1676s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 27:56 how many features</a>
+        </div>
+        <h2>Random forests</h2>
+      </div>
+      <p>A very popular way to get less correlated learners is the <dfn>random forest</dfn>, one of the most widely used classification techniques in practice. It has two ingredients.</p>
+      <ol>
+        <li><b>Bag decision trees, and overfit each one.</b> Build bags \(D_1, \dots, D_M\) and grow a tree on each until it is as pure as possible (zero training error), with no cross-validation of the depth. These trees have low bias.</li>
+        <li><b>Feature bagging.</b> While growing each tree, consider only a random subset of the features at every node.</li>
+      </ol>
+      <p>Recall how a tree picks a split (<a href="part-13.html">Part 13</a>). At each node it tries every feature and threshold and keeps the question "\(f_j &lt; \theta\)?" that gives the largest drop in impurity, measured by information gain, the Gini index or any other impurity measure. So every tree, whatever its bag, considers all the features at every node.</p>
+      <p>Feature bagging changes that search. Say there are \(d = 1000\) features (height, weight, and so on). To choose the split at the root, sample a few features, in the lecture's illustration \(f_1, f_5, f_{23}, f_{40}\), pretend the data has only these, and find the best feature–threshold split among them; suppose it is on \(f_5\). At the next node, sample again, say \(f_1, f_{10}, f_{40}, f_{20}\), and find the best split among those. Doing this at every split means different trees use different sets of features, so they become more decorrelated, and averaging them reduces variance more. This is also what is observed in practice.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 286" role="img" aria-label="Left: a plain decision-tree node marks all of the first forty features, and in fact all d features, as candidates. Right: two nodes of a random-forest tree; the first marks only f1, f5, f23 and f40 as candidates and splits on f5, the second, its child, marks only f1, f10, f20 and f40.">
+            <defs><marker id="p17-ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="10" y="20">Plain decision tree</text>
+            <text class="d-s" x="10" y="38">every node searches all d features</text>
+            <rect class="d-box" x="10" y="56" width="318" height="84" rx="8"/>
+            <text class="d-row" x="22" y="72">any node, any tree</text>
+            <g id="p17-strip-all"></g>
+            <text class="d-al" x="288" y="92">…</text>
+            <text class="d-s" x="22" y="130">best of all d features → f₅ &lt; θ</text>
+            <text class="d-s" x="10" y="168">The same strong features win the</text>
+            <text class="d-s" x="10" y="184">search in tree after tree, so trees</text>
+            <text class="d-s" x="10" y="200">grown on different bags look alike:</text>
+            <text class="d-s" x="10" y="216">they are correlated, and averaging</text>
+            <text class="d-s" x="10" y="232">them removes less variance.</text>
+
+            <line class="d-rule" x1="340" y1="10" x2="340" y2="276"/>
+
+            <text class="d-h" x="352" y="20">Random-forest tree (feature bagging)</text>
+            <text class="d-s" x="352" y="38">every node samples a few features afresh</text>
+            <rect class="d-box" x="352" y="56" width="318" height="84" rx="8"/>
+            <text class="d-row" x="364" y="72">node 1</text>
+            <g id="p17-strip-n1"></g>
+            <text class="d-s" x="364.8" y="112" text-anchor="middle">f₁</text>
+            <text class="d-s" x="390.8" y="112" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₅</text>
+            <text class="d-s" x="507.8" y="112" text-anchor="middle">f₂₃</text>
+            <text class="d-s" x="618.3" y="112" text-anchor="middle">f₄₀</text>
+            <text class="d-s" x="364" y="131">best of these 4 → split on f₅ &lt; θ</text>
+            <line class="d-ln" x1="580" y1="140" x2="580" y2="164" marker-end="url(#p17-ah2)"/>
+            <text class="d-al" x="586" y="156">child</text>
+            <rect class="d-box" x="352" y="168" width="318" height="84" rx="8"/>
+            <text class="d-row" x="364" y="184">node 2</text>
+            <g id="p17-strip-n2"></g>
+            <text class="d-s" x="364.8" y="224" text-anchor="middle">f₁</text>
+            <text class="d-s" x="423.3" y="224" text-anchor="middle">f₁₀</text>
+            <text class="d-s" x="488.3" y="224" text-anchor="middle">f₂₀</text>
+            <text class="d-s" x="618.3" y="224" text-anchor="middle">f₄₀</text>
+            <text class="d-s" x="364" y="243">a new random subset; best split among these</text>
+            <rect x="352" y="266" width="10" height="10" style="fill: var(--accent)"/><text class="d-s" x="368" y="275">candidate feature</text>
+            <rect x="480" y="266" width="10" height="10" style="fill: var(--rule)"/><text class="d-s" x="496" y="275">not considered at this node</text>
+          </svg>
+        </div>
+        <figcaption><b>What feature bagging changes.</b> Each strip shows the first 40 of \(d = 1000\) features. A plain tree's node considers every feature; a random-forest node considers only a small random subset, a fresh one at each node (the subsets are the lecture's illustration). Different trees therefore split on different features and end up less alike.</figcaption>
+      </figure>
+
+      <div class="result">
+        <span class="lbl">Random forest</span>
+        <p>Bagged, fully grown decision trees with feature bagging at every split <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1578s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>26:18</a>. Bias typically does not increase while variance goes down, so the error of the combined classifier typically goes down. It is a very powerful variance-reduction technique.</p>
+      </div>
+      <ul>
+        <li><b>How many features per split.</b> A common rule of thumb is about \(\sqrt d\) features at each split for classification, for which there is some theoretical reasoning. For regression the lecture recalls a suggestion of around \(d/3\) or \(d/5\), that is, of the order of \(d\). These are rules of thumb; with enough computation time, try other values and keep the one that works best.</li>
+        <li><b>Variants.</b> For regression, replace the classification trees by regression trees. One can randomize further, for example by also sampling the candidate thresholds at each split <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1642s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>27:22</a>. Standard practice is still overfit trees plus feature bagging.</li>
+      </ul>
+    </section>
+
+    <section id="two-steps">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1710s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 28:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1781s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L67 · 29:41 two steps</a>
+        </div>
+        <h2>Bagging runs in parallel, and leaves two choices open</h2>
+      </div>
+      <p>A major practical advantage of bagging: the weak learners are not needed until the aggregation step, and none of them depends on another. On a CPU with many cores they can all be trained at the same time, without waiting for one tree to finish before starting the next. This is one reason bagging is popular in practice.</p>
+      <p>Bagging is two choices made with a reason:</p>
+      <ol>
+        <li><b>Bootstrapping</b> creates the bags by uniform sampling with replacement.</li>
+        <li><b>Aggregation</b> takes a plain average, because averaging reduces variance.</li>
+      </ol>
+      <p>Is there a more principled way to sample than uniformly, and a more principled way to aggregate than a plain average <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=OXTu2vrsTjY&amp;t=1815s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>30:15</a>? The answer to both is yes. An algorithm that keeps the same two steps but does each in the best possible way, in a sense made precise by its analysis, is the boosting algorithm.</p>
+    </section>
+
+    <!-- ============ LECTURE 68 ============ -->
+    <section id="boosting">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=31s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 0:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=135s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 2:15 decision stumps</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=195s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 3:15 weak to strong</a>
+        </div>
+        <h2>Boosting starts from underfit learners</h2>
+      </div>
+      <p><dfn>Boosting</dfn> is a general technique. The lecture studies one specific boosting algorithm, <dfn>AdaBoost</dfn>, introduced by Freund and Schapire in the 1990s. Their work on boosting, a contribution to theoretical machine learning, earned them the Gödel Prize.</p>
+      <p>Boosting also turns a weak learner into a strong one, and does it in a theoretically sound, principled way. Its weak learners can just as well be <b>underfit</b>. This is part of what makes boosting powerful, because underfit classifiers are easy and cheap to get <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=65s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:05</a>. Stop a decision tree after one question, "\(f_j &lt; \theta\)?". In the plane this cuts the feature space once, with a vertical or horizontal line, and calls one side positive and the other negative. In higher dimensions it is even more simplistic.</p>
+      <p>Such a one-level tree is a <dfn>decision stump</dfn>; sometimes two levels (two questions) are used. Stumps are the usual weak learners in boosting. A tree in practice might be 10 to 15 levels deep, so cutting it at one or two levels costs a lot of accuracy: a stump has <b>high bias and low variance</b>.</p>
+      <p>Now treat the weak learner as a black box: give it a data set and it returns, say, a stump. A single stump cannot reach 100% training accuracy. Can we control what we feed the black box so that the resulting classifiers, combined, reach <b>zero training error</b>? A combination that does is what the lecture calls a strong learner here. Boosting says this is possible and gives an algorithm for it.</p>
+    </section>
+
+    <section id="adaboost">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=262s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 4:22</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=716s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 11:56 weight update</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=976s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 16:16 final classifier</a>
+        </div>
+        <h2>The AdaBoost algorithm</h2>
+      </div>
+      <p>AdaBoost (<b>ada</b>ptive <b>boost</b>ing) replaces both of bagging's steps by more principled ones. In place of uniformly drawn bags it keeps a <b>weight on every training point</b>, a probability distribution \(D_t\) over the points that changes every round. In place of a plain average it takes a <b>weighted vote</b>.</p>
+      <ol class="algo">
+        <li class="algo-title">AdaBoost</li>
+        <li>Input: \(S = \{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}\), \(\mathbf{x}_i \in \mathbb{R}^d\), \(y_i \in \{-1, +1\}\), and a number of rounds \(T\).</li>
+        <li>Initialize \(D_1(i) = 1/n\) for every point \(i\).</li>
+        <li>For \(t = 1, \dots, T\):
+          <ul>
+            <li>Give \(S\) and \(D_t\) to the weak learner; it returns \(h_t : \mathbb{R}^d \to \{-1, +1\}\).</li>
+            <li>Compute the weighted error \(\varepsilon_t = \sum_{i:\, h_t(\mathbf{x}_i) \ne y_i} D_t(i)\) and \(\alpha_t = \ln\sqrt{(1-\varepsilon_t)/\varepsilon_t}\).</li>
+            <li>Reweight: \(\tilde D_{t+1}(i) = D_t(i)\,e^{\alpha_t}\) if \(h_t(\mathbf{x}_i) \ne y_i\), and \(\tilde D_{t+1}(i) = D_t(i)\,e^{-\alpha_t}\) if \(h_t(\mathbf{x}_i) = y_i\).</li>
+            <li>Normalize: \(D_{t+1}(i) = \tilde D_{t+1}(i) \big/ \sum_{j} \tilde D_{t+1}(j)\).</li>
+          </ul>
+        </li>
+        <li>Output \(h^*(\mathbf{x}) = \operatorname{sign}\Big(\sum_{t=1}^T \alpha_t\, h_t(\mathbf{x})\Big)\).</li>
+      </ol>
+      <p class="note">The lecture writes the uniform starting weights as \(D_0\); they are called \(D_1\) here so that round \(t\) always trains on \(D_t\). Where \(\alpha_t\) comes from is the next section.</p>
+
+      <h3>Feeding weights to the weak learner <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=458s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 7:38</a></h3>
+      <p>If the weak learner can take weighted points, pass it \(S\) together with \(D_t\). The plain versions of algorithms such as decision trees do not handle weights. Then create a bag from \(S\) according to \(D_t\): draw \(n\) points with replacement, where each draw picks point \(i\) with probability \(D_t(i)\). A point with \(D_t(i) = 0.7\) has a 70% chance of being the one picked at each draw. Train the weak learner on that bag to get \(h_t\). With the uniform \(D_1\) this is exactly bagging's bootstrap; later rounds tilt the sampling.</p>
+
+      <h3>Whose weights should go up? <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=590s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 9:50</a></h3>
+      <p>Suppose there are 1000 points and the first stump classifies 600 correctly and 400 incorrectly. The next stump is also only better than random, and we want it to be a different, useful classifier. So <b>raise the weights of the 400 misclassified points</b> and lower the rest. Heavier points are drawn more often into the next bag, so the next stump tries to find features that classify them correctly. In this way each round is pushed to do well where the previous one failed.</p>
+      <p>The update is multiplicative: a mistake's weight is multiplied by \(e^{\alpha_t}\) and a correct point's by \(e^{-\alpha_t}\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=781s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:01</a>. After this the weights no longer add up to 1, so divide each by their sum to get a distribution again, which we need in order to sample from it <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=813s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:33</a>.</p>
+
+      <h3>The lecture's example <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=843s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 14:03</a></h3>
+      <p>Three points start at \(1/3\) each. Suppose that at some round their weights are \(D_t = (0.3,\ 0.5,\ 0.2)\), and the stump \(h_t\) misclassifies \(\mathbf{x}_1\) and classifies \(\mathbf{x}_2\) and \(\mathbf{x}_3\) correctly. Then</p>
+      <div class="eq">\[ D_{t+1} = \frac{1}{Z_t}\big(0.3\,e^{\alpha_t},\ \ 0.5\,e^{-\alpha_t},\ \ 0.2\,e^{-\alpha_t}\big), \qquad Z_t = 0.3\,e^{\alpha_t} + 0.5\,e^{-\alpha_t} + 0.2\,e^{-\alpha_t} \]</div>
+      <p>\(Z_t\) is just the normalizer that makes the three weights add up to 1. The numbers are worked out in the next section, once \(\alpha_t\) is known.</p>
+
+      <h3>The final classifier</h3>
+      <p>After \(T\) rounds there are \(T\) weak learners \(h_1, \dots, h_T\), each trained on a different distribution over the data. They are combined as in bagging, with one change: a <b>weighted</b> vote, \(h^*(\mathbf{x}) = \operatorname{sign}\big(\sum_t \alpha_t h_t(\mathbf{x})\big)\). The vote weights are exactly the \(\alpha_t\) that were used to bump the point weights.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Step</th><th>Bagging</th><th>AdaBoost</th></tr></thead>
+          <tbody>
+            <tr><td>Data for learner \(t\)</td><td>uniform bootstrap bag, independent of the others</td><td>weights \(D_t\), raised on the previous learner's mistakes</td></tr>
+            <tr><td>Combine</td><td>\(\operatorname{sign}\big(\frac1M\sum_t h_t\big)\), plain average</td><td>\(\operatorname{sign}\big(\sum_t \alpha_t h_t\big)\), weighted vote</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="alpha">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1069s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 17:49</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1099s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 18:19 weighted error</a>
+        </div>
+        <h2>How \(\alpha_t\) is set</h2>
+      </div>
+      <p>The analysis of boosting says the right weights are</p>
+      <div class="eq">\[ \alpha_t = \ln\sqrt{\frac{1 - \varepsilon_t}{\varepsilon_t}} = \frac12 \ln\frac{1 - \varepsilon_t}{\varepsilon_t}, \qquad \varepsilon_t = \sum_{i:\ h_t(\mathbf{x}_i) \ne y_i} D_t(i) \]</div>
+      <p>\(\varepsilon_t\) is the error of \(h_t\) measured with the weights it was trained on: take the points it gets wrong and add up their weights under \(D_t\). Heavy points count for more. The logarithm appears because \(\alpha_t\) is used in an exponent: the multiplier on a mistake is \(e^{\alpha_t} = \sqrt{(1-\varepsilon_t)/\varepsilon_t}\).</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">Weighted error εₜ</th><th class="num">Mistake multiplier e^αₜ</th><th class="num">Vote αₜ</th></tr></thead>
+          <tbody>
+            <tr><td class="num">0.10</td><td class="num">3.00</td><td class="num">1.10</td></tr>
+            <tr><td class="num">0.20</td><td class="num">2.00</td><td class="num">0.69</td></tr>
+            <tr><td class="num">0.30</td><td class="num">1.53</td><td class="num">0.42</td></tr>
+            <tr><td class="num">0.40</td><td class="num">1.22</td><td class="num">0.20</td></tr>
+            <tr><td class="num">0.49</td><td class="num">1.02</td><td class="num">0.02</td></tr>
+            <tr><td class="num">0.50</td><td class="num">1.00</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>A learner with low weighted error gives its mistakes a large bump and gets a large say in the final vote. A learner with error close to \(\tfrac12\), barely better than random, changes the weights very little and gets almost no vote <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1133s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:53</a>. A weak learner beats random, so \(\varepsilon_t &lt; \tfrac12\) and \(\alpha_t &gt; 0\). The lecture says that deriving this choice is beyond the scope of the course.</p>
+
+      <h3>The example, with numbers</h3>
+      <p>In the three-point example only \(\mathbf{x}_1\) is misclassified, so \(\varepsilon_t = 0.3\) and \(\alpha_t = \tfrac12\ln(0.7/0.3) \approx 0.424\), giving multipliers \(e^{\alpha_t} \approx 1.53\) and \(e^{-\alpha_t} \approx 0.65\). The lecture keeps \(\alpha_t\) symbolic; plugging in:</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 266" role="img" aria-label="Three groups of bars. Before: weights 0.3, 0.5 and 0.2, with x1 misclassified. After multiplying, x1 becomes 0.458 and x2, x3 become 0.327 and 0.131, which sum to 0.917. After dividing by that sum: 0.500, 0.357 and 0.143.">
+            <defs><marker id="p17-ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-t" x="30" y="22">Dₜ, before</text>
+            <text class="d-t" x="280" y="22">after × e^(±α)</text>
+            <text class="d-t" x="530" y="22">Dₜ₊₁ = after ÷ Z</text>
+
+            <line class="d-rule" x1="24" y1="215" x2="162" y2="215"/>
+            <rect class="d-box-acc" x="30" y="125" width="34" height="90"/>
+            <rect class="d-box" x="76" y="65" width="34" height="150"/>
+            <rect class="d-box" x="122" y="155" width="34" height="60"/>
+            <text class="d-s" x="47" y="118" text-anchor="middle">0.30</text>
+            <text class="d-s" x="93" y="58" text-anchor="middle">0.50</text>
+            <text class="d-s" x="139" y="148" text-anchor="middle">0.20</text>
+
+            <line class="d-rule" x1="274" y1="215" x2="412" y2="215"/>
+            <rect class="d-box-acc" x="280" y="77.5" width="34" height="137.5"/>
+            <rect class="d-box" x="326" y="116.8" width="34" height="98.2"/>
+            <rect class="d-box" x="372" y="175.7" width="34" height="39.3"/>
+            <text class="d-s" x="297" y="70" text-anchor="middle">0.458</text>
+            <text class="d-s" x="343" y="109" text-anchor="middle">0.327</text>
+            <text class="d-s" x="389" y="168" text-anchor="middle">0.131</text>
+
+            <line class="d-rule" x1="524" y1="215" x2="662" y2="215"/>
+            <rect class="d-box-acc" x="530" y="65" width="34" height="150"/>
+            <rect class="d-box" x="576" y="107.9" width="34" height="107.1"/>
+            <rect class="d-box" x="622" y="172.1" width="34" height="42.9"/>
+            <text class="d-s" x="547" y="58" text-anchor="middle">0.500</text>
+            <text class="d-s" x="593" y="100" text-anchor="middle">0.357</text>
+            <text class="d-s" x="639" y="165" text-anchor="middle">0.143</text>
+
+            <text class="d-al" x="47" y="232" text-anchor="middle">x₁</text><text class="d-al" x="93" y="232" text-anchor="middle">x₂</text><text class="d-al" x="139" y="232" text-anchor="middle">x₃</text>
+            <text class="d-al" x="297" y="232" text-anchor="middle">x₁</text><text class="d-al" x="343" y="232" text-anchor="middle">x₂</text><text class="d-al" x="389" y="232" text-anchor="middle">x₃</text>
+            <text class="d-al" x="547" y="232" text-anchor="middle">x₁</text><text class="d-al" x="593" y="232" text-anchor="middle">x₂</text><text class="d-al" x="639" y="232" text-anchor="middle">x₃</text>
+
+            <line class="d-ln" x1="166" y1="150" x2="270" y2="150" marker-end="url(#p17-ah3)"/>
+            <text class="d-s" x="218" y="128" text-anchor="middle">× 1.53 on x₁</text>
+            <text class="d-s" x="218" y="142" text-anchor="middle">× 0.65 on x₂, x₃</text>
+            <line class="d-ln" x1="416" y1="150" x2="520" y2="150" marker-end="url(#p17-ah3)"/>
+            <text class="d-s" x="468" y="128" text-anchor="middle">sum Z = 0.917</text>
+            <text class="d-s" x="468" y="142" text-anchor="middle">divide by Z</text>
+
+            <rect class="d-box-acc" x="30" y="248" width="12" height="12"/><text class="d-s" x="48" y="258">misclassified by hₜ: weight grows</text>
+            <rect class="d-box" x="280" y="248" width="12" height="12"/><text class="d-s" x="298" y="258">classified correctly: weight shrinks</text>
+          </svg>
+        </div>
+        <figcaption><b>One round of reweighting, drawn to scale.</b> The lecture's weights \(D_t = (0.3, 0.5, 0.2)\) with \(\mathbf{x}_1\) misclassified, so \(\varepsilon_t = 0.3\) and \(\alpha_t \approx 0.424\). The mistake rises from 0.3 to 0.5 and the two correct points shrink, keeping their 5 : 2 ratio.</figcaption>
+      </figure>
+      <p class="note">The mistake ends up holding exactly half the weight. This is a general property of this \(\alpha_t\) (a standard fact, not stated in the lecture): on the new weights \(D_{t+1}\), the stump \(h_t\) has weighted error exactly \(\tfrac12\), no better than random, so the next round cannot simply pick \(h_t\) again.</p>
+    </section>
+
+    <section id="training-error">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1165s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 19:25</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1299s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 21:39 the parameter γ</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1403s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 23:23 γ need not be known</a>
+        </div>
+        <h2>Training error goes to zero</h2>
+      </div>
+      <p>The lecture states a guarantee and points to standard boosting texts for the proof. With \(\alpha_t\) set as above, the training error of \(h^*\) on the original data set \(S\) drops fast as rounds are added, even though each weak learner on its own makes many training mistakes. Once the number of rounds \(T\) exceeds a certain quantity, the training error is exactly zero <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1233s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:33</a>. That quantity depends on two things:</p>
+      <ul>
+        <li><b>The number of data points \(n\).</b> More data needs more rounds, as you would expect, but the dependence is only logarithmic in \(n\).</li>
+        <li><b>How good the weak learner is, through a parameter \(\gamma\).</b> The weak learner is assumed to be better than random by some margin: its accuracy is \(\tfrac12 + \gamma\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1334s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:14</a>. At 60% accuracy \(\gamma = 0.1\); at 70%, \(\gamma = 0.2\); at 90%, \(\gamma = 0.4\). A very weak learner with 51% accuracy has \(\gamma = 0.01\) and needs many rounds; one with 75% has \(\gamma = 0.25\) and needs far fewer. The stronger the weak learner, the fewer the rounds.</li>
+      </ul>
+      <div class="result">
+        <span class="lbl">The guarantee, in its standard form</span>
+        <p>The exact expression on the board is not recoverable from the auto-generated captions. The standard version of this result: if every round's weighted error satisfies \(\varepsilon_t \le \tfrac12 - \gamma\), then the training error of \(h^*\) after \(T\) rounds is at most \(e^{-2\gamma^2 T}\). Training error is a multiple of \(1/n\), so once this bound drops below \(1/n\) the error must be 0:</p>
+        \[ T &gt; \frac{\ln n}{2\gamma^2} \quad\Longrightarrow\quad \text{training error of } h^* = 0 \]
+        <p>It has both features the lecture stresses: logarithmic in \(n\), and growing as \(\gamma\) shrinks.</p>
+      </div>
+      <p>The striking part is that AdaBoost <b>never needs to know \(\gamma\)</b>, that is, how weak its weak learner is. Earlier versions of boosting needed \(\gamma\) as part of the algorithm <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1435s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:55</a>. AdaBoost adapts: keep adding weak learners and the training error must eventually reach zero. The lecture calls this the power of boosting.</p>
+
+      <figure id="ada-fig">
+        <div class="controls">
+          <label for="ada-t">Rounds of boosting</label>
+          <input type="range" id="ada-t" min="0" max="12" step="1" value="1">
+          <output id="ada-t-out" for="ada-t">after 1 round</output>
+          <button class="btn" id="ada-next" type="button">Next round</button>
+          <button class="btn" id="ada-reset" type="button">Reset</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Weighted error εₜ</span><span class="v" id="ada-eps">–</span></div>
+          <div><span class="k">Vote αₜ</span><span class="v" id="ada-alpha">–</span></div>
+          <div><span class="k">Points hₜ gets wrong</span><span class="v" id="ada-wrong">–</span></div>
+          <div><span class="k">Training error of h*</span><span class="v mine" id="ada-err">–</span></div>
+        </div>
+        <div class="status" id="ada-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="ada-svg" viewBox="0 0 640 392" role="img" aria-label="Sixteen points in the square from 0 to 10 in both coordinates, positive ones inside a central disc and negative ones around it. Point sizes show the current weights, the dashed line is the current stump, points it misclassifies are ringed, and the shaded region is where the weighted vote of all stumps so far predicts plus one. A list on the right shows each stump's rule and its vote alpha as a bar."></svg></div>
+        <figcaption><b>AdaBoost with decision stumps, one round at a time.</b> Synthetic data generated for this page (seeded): 16 points, labelled \(+1\) inside a circle and \(-1\) outside, so no single stump separates them. Each round the stump with the smallest weighted error is chosen (the "weak learner takes weights directly" option). A point's area is proportional to its weight after the round's update, so the ringed mistakes grow. The training error of the weighted vote falls from 4 of 16 to 0 at round 7 and stays there, although every stump still gets several points wrong.</figcaption>
+      </figure>
+    </section>
+
+    <section id="test-error">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1467s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 24:27</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1593s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 26:33 it keeps falling</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1686s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 28:06 margins</a>
+        </div>
+        <h2>Test error after training error hits zero</h2>
+      </div>
+      <p>The real goal is doing well on test data. So plot both errors against the number of rounds \(T\), stopping the algorithm after each round and measuring its error on a held-out test set. Theory says the training error falls to zero at some round \(T^*\) and stays at zero. The test error also falls.</p>
+      <p>What happens after \(T^*\)? A reasonable guess is overfitting. Every training point is already classified correctly, so further weak learners might start fitting the noise, and the test error would turn upward. Surprisingly, on many data sets the test error <b>keeps decreasing</b> after the training error reaches zero. It does not reach zero, since the training data carries only so much information about the underlying distribution. This is typical behaviour with exceptions: one can construct data sets on which boosting does start to overfit.</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 282" role="img" aria-label="Schematic error curves against the number of rounds. Training error falls to zero at T star and stays there. The typical test error keeps falling slowly after T star; a dashed curve shows the overfitting one might have expected, rising after T star.">
+            <line class="d-ln" x1="60" y1="232" x2="612" y2="232"/>
+            <line class="d-ln" x1="60" y1="232" x2="60" y2="30"/>
+            <text class="d-al" x="612" y="252" text-anchor="end">number of rounds T</text>
+            <text class="d-al" x="54" y="36" text-anchor="end">error</text>
+            <text class="d-al" x="54" y="236" text-anchor="end">0</text>
+            <line class="d-rule" x1="300" y1="36" x2="300" y2="232" style="stroke-dasharray: 3 4"/>
+            <text class="d-s" x="306" y="48">T*: training error reaches 0</text>
+            <path class="d-ln" d="M60 104 C 120 170, 210 220, 300 230.5 L 606 230.5" style="stroke-width: 2.4"/>
+            <text class="d-t" x="72" y="216">training error</text>
+            <text class="d-s" x="314" y="224">training error stays at 0</text>
+            <path class="d-ln-acc" d="M60 88 C 140 142, 230 168, 300 176 C 380 184, 480 190, 606 194" style="stroke-width: 2.4"/>
+            <text class="d-s" x="604" y="212" text-anchor="end" style="fill: var(--accent)">keeps falling (often observed)</text>
+            <path class="d-ln d-dash" d="M300 176 C 380 172, 480 156, 606 132" style="stroke: var(--muted)"/>
+            <text class="d-s" x="604" y="122" text-anchor="end">what overfitting would look like</text>
+            <text class="d-t" x="96" y="84" style="fill: var(--accent)">test error</text>
+          </svg>
+        </div>
+        <figcaption><b>Boosting often keeps improving after zero training error.</b> A schematic of the lecture's sketch, not data. The dashed curve is the overfitting one might expect once every training point is correct; on many real data sets the test error instead keeps edging down.</figcaption>
+      </figure>
+      <p>The practical advice <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1655s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>27:35</a>: do not stop boosting the moment the training error becomes zero. Continue for a while, watch the error on a validation set, and choose the number of rounds based on whether the validation error keeps going down or starts to reverse.</p>
+      <p>There is an explanation under certain conditions, beyond the scope of the course. After the training error is zero, the newly added weak learners keep <b>increasing the margin</b> of the combined classifier, and a larger margin means a better ability to do well on test data, the same idea that motivated SVMs in <a href="part-16.html">Part 16</a>.</p>
+    </section>
+
+    <section id="in-practice">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1753s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 29:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1816s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 30:16 compared with others</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1883s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L68 · 31:23 off the shelf</a>
+        </div>
+        <h2>Boosting in practice, and bagging versus boosting</h2>
+      </div>
+      <p>AdaBoost is an off-the-shelf classifier that works extremely well and can boost even a poor classifier's accuracy a long way. Its downside is that it <b>cannot run in parallel</b>. To build the next weak learner you need to know where the previous one made its mistakes, so each round waits for the round before it. Bagging's bags are uniform, independent of one another, and can all be processed at once. Boosting therefore takes somewhat longer to train, but it typically performs better than bagging in practice.</p>
+      <p>Boosting helps most when the base learner really is weak. Start from a good learner and boosting typically gives no improvement in accuracy. Theory would allow an SVM as the weak learner, but in practice one boosts a quick and dirty learner such as a decision stump. Comparative studies find boosted stumps and SVMs typically perform comparably: on some data sets one is better, on others the other <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1851s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>30:51</a>.</p>
+      <p>Neither bagging nor boosting needs much tuning, so both can be run quickly. That is why they are called <dfn>off-the-shelf</dfn> classifiers.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>Bagging / random forest</th><th>Boosting (AdaBoost)</th></tr></thead>
+          <tbody>
+            <tr><td>Weak learner</td><td>full-depth trees: overfit, low bias, high variance</td><td>decision stumps: underfit, high bias, low variance</td></tr>
+            <tr><td>Data for each learner</td><td>uniform bootstrap bag</td><td>weights \(D_t\), focused on earlier mistakes</td></tr>
+            <tr><td>Combination</td><td>sign of the plain average (majority vote)</td><td>sign of the \(\alpha_t\)-weighted vote</td></tr>
+            <tr><td>Effect</td><td>reduces variance, bias roughly unchanged</td><td>drives training error to 0; test error often keeps falling</td></tr>
+            <tr><td>Training</td><td>parallel</td><td>serial, slower</td></tr>
+            <tr><td>In practice</td><td>very powerful variance reducer</td><td>typically better than bagging; boosted stumps comparable to SVMs</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>This ends the course's discussion of ensemble (meta) classifiers. The next lecture <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-B534pLpnhk&amp;t=1918s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>31:58</a> unifies the classifiers seen so far under one theme, loss plus regularization, which also explains why binary classification has a whole host of algorithms while regression had essentially one (<a href="part-18.html">Part 18</a>).</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Weak learner</dt><dd>A classifier that does better than random (50% for binary labels) on test data, perhaps only slightly, e.g. 55–60%.</dd></div>
+        <div><dt>Strong learner</dt><dd>What an ensemble aims for; in L68, a combination that reaches zero training error.</dd></div>
+        <div><dt>Ensemble (meta) classifier</dt><dd>Runs a base learning algorithm many times and combines the resulting classifiers into one.</dd></div>
+        <div><dt>Overfitting</dt><dd>Treating noise as structure: zero or tiny training error, poor test error, predictions sensitive to the data.</dd></div>
+        <div><dt>Underfitting</dt><dd>Treating structure as noise: a model too simple for the true relationship.</dd></div>
+        <div><dt>Bias</dt><dd>How far the assumed structure is from the truth; high for underfit models such as a line for a sine.</dd></div>
+        <div><dt>Variance</dt><dd>How much the predictions change when the training data is redrawn; high for overfit models.</dd></div>
+        <div><dt>Bootstrap sample (bag)</dt><dd>\(n\) uniform draws with replacement from the data; it holds about 63% of the distinct points.</dd></div>
+        <div><dt>Bagging</dt><dd>Bootstrap aggregation: train one learner per bag, predict with \(\operatorname{sign}\big(\frac1M\sum_i h_i(\mathbf{x})\big)\). Reduces variance.</dd></div>
+        <div><dt>Random forest</dt><dd>Bagged full-depth decision trees with feature bagging: each split considers only a random subset of about \(\sqrt d\) features.</dd></div>
+        <div><dt>Decision stump</dt><dd>A decision tree with one (sometimes two) questions: cheap, high bias, low variance. The usual weak learner for boosting.</dd></div>
+        <div><dt>AdaBoost</dt><dd>Adaptive boosting: reweight the points after each round, raising the weights of mistakes, and output \(\operatorname{sign}\big(\sum_t \alpha_t h_t(\mathbf{x})\big)\).</dd></div>
+        <div><dt>Weighted error \(\varepsilon_t\)</dt><dd>Total weight under \(D_t\) of the points that \(h_t\) misclassifies.</dd></div>
+        <div><dt>Vote weight \(\alpha_t\)</dt><dd>\(\tfrac12\ln\frac{1-\varepsilon_t}{\varepsilon_t}\): the factor in the weight update \(e^{\pm\alpha_t}\) and the weight of \(h_t\) in the final vote.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>A decision tree grown until every leaf is pure has zero training error. Why is it still a weak learner, and is its problem bias or variance?</span><span class="tog"></span></summary>
+          <p>Its last splits fit noise as if it were structure. Redraw the training data and the tree, and its predictions, change a lot: high variance. Its bias is low, because a deep tree can represent complicated structure. Bagging targets exactly this kind of learner.</p></details>
+        <details><summary><span class="q">Q2</span><span>Why does bagging use bootstrap samples instead of cutting the data set into \(M\) disjoint pieces?</span><span class="tog"></span></summary>
+          <p>Disjoint pieces have only \(n/M\) points each, so with many pieces every learner sees too little data. Sampling with replacement gives \(M\) data sets of the full size \(n\), at the price of repeated points.</p></details>
+        <details><summary><span class="q">Q3</span><span>A bag is drawn from \(n = 10\) points. What is the probability that a given point is missing from it? About how many distinct points does the bag hold?</span><span class="tog"></span></summary>
+          <p>\((1 - 1/10)^{10} = 0.9^{10} \approx 0.349\). Each point is in the bag with probability about 0.651, so the bag holds about \(10 \times 0.651 \approx 6.5\) distinct points on average; the other 3.5 or so slots are repeats.</p></details>
+        <details><summary><span class="q">Q4</span><span>A random forest is trained on data with \(d = 400\) features. Using the lecture's rules of thumb, how many features does each split consider for classification, and roughly how many for regression?</span><span class="tog"></span></summary>
+          <p>Classification: \(\sqrt{400} = 20\) features per split. Regression: of the order of \(d\), about \(d/3 \approx 133\) (or \(d/5 = 80\)). These are rules of thumb to start from.</p></details>
+        <details><summary><span class="q">Q5</span><span>In some AdaBoost round the stump's weighted error is \(\varepsilon_t = 0.2\). Find \(\alpha_t\), the two multipliers, the normalizer \(Z_t\), and the total weight on the misclassified points after normalizing.</span><span class="tog"></span></summary>
+          <p>\(\alpha_t = \tfrac12\ln(0.8/0.2) = \tfrac12\ln 4 = \ln 2 \approx 0.693\), so \(e^{\alpha_t} = 2\) and \(e^{-\alpha_t} = 0.5\). The mistakes' total weight goes from 0.2 to 0.4 and the correct points' from 0.8 to 0.4, so \(Z_t = 0.8\). After dividing, the mistakes hold \(0.4/0.8 = 0.5\) of the weight.</p></details>
+        <details><summary><span class="q">Q6</span><span>Three stumps with \(\alpha = 1.0,\ 0.5,\ 0.4\) predict \(+1, -1, -1\) at a point \(\mathbf{x}\). What does \(h^*\) predict? What would an unweighted majority vote predict?</span><span class="tog"></span></summary>
+          <p>\(\sum_t \alpha_t h_t(\mathbf{x}) = 1.0 - 0.5 - 0.4 = 0.1 \ge 0\), so \(h^*(\mathbf{x}) = +1\). A plain majority vote, as in bagging, would say \(-1\) (two votes to one). The weighted vote lets the more accurate stump overrule two weaker ones.</p></details>
+        <details><summary><span class="q">Q7</span><span>Using the standard form \(T &gt; \ln n / (2\gamma^2)\), how many rounds guarantee zero training error for \(n = 1000\) with weak learners of 75% accuracy? With 51% accuracy?</span><span class="tog"></span></summary>
+          <p>\(\ln 1000 \approx 6.91\). At 75%, \(\gamma = 0.25\) and \(T &gt; 6.91 / 0.125 \approx 55.3\), so 56 rounds. At 51%, \(\gamma = 0.01\) and \(T &gt; 6.91 / 0.0002 \approx 34{,}539\), so 34,540 rounds. The weaker the learner, the more rounds, and AdaBoost never needs to know \(\gamma\).</p></details>
+        <details><summary><span class="q">Q8</span><span>Your AdaBoost classifier reaches zero training error after 40 rounds. Should you stop there? And why can't the 40 rounds be run in parallel the way bagging's trees can?</span><span class="tog"></span></summary>
+          <p>Not necessarily: on many data sets the test error keeps falling after the training error reaches zero, so keep going while watching a validation error and stop when it stops improving. The rounds are serial because \(D_{t+1}\) depends on where \(h_t\) made mistakes, so \(h_{t+1}\) cannot be trained before \(h_t\) exists.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a class="next" href="index.html"><span class="dir">Part 18 · coming</span><span class="nm">Loss functions, neural networks and summary</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const clear = g => { while (g.firstChild) g.removeChild(g.firstChild); };
+
+  /* ---------- Feature strips in the random-forest figure ---------- */
+  (() => {
+    const strip = (id, x0, y0, on) => {
+      const g = document.getElementById(id); if (!g) return;
+      for (let i = 0; i < 40; i++) mk('rect', { x: x0 + i * 6.5, y: y0, width: 5.5, height: 16, style: on === 'all' || on.includes(i + 1) ? 'fill: var(--accent)' : 'fill: var(--rule)' }, g);
+    };
+    strip('p17-strip-all', 22, 80, 'all');
+    strip('p17-strip-n1', 362, 80, [1, 5, 23, 40]);
+    strip('p17-strip-n2', 362, 192, [1, 10, 20, 40]);
+  })();
+
+  /* ---------- Bias and variance: refit polynomials to redrawn data ---------- */
+  (() => {
+    const svg = document.getElementById('bv-svg'); if (!svg) return;
+    let seed = 1766;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const f = x => Math.sin(2 * Math.PI * x);
+    const N = 9, SIG = 0.3, DRAWS = 200, SHOW = 30, XT = 0.25;
+    const sets = [];
+    for (let k = 0; k < DRAWS; k++) { const xs = [], ys = []; for (let j = 0; j < N; j++) { const x = (j + rand()) / N; xs.push(x); ys.push(f(x) + SIG * normal()); } sets.push({ xs, ys }); }
+    /* least squares in a Chebyshev basis on t = 2x - 1 (well conditioned up to degree 8) */
+    const cheb = (t, p) => { const T = [1, t]; for (let k = 2; k <= p; k++) T.push(2 * t * T[k - 1] - T[k - 2]); return T.slice(0, p + 1); };
+    const solve = (A, b) => { const n = b.length; const M = A.map((r, i) => [...r, b[i]]); for (let c = 0; c < n; c++) { let m = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[m][c])) m = r; [M[c], M[m]] = [M[m], M[c]]; for (let r = c + 1; r < n; r++) { const q = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= q * M[c][k]; } } const x = new Array(n).fill(0); for (let r = n - 1; r >= 0; r--) { let s = M[r][n]; for (let k = r + 1; k < n; k++) s -= M[r][k] * x[k]; x[r] = s / M[r][r]; } return x; };
+    const fit = (xs, ys, p) => { const B = xs.map(x => cheb(2 * x - 1, p)); const A = Array.from({ length: p + 1 }, (_, i) => Array.from({ length: p + 1 }, (_, j) => B.reduce((s, r) => s + r[i] * r[j], 0))); const b = Array.from({ length: p + 1 }, (_, i) => B.reduce((s, r, k) => s + r[i] * ys[k], 0)); const c = solve(A, b); return x => cheb(2 * x - 1, p).reduce((s, v, i) => s + v * c[i], 0); };
+
+    const L = 52, R = 624, T0 = 14, B = 322, ylo = -2.5, yhi = 2.5;
+    const sx = x => L + x * (R - L), sy = y => B - (y - ylo) / (yhi - ylo) * (B - T0);
+    const clampY = y => Math.max(ylo, Math.min(yhi, y));
+    const g = mk('g', { class: 'c-grid' }, svg);
+    [-2, -1, 0, 1, 2].forEach(v => { mk('line', { x1: L, x2: R, y1: sy(v), y2: sy(v) }, g); mk('text', { x: L - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v; });
+    [0, 0.25, 0.5, 0.75, 1].forEach(v => { mk('line', { x1: sx(v), x2: sx(v), y1: T0, y2: B }, g); mk('text', { x: sx(v), y: B + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v; });
+    mk('line', { x1: L, x2: R, y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('text', { x: R, y: B + 32, 'text-anchor': 'end', class: 'c-title' }, svg).textContent = 'x';
+    mk('text', { x: L - 30, y: T0 + 4, class: 'c-title' }, svg).textContent = 'y';
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'bv-clip' }, defs); mk('rect', { x: L, y: T0, width: R - L, height: B - T0 }, cp);
+    const pathOf = h => { let d = ''; for (let i = 0; i <= 120; i++) { const x = i / 120, y = Math.max(-4, Math.min(4, h(x))); d += (i ? ' L' : 'M') + sx(x).toFixed(1) + ' ' + sy(y).toFixed(1); } return d; };
+    mk('path', { d: pathOf(f), class: 'c-line', style: 'fill: none; stroke: var(--muted); stroke-dasharray: 6 5' }, svg);
+    mk('text', { x: R - 6, y: T0 + 16, 'text-anchor': 'end', class: 'c-note' }, svg).textContent = 'dashed: true structure, sin 2πx';
+    const gFaint = mk('g', { 'clip-path': 'url(#bv-clip)' }, svg);
+    const faint = Array.from({ length: SHOW }, () => mk('path', { style: 'fill: none; stroke: var(--muted); stroke-opacity: .3; stroke-width: 1' }, gFaint));
+    mk('line', { x1: sx(XT), x2: sx(XT), y1: T0, y2: B, class: 'c-faint', style: 'stroke-dasharray: 3 3' }, svg);
+    mk('text', { x: sx(XT) + 22, y: B - 8, class: 'c-note' }, svg).textContent = 'test x = 0.25';
+    const jit = Array.from({ length: DRAWS }, (_, k) => ((k * 37) % 19) - 9);
+    const gStrip = mk('g', {}, svg);
+    const stripDots = sets.map((_, k) => mk('circle', { cx: sx(XT) + jit[k], r: 2.3, style: 'fill: var(--accent); fill-opacity: .4' }, gStrip));
+    const hiPath = mk('path', { class: 'c-user', 'clip-path': 'url(#bv-clip)', style: 'fill: none' }, svg);
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    const dots = Array.from({ length: N }, () => mk('circle', { r: 4.2 }, gDots));
+    mk('circle', { cx: sx(XT), cy: sy(f(XT)), r: 6, class: 'c-pt-hi' }, svg);
+    const hiPred = mk('circle', { cx: sx(XT), r: 5.5, class: 'c-proxy' }, svg);
+
+    const slider = document.getElementById('bv-deg'), out = document.getElementById('bv-deg-out');
+    const trOut = document.getElementById('bv-train'), biOut = document.getElementById('bv-bias'), spOut = document.getElementById('bv-spread'), status = document.getElementById('bv-status');
+    let deg = parseInt(slider.value, 10), cur = 10, fits = [], bias = 0, spread = 0;
+    const refit = () => {
+      fits = sets.map(s => fit(s.xs, s.ys, deg));
+      for (let k = 0; k < SHOW; k++) faint[k].setAttribute('d', pathOf(fits[k]));
+      const pr = fits.map(h => h(XT));
+      pr.forEach((v, k) => stripDots[k].setAttribute('cy', sy(clampY(v))));
+      const m = pr.reduce((a, c) => a + c, 0) / DRAWS;
+      bias = m - f(XT); spread = Math.sqrt(pr.reduce((a, c) => a + (c - m) ** 2, 0) / DRAWS);
+      out.textContent = 'degree ' + deg;
+      biOut.textContent = Math.abs(bias) < 0.005 ? '0.00' : (bias > 0 ? '+' : '−') + Math.abs(bias).toFixed(2);
+      spOut.textContent = spread.toFixed(2);
+    };
+    const drawHi = () => {
+      const s = sets[cur], h = fits[cur];
+      hiPath.setAttribute('d', pathOf(h));
+      s.xs.forEach((x, j) => { dots[j].setAttribute('cx', sx(x)); dots[j].setAttribute('cy', sy(s.ys[j])); });
+      hiPred.setAttribute('cy', sy(clampY(h(XT))));
+      const mse = s.xs.reduce((a, x, j) => a + (h(x) - s.ys[j]) ** 2, 0) / N;
+      trOut.textContent = (mse < 5e-4 ? 0 : mse).toFixed(3);
+      let msg;
+      if (Math.abs(bias) > 0.3) msg = 'Underfit: the fits hardly move between draws (small spread), but on average they sit well below the peak at the test x (large bias).';
+      else if (spread > 0.6) msg = 'Overfit: every fit passes through its own nine points (zero training error), but the prediction at the test x swings from draw to draw (large spread).';
+      else if (spread > 0.3) msg = 'More flexible: the bias stays small, but the spread at the test x is starting to grow.';
+      else msg = 'Bias and spread are both small at this degree.';
+      status.textContent = 'Draw ' + (cur + 1) + ' of ' + SHOW + ' highlighted. ' + msg;
+    };
+    refit(); drawHi();
+    slider.addEventListener('input', () => { deg = parseInt(slider.value, 10); refit(); drawHi(); });
+    document.getElementById('bv-next').addEventListener('click', () => { cur = (cur + 1) % SHOW; drawHi(); });
+  })();
+
+  /* ---------- AdaBoost with decision stumps, round by round ---------- */
+  (() => {
+    const svg = document.getElementById('ada-svg'); if (!svg) return;
+    let seed = 143;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    /* +1 inside a circle of radius 4 around (5, 5), -1 outside; keep a margin and a minimum spacing */
+    const inside = x => 2.2 * (16 - ((x[0] - 5) ** 2 + (x[1] - 5) ** 2)) / 4;
+    const P = []; let guard = 0;
+    while (P.length < 16 && guard++ < 5000) {
+      const x = [Math.round((0.6 + 8.8 * rand()) * 10) / 10, Math.round((0.6 + 8.8 * rand()) * 10) / 10];
+      const s = inside(x); if (Math.abs(s) < 1.5) continue;
+      if (P.some(p => Math.hypot(p.x[0] - x[0], p.x[1] - x[1]) < 1.3)) continue;
+      P.push({ x, y: s > 0 ? 1 : -1 });
+    }
+    const n = P.length, TMAX = 12;
+    /* every stump: threshold midway between neighbouring coordinates, either orientation */
+    const stumps = [];
+    for (const k of [0, 1]) { const v = [...new Set(P.map(p => p.x[k]))].sort((a, b) => a - b); for (let i = 0; i + 1 < v.length; i++) { const th = Math.round((v[i] + v[i + 1]) * 50) / 100; stumps.push({ k, th, s: 1 }, { k, th, s: -1 }); } }
+    const pred = (h, x) => (x[h.k] < h.th ? h.s : -h.s);
+    const vote = (t, x) => { let s = 0; for (let r = 0; r < t; r++) s += rounds[r].alpha * pred(rounds[r].h, x); return s >= 0 ? 1 : -1; };
+    const rounds = [];
+    let D = P.map(() => 1 / n);
+    for (let t = 0; t < TMAX; t++) {
+      let best = null, be = 2;
+      for (const h of stumps) { let e = 0; P.forEach((p, i) => { if (pred(h, p.x) !== p.y) e += D[i]; }); if (e < be - 1e-12) { be = e; best = h; } }
+      const eps = Math.max(be, 1e-9), alpha = 0.5 * Math.log((1 - eps) / eps);
+      const wrong = P.map(p => pred(best, p.x) !== p.y);
+      const tilde = D.map((d, i) => d * Math.exp(wrong[i] ? alpha : -alpha)), Z = tilde.reduce((a, c) => a + c, 0);
+      const after = tilde.map(d => d / Z);
+      rounds.push({ h: best, eps, alpha, wrong, nWrong: wrong.filter(Boolean).length, after });
+      rounds[t].err = P.filter(p => vote(t + 1, p.x) !== p.y).length;
+      D = after;
+    }
+    const firstZero = rounds.findIndex(r => r.err === 0);
+
+    const L = 36, T0 = 22, S = 34;
+    const sx = v => L + v * S, sy = v => T0 + (10 - v) * S;
+    const gReg = mk('g', {}, svg);
+    const gGrid = mk('g', { class: 'c-grid' }, svg);
+    [0, 2, 4, 6, 8, 10].forEach(v => {
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(0), y2: sy(10) }, gGrid); mk('line', { x1: sx(0), x2: sx(10), y1: sy(v), y2: sy(v) }, gGrid);
+      mk('text', { x: sx(v), y: sy(0) + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+      mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+    });
+    mk('text', { x: sx(10), y: sy(0) + 30, 'text-anchor': 'end', class: 'c-title' }, svg).textContent = 'x₁';
+    mk('text', { x: 2, y: sy(5) + 4, class: 'c-title' }, svg).textContent = 'x₂';
+    const stumpLine = mk('line', { class: 'c-err' }, svg);
+    const gRing = mk('g', {}, svg), gPts = mk('g', {}, svg);
+    const rings = P.map(p => mk('circle', { cx: sx(p.x[0]), cy: sy(p.x[1]), class: 'c-hl' }, gRing));
+    const marks = P.map(p => p.y > 0
+      ? mk('circle', { cx: sx(p.x[0]), cy: sy(p.x[1]), style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.5' }, gPts)
+      : mk('rect', { style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.6' }, gPts));
+    const radius = d => Math.max(2.2, Math.min(16, 6.5 * Math.sqrt(n * d)));
+    const setSizes = W => P.forEach((p, i) => {
+      const r = radius(W[i]);
+      if (p.y > 0) marks[i].setAttribute('r', r);
+      else { const a = r * 1.772; marks[i].setAttribute('x', sx(p.x[0]) - a / 2); marks[i].setAttribute('y', sy(p.x[1]) - a / 2); marks[i].setAttribute('width', a); marks[i].setAttribute('height', a); }
+      rings[i].setAttribute('r', 1.25 * r + 3);
+    });
+
+    /* right-hand list of stumps and their votes */
+    const X0 = 400, sub = k => String(k).split('').map(c => '₀₁₂₃₄₅₆₇₈₉'[+c]).join('');
+    mk('text', { x: X0, y: 34, class: 'c-title' }, svg).textContent = 'Stumps so far and their votes αₜ';
+    mk('text', { x: X0 + 28, y: 54, class: 'c-tick' }, svg).textContent = '+1 if';
+    mk('text', { x: X0 + 122, y: 54, class: 'c-tick' }, svg).textContent = 'αₜ';
+    const rows = rounds.map((r, i) => {
+      const y = 76 + i * 23, gr = mk('g', {}, svg);
+      const lab = mk('text', { x: X0, y, class: 'c-note' }, gr); lab.textContent = 'h' + sub(i + 1);
+      const rule = mk('text', { x: X0 + 28, y, class: 'c-note' }, gr); rule.textContent = (r.h.k ? 'x₂' : 'x₁') + (r.h.s > 0 ? ' < ' : ' > ') + (+r.h.th.toFixed(2));
+      const bar = mk('rect', { x: X0 + 122, y: y - 9, height: 10, width: r.alpha * 90, style: 'fill: var(--muted)' }, gr);
+      const val = mk('text', { x: X0 + 126 + r.alpha * 90, y, class: 'c-tick' }, gr); val.textContent = r.alpha.toFixed(2);
+      return { gr, lab, rule, bar };
+    });
+    mk('circle', { cx: X0 + 6, cy: 344, r: 5, style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.5' }, svg);
+    mk('text', { x: X0 + 16, y: 348, class: 'c-tick' }, svg).textContent = 'label +1';
+    mk('rect', { x: X0 + 106, y: 339, width: 9, height: 9, style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.6' }, svg);
+    mk('text', { x: X0 + 122, y: 348, class: 'c-tick' }, svg).textContent = 'label −1';
+    mk('circle', { cx: X0 + 6, cy: 362, r: 6, class: 'c-hl' }, svg);
+    mk('text', { x: X0 + 16, y: 366, class: 'c-tick' }, svg).textContent = 'hₜ wrong: weight grows';
+    mk('rect', { x: X0, y: 375, width: 12, height: 10, style: 'fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1' }, svg);
+    mk('text', { x: X0 + 18, y: 384, class: 'c-tick' }, svg).textContent = 'h* says +1';
+    mk('line', { x1: X0 + 106, x2: X0 + 128, y1: 380, y2: 380, class: 'c-err' }, svg);
+    mk('text', { x: X0 + 134, y: 384, class: 'c-tick' }, svg).textContent = 'stump hₜ';
+
+    const slider = document.getElementById('ada-t'), out = document.getElementById('ada-t-out'), next = document.getElementById('ada-next');
+    const eOut = document.getElementById('ada-eps'), aOut = document.getElementById('ada-alpha'), wOut = document.getElementById('ada-wrong'), hOut = document.getElementById('ada-err'), status = document.getElementById('ada-status');
+    const uniform = P.map(() => 1 / n);
+    let t = parseInt(slider.value, 10), shown = (t ? rounds[t - 1].after : uniform).slice(), anim = 0;
+    const regions = () => {
+      clear(gReg);
+      if (!t) return;
+      const xs = [0, 10], ys = [0, 10];
+      for (let r = 0; r < t; r++) (rounds[r].h.k ? ys : xs).push(rounds[r].h.th);
+      const ux = [...new Set(xs)].sort((a, b) => a - b), uy = [...new Set(ys)].sort((a, b) => a - b);
+      for (let i = 0; i + 1 < ux.length; i++) for (let j = 0; j + 1 < uy.length; j++) {
+        if (vote(t, [(ux[i] + ux[i + 1]) / 2, (uy[j] + uy[j + 1]) / 2]) > 0) mk('rect', { x: sx(ux[i]), y: sy(uy[j + 1]), width: (ux[i + 1] - ux[i]) * S, height: (uy[j + 1] - uy[j]) * S, style: 'fill: var(--accent-soft)' }, gReg);
+      }
+    };
+    const render = animate => {
+      slider.value = t; out.textContent = t === 1 ? 'after 1 round' : 'after ' + t + ' rounds';
+      next.disabled = t >= TMAX;
+      regions();
+      const target = t ? rounds[t - 1].after : uniform;
+      if (t) {
+        const h = rounds[t - 1].h;
+        if (h.k === 0) { stumpLine.setAttribute('x1', sx(h.th)); stumpLine.setAttribute('x2', sx(h.th)); stumpLine.setAttribute('y1', sy(0)); stumpLine.setAttribute('y2', sy(10)); }
+        else { stumpLine.setAttribute('x1', sx(0)); stumpLine.setAttribute('x2', sx(10)); stumpLine.setAttribute('y1', sy(h.th)); stumpLine.setAttribute('y2', sy(h.th)); }
+        stumpLine.setAttribute('visibility', 'visible');
+      } else stumpLine.setAttribute('visibility', 'hidden');
+      rings.forEach((rg, i) => rg.setAttribute('visibility', t && rounds[t - 1].wrong[i] ? 'visible' : 'hidden'));
+      rows.forEach((row, i) => {
+        row.gr.setAttribute('visibility', i < t ? 'visible' : 'hidden');
+        const on = i === t - 1;
+        row.lab.setAttribute('style', on ? 'fill: var(--accent); font-weight: 600' : '');
+        row.rule.setAttribute('style', on ? 'fill: var(--accent); font-weight: 600' : '');
+        row.bar.setAttribute('style', on ? 'fill: var(--accent)' : 'fill: var(--muted)');
+      });
+      const from = shown.slice(), my = ++anim;
+      const apply = k => { if (my !== anim) return; shown = from.map((v, i) => v + (target[i] - v) * k); setSizes(shown); };
+      if (animate) tween(0, 1, apply); else apply(1);
+      if (!t) {
+        eOut.textContent = '–'; aOut.textContent = '–'; wOut.textContent = '–'; hOut.textContent = '–';
+        status.textContent = 'Round 0: all 16 points start with weight 1/16, drawn at equal size. Press Next round.';
+        return;
+      }
+      const r = rounds[t - 1];
+      eOut.textContent = r.eps.toFixed(3); aOut.textContent = r.alpha.toFixed(3);
+      wOut.textContent = r.nWrong + ' of ' + n; hOut.textContent = r.err + ' of ' + n;
+      let msg = 'Round ' + t + ': h' + sub(t) + ' gets ' + r.nWrong + ' point' + (r.nWrong === 1 ? '' : 's') + ' wrong (ringed), weighted error ε = ' + r.eps.toFixed(3) + '. Their weights are multiplied by e^α = ' + Math.exp(r.alpha).toFixed(2) + ' and the others by e^−α = ' + Math.exp(-r.alpha).toFixed(2) + ', then all are renormalized.';
+      if (r.nWrong > n / 2) msg += ' It misclassifies more than half the points, yet ε < ½ because those points carry little weight.';
+      if (r.err === 0) msg += t - 1 === firstZero ? ' The weighted vote h* now classifies every training point correctly.' : ' The training error of h* stays at 0.';
+      status.textContent = msg;
+    };
+    render(false);
+    slider.addEventListener('input', () => { t = parseInt(slider.value, 10); render(false); });
+    next.addEventListener('click', () => { if (t < TMAX) { t += 1; render(true); } });
+    document.getElementById('ada-reset').addEventListener('click', () => { t = 0; render(true); });
+  })();
+})();
+</script>
+</body>
+</html>
