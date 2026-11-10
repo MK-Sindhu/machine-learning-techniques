@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 3 · Principal component analysis · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 3: lectures 6–7 on principal component analysis, from orthogonal residue directions and compression to eigenvectors and variance maximization.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 3 of 18</span><span class="sep">·</span><a href="part-02.html">← Part 2</a><span class="sep">·</span><a href="part-04.html">Part 4 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Principal component analysis: from repeated lines to eigenvectors</h1>
+    <p class="lede">Notes for lectures 6 and 7. Fitting lines to residues again and again produces orthogonal directions, a new basis for the data, and a compression that keeps only the first few directions. Linear algebra then identifies those directions as eigenvectors of the covariance matrix and shows that the line with the least error is the line with the most variance.</p>
+    <div class="meta">
+      <span><b>Part 3</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>59 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L6 · 31:19</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L7 · 27:14</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 6</h4>
+      <ul>
+        <li><a href="#recap">Part 2's open questions</a></li>
+        <li><a href="#orthogonal">Each new line is orthogonal</a></li>
+        <li><a href="#new-basis">A new basis</a></li>
+        <li><a href="#compression">Where the compression is</a></li>
+        <li><a href="#how-many">When to stop</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 7</h4>
+      <ul>
+        <li><a href="#eigenvectors">Eigenvectors of C</a></li>
+        <li><a href="#eigenvalues">What eigenvalues measure</a></li>
+        <li><a href="#variance">Error = variance</a></li>
+        <li><a href="#height-weight">Height and weight</a></li>
+        <li><a href="#pca">The PCA algorithm</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>The best line for the residues is <b>orthogonal</b> to every earlier line. After \(d\) rounds the lines \(\mathbf{w}_1, \dots, \mathbf{w}_d\) form an orthonormal basis and \(\mathbf{x}_i = \sum_k (\mathbf{x}_i^\top\mathbf{w}_k)\,\mathbf{w}_k\): a change of basis.</li>
+        <li>If the residues vanish after \(k\) rounds, store \(k\) shared representatives and \(k\) coefficients per point: \(dk + kn\) numbers instead of \(dn\) (600 instead of 10,000 for \(d = n = 100,\ k = 3\)).</li>
+        <li>For data that is only approximately low-dimensional, Pythagoras splits the fixed average \(\lVert\mathbf{x}_i\rVert^2\) into error plus \(\frac1n\sum(\mathbf{x}_i^\top\mathbf{w})^2\). Keep the top \(k\) directions that capture about 95% of the total (a rule of thumb).</li>
+        <li>Linear algebra: \(\mathbf{w}_k\) is the eigenvector of \(C\) with the \(k\)-th largest eigenvalue, and \(\lambda_k = \frac1n\sum(\mathbf{x}_i^\top\mathbf{w}_k)^2 \ge 0\), so \(C\) is positive semidefinite.</li>
+        <li>On centred data, \(\mathbf{w}^\top C\mathbf{w}\) is the <b>variance</b> of the projected values. Minimizing reconstruction error is the same as maximizing variance, so projections do not crowd together.</li>
+        <li>This is <dfn>principal component analysis</dfn>. The principal components are the top \(k\) eigenvectors; the new coordinates are de-correlated combinations of the original features.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 6 ============ -->
+    <section id="recap">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=13s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 0:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=74s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 1:14 the procedure so far</a>
+        </div>
+        <h2>Where Part 2 left off</h2>
+      </div>
+      <p><a href="part-02.html">Part 2</a> built a procedure: centre the data, find the line with the least reconstruction error, replace every point by its residue, and repeat. It ended with <a href="part-02.html#questions">four open questions</a>. Lectures 6 and 7 answer all four, and the answers together make up principal component analysis.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Part 2's question</th><th>Short answer</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>1. How do we solve \(\max_{\lVert\mathbf{w}\rVert=1}\mathbf{w}^\top C\mathbf{w}\)?</td><td>Take the eigenvector of \(C\) with the largest eigenvalue. Round \(k\) gives the \(k\)-th eigenvector.</td><td><a href="#eigenvectors">L7</a></td></tr>
+            <tr><td>2. How many times do we repeat the residue step?</td><td>At most \(d\). Stop once the residues are zero, or once the rounds so far account for about 95% of the total.</td><td><a href="#how-many">L6</a>, <a href="#eigenvalues">L7</a></td></tr>
+            <tr><td>3. Where is the compression with several lines?</td><td>\(k\) shared representatives plus \(k\) coefficients per point: \(dk + kn\) numbers instead of \(dn\).</td><td><a href="#compression">L6</a></td></tr>
+            <tr><td>4. What representation are we learning?</td><td>Each point's coordinates in a new orthonormal basis whose directions are de-correlated: the principal components.</td><td><a href="#new-basis">L6</a>, <a href="#pca">L7</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>The procedure so far</h3>
+      <p>The data set is \(\{\mathbf{x}_1, \dots, \mathbf{x}_n\}\) with \(\mathbf{x}_i \in \mathbb{R}^d\), centred. Round 1 finds</p>
+      <div class="eq">\[ \mathbf{w}_1 = \arg\max_{\lVert\mathbf{w}\rVert^2 = 1} \; \mathbf{w}^\top C\,\mathbf{w}, \qquad C = \frac1n\sum_{i=1}^n \mathbf{x}_i\mathbf{x}_i^\top \]</div>
+      <p>"argmax" means the argument that achieves the maximum: the vector \(\mathbf{w}\) itself, not the maximum value.</p>
+      <p>Round 2 works on the residues <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=143s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:23</a>. These are still vectors in \(\mathbb{R}^d\): the error vectors left over after round 1.</p>
+      <div class="eq">\[ \mathbf{x}_i' = \mathbf{x}_i - (\mathbf{x}_i^\top\mathbf{w}_1)\,\mathbf{w}_1, \qquad \mathbf{w}_2 = \arg\max_{\lVert\mathbf{w}\rVert^2 = 1} \; \mathbf{w}^\top C'\,\mathbf{w}, \qquad C' = \frac1n\sum_{i=1}^n \mathbf{x}_i'\,\mathbf{x}_i'^\top \]</div>
+      <p class="note">\(C'\) is the \(d \times d\) matrix built from the residues in the same way \(C\) was built from the data <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=184s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:04</a>.</p>
+    </section>
+
+    <section id="orthogonal">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=245s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 4:05</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=357s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 5:57 residues line up</a>
+        </div>
+        <h2>Each new line is orthogonal to the earlier ones</h2>
+      </div>
+      <p>With two lines in hand, the natural question is how \(\mathbf{w}_1\) and \(\mathbf{w}_2\) are related. Look at two dimensions first. Take centred data and its best line \(\mathbf{w}_1\), a unit vector, so its tip lies on the unit circle. Each residue \(\mathbf{x}_i - (\mathbf{x}_i^\top\mathbf{w}_1)\mathbf{w}_1\) runs from the proxy on the line to the point. A projection meets the line at a right angle, so every residue is perpendicular to \(\mathbf{w}_1\).</p>
+      <p>In two dimensions only one direction is perpendicular to \(\mathbf{w}_1\), so all the residues lie on one line through the origin. In higher dimensions they lie in the hyperplane perpendicular to \(\mathbf{w}_1\). The best line for the residues in 2-D is the line they already lie on: any other line would add error that this one avoids. That line is perpendicular to \(\mathbf{w}_1\).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 240" role="img" aria-label="Left: seven centred points in two dimensions, the best line w1, and dashed residues from each proxy to its point, all perpendicular to w1. Right: the residues drawn from the origin all lie on one line perpendicular to w1, which is w2.">
+            <text class="d-h" x="20" y="22">Round 1: fit w₁, keep the residues</text>
+            <line class="d-ln" x1="61.1" y1="185" x2="268.9" y2="65" style="stroke-width:2"/>
+            <text class="d-t" x="274" y="66">w₁</text>
+            <path class="d-ln-acc d-dash" d="M81.9 173 L73.5 158.6"/>
+            <path class="d-ln-acc d-dash" d="M111 156.2 L134.1 196.2"/>
+            <path class="d-ln-acc d-dash" d="M140.1 139.4 L119 103"/>
+            <path class="d-ln-acc d-dash" d="M169.2 122.6 L181.4 143.7"/>
+            <path class="d-ln-acc d-dash" d="M196.2 107 L178.8 77"/>
+            <path class="d-ln-acc d-dash" d="M219 93.8 L235.5 122.4"/>
+            <path class="d-ln-acc d-dash" d="M237.7 83 L232.7 74.2"/>
+            <path class="d-ln" d="M203.1 103 L199.1 96.1 L192.2 100.1" style="stroke-width:1.2"/>
+            <circle class="c-proxy" cx="81.9" cy="173" r="3.5"/><circle class="c-proxy" cx="111" cy="156.2" r="3.5"/><circle class="c-proxy" cx="140.1" cy="139.4" r="3.5"/><circle class="c-proxy" cx="169.2" cy="122.6" r="3.5"/><circle class="c-proxy" cx="196.2" cy="107" r="3.5"/><circle class="c-proxy" cx="219" cy="93.8" r="3.5"/><circle class="c-proxy" cx="237.7" cy="83" r="3.5"/>
+            <circle class="pt-plain" cx="73.5" cy="158.6" r="4.5"/><circle class="pt-plain" cx="134.1" cy="196.2" r="4.5"/><circle class="pt-plain" cx="119" cy="103" r="4.5"/><circle class="pt-plain" cx="181.4" cy="143.7" r="4.5"/><circle class="pt-plain" cx="178.8" cy="77" r="4.5"/><circle class="pt-plain" cx="235.5" cy="122.4" r="4.5"/><circle class="pt-plain" cx="232.7" cy="74.2" r="4.5"/>
+            <circle class="pt-new" cx="165" cy="125" r="3.5"/><text class="d-al" x="160" y="114" text-anchor="end">0</text>
+            <text class="d-s" x="20" y="228">dots: data · rings: proxies · dashes: residues ⟂ w₁</text>
+
+            <line class="d-rule" x1="330" y1="10" x2="330" y2="234"/>
+
+            <text class="d-h" x="350" y="22">Round 2: fit the residues</text>
+            <line class="d-ln" x1="412.7" y1="175.4" x2="587.3" y2="74.6" style="stroke-dasharray: 3 4"/>
+            <text class="d-al" x="592" y="76">along w₁</text>
+            <line class="d-ln-acc" x1="534.8" y1="185.3" x2="465.2" y2="64.7" style="stroke-width:2.4"/>
+            <text class="d-t" x="458" y="60" text-anchor="end" style="fill: var(--accent)">w₂</text>
+            <line class="d-ln" x1="500" y1="125" x2="491.7" y2="110.6"/><line class="d-ln" x1="500" y1="125" x2="523.1" y2="165"/><line class="d-ln" x1="500" y1="125" x2="479" y2="88.6"/><line class="d-ln" x1="500" y1="125" x2="512.2" y2="146.1"/><line class="d-ln" x1="500" y1="125" x2="482.7" y2="95"/><line class="d-ln" x1="500" y1="125" x2="516.5" y2="153.6"/><line class="d-ln" x1="500" y1="125" x2="494.9" y2="116.2"/>
+            <circle class="pt-tree" cx="491.7" cy="110.6" r="4"/><circle class="pt-tree" cx="523.1" cy="165" r="4"/><circle class="pt-tree" cx="479" cy="88.6" r="4"/><circle class="pt-tree" cx="512.2" cy="146.1" r="4"/><circle class="pt-tree" cx="482.7" cy="95" r="4"/><circle class="pt-tree" cx="516.5" cy="153.6" r="4"/><circle class="pt-tree" cx="494.9" cy="116.2" r="4"/>
+            <path class="d-ln" d="M507.8 120.5 L503.3 112.7 L495.5 117.2" style="stroke-width:1.2"/>
+            <circle class="pt-new" cx="500" cy="125" r="3.5"/>
+            <text class="d-s" x="530" y="130">w₁ᵀw₂ = 0</text>
+            <text class="d-s" x="350" y="228">the residues lie on one line, so w₂ fits them with zero error</text>
+          </svg>
+        </div>
+        <figcaption><b>Why \(\mathbf{w}_2 \perp \mathbf{w}_1\) in two dimensions.</b> Seven illustrative centred points, drawn to scale. Every residue is perpendicular to \(\mathbf{w}_1\), so redrawn from the origin they all fall on the perpendicular line. That line fits them exactly, so it is \(\mathbf{w}_2\), and the residue of the residue is zero.</figcaption>
+      </figure>
+
+      <div class="result">
+        <span class="lbl">Observation <a class="ts" style="margin-left:6px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=452s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:32</a></span>
+        <p>All residues are orthogonal to \(\mathbf{w}_1\). Hence any line that minimizes the total error on the residues is also orthogonal to \(\mathbf{w}_1\):</p>
+        \[ \mathbf{w}_2^\top\mathbf{w}_1 = 0. \]
+      </div>
+      <p>The lecture does not prove the second step and leaves it as an exercise. One short argument is to write a unit vector as \(\mathbf{w} = \alpha\,\mathbf{w}_1 + \beta\,\mathbf{u}\), where \(\mathbf{u}\) is a unit vector orthogonal to \(\mathbf{w}_1\) and \(\alpha^2 + \beta^2 = 1\). Every residue has \(\mathbf{x}_i'^\top\mathbf{w}_1 = 0\), so \(\mathbf{x}_i'^\top\mathbf{w} = \beta\,\mathbf{x}_i'^\top\mathbf{u}\) and</p>
+      <div class="eq">\[ \frac1n\sum_{i=1}^n (\mathbf{x}_i'^\top\mathbf{w})^2 = \beta^2 \cdot \frac1n\sum_{i=1}^n (\mathbf{x}_i'^\top\mathbf{u})^2 . \]</div>
+      <p>Any component along \(\mathbf{w}_1\) (\(\alpha \neq 0\)) makes \(\beta^2 &lt; 1\) and only shrinks the objective. So the maximizer has no \(\mathbf{w}_1\) component.</p>
+      <p>The direction of \(\mathbf{w}_2\) is fixed only up to sign <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=512s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:32</a>. The unit vector pointing the opposite way spans the same line, and it is orthogonal to \(\mathbf{w}_1\) too.</p>
+
+      <h3>Keep going <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=545s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 9:05</a></h3>
+      <p>In 2-D the procedure must stop after two rounds: \(\mathbf{w}_2\) fits the residues exactly, so the residue of the residue is the zero vector. In 100 dimensions there may still be something left, so we continue, and each new line is orthogonal to all the previous ones. After \(d\) rounds in \(\mathbb{R}^d\):</p>
+      <div class="eq">\[ \{\mathbf{w}_1, \mathbf{w}_2, \dots, \mathbf{w}_d\} \quad\text{with}\quad \lVert\mathbf{w}_k\rVert^2 = 1 \ \text{for all } k, \qquad \mathbf{w}_i^\top\mathbf{w}_j = 0 \ \text{for all } i \neq j. \]</div>
+      <p>A set of mutually perpendicular unit vectors is called <dfn>orthonormal</dfn> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=652s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:52</a>.</p>
+    </section>
+
+    <section id="new-basis">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=713s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 11:53</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=956s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 15:56 change of basis</a>
+        </div>
+        <h2>One direction peeled off per round: a new basis</h2>
+      </div>
+      <p>To see what orthonormality buys, write out the residues explicitly. After round 1 the residue of \(\mathbf{x}_1\) is \(\mathbf{x}_1 - (\mathbf{x}_1^\top\mathbf{w}_1)\mathbf{w}_1\). Round 2 subtracts that vector's own projection onto \(\mathbf{w}_2\):</p>
+      <div class="eq">\[ \begin{aligned} &amp;\big[\mathbf{x}_1 - (\mathbf{x}_1^\top\mathbf{w}_1)\mathbf{w}_1\big] - \Big(\big[\mathbf{x}_1 - (\mathbf{x}_1^\top\mathbf{w}_1)\mathbf{w}_1\big]^\top\mathbf{w}_2\Big)\,\mathbf{w}_2 \\ &amp;\quad= \mathbf{x}_1 - (\mathbf{x}_1^\top\mathbf{w}_1)\mathbf{w}_1 - (\mathbf{x}_1^\top\mathbf{w}_2)\mathbf{w}_2 + (\mathbf{x}_1^\top\mathbf{w}_1)(\mathbf{w}_1^\top\mathbf{w}_2)\,\mathbf{w}_2 . \end{aligned} \]</div>
+      <p>The last term is zero because \(\mathbf{w}_1^\top\mathbf{w}_2 = 0\). So after two rounds the residue is the point minus its projections onto \(\mathbf{w}_1\) and onto \(\mathbf{w}_2\):</p>
+      <div class="eq">\[ \mathbf{x}_1 - (\mathbf{x}_1^\top\mathbf{w}_1)\mathbf{w}_1 - (\mathbf{x}_1^\top\mathbf{w}_2)\mathbf{w}_2 . \]</div>
+      <p>The same cancellation happens in every round, because each \(\mathbf{w}_k\) is orthogonal to all the earlier ones <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=850s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>14:10</a>. After \(d\) rounds, for every \(i\):</p>
+      <div class="eq">\[ \text{residue}_i = \mathbf{x}_i - \Big[(\mathbf{x}_i^\top\mathbf{w}_1)\mathbf{w}_1 + (\mathbf{x}_i^\top\mathbf{w}_2)\mathbf{w}_2 + \dots + (\mathbf{x}_i^\top\mathbf{w}_d)\mathbf{w}_d\Big] . \]</div>
+
+      <h3>After \(d\) rounds nothing is left <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=886s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 14:46</a></h3>
+      <p>In 2-D the residue after round 2 is the zero vector, because the second line fits the lined-up residues exactly. The same happens in \(d\) dimensions after \(d\) rounds. Each round removes one component, and a vector in \(\mathbb{R}^d\) has only \(d\) independent components, here along \(\mathbf{w}_1, \dots, \mathbf{w}_d\). So every residue is \(\mathbf{0}\), which gives</p>
+      <div class="result">
+        <span class="lbl">Every point in the new basis</span>
+        \[ \mathbf{x}_i = (\mathbf{x}_i^\top\mathbf{w}_1)\,\mathbf{w}_1 + (\mathbf{x}_i^\top\mathbf{w}_2)\,\mathbf{w}_2 + \dots + (\mathbf{x}_i^\top\mathbf{w}_d)\,\mathbf{w}_d \qquad \text{for all } i. \]
+      </div>
+      <p>In linear-algebra terms this is a <dfn>change of basis</dfn>. The points were written in the standard basis; now each one is written in the orthonormal basis \(\mathbf{w}_1, \dots, \mathbf{w}_d\), and its coordinates are the dot products \(\mathbf{x}_i^\top\mathbf{w}_k\). Any basis can express the data, so on its own this gains nothing <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=991s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:31</a>. The gain comes from stopping early, in the next section.</p>
+
+      <figure>
+        <div class="fig-split">
+          <svg class="dg" viewBox="0 0 270 285" role="img" aria-label="A point x drawn against the standard axes e1, e2 and against the rotated orthonormal axes w1, w2. Its projection on w1 is 4 w1; the residue after round 1 is 2 w2, perpendicular to w1; removing that leaves zero.">
+            <defs><marker id="p03-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <line class="d-rule" x1="85" y1="255" x2="262" y2="255"/>
+            <line class="d-rule" x1="85" y1="255" x2="85" y2="18"/>
+            <text class="d-al" x="262" y="270" text-anchor="end">e₁</text>
+            <text class="d-al" x="91" y="26">e₂</text>
+            <line class="d-rule d-dash" x1="183.6" y1="105.7" x2="183.6" y2="255"/>
+            <line class="d-rule d-dash" x1="183.6" y1="105.7" x2="85" y2="105.7"/>
+            <text class="d-al" x="183.6" y="270" text-anchor="middle">2.46</text>
+            <text class="d-al" x="80" y="109" text-anchor="end">3.73</text>
+            <line class="d-ln" x1="67.7" y1="265" x2="244.3" y2="163"/>
+            <text class="d-t" x="248" y="162">w₁</text>
+            <line class="d-ln" x1="93" y1="268.9" x2="27" y2="154.5"/>
+            <text class="d-t" x="22" y="150" text-anchor="middle">w₂</text>
+            <line class="d-ln" x1="45" y1="185.7" x2="183.6" y2="105.7" style="stroke-dasharray: 3 4"/>
+            <line class="d-ln-acc" x1="85" y1="255" x2="223.6" y2="175" marker-end="url(#p03-ah)" style="stroke-width:2.4"/>
+            <line class="d-ln-acc" x1="85" y1="255" x2="45" y2="185.7" marker-end="url(#p03-ah)" style="stroke-width:2.4"/>
+            <path class="d-ln-acc d-dash" d="M223.6 175 L183.6 105.7"/>
+            <path class="d-ln" d="M215.8 179.5 L211.3 171.7 L219.1 167.2" style="stroke-width:1.2"/>
+            <circle class="pt-plain" cx="183.6" cy="105.7" r="5"/>
+            <text class="d-t" x="190" y="100">x</text>
+            <circle class="c-proxy" cx="223.6" cy="175" r="3.5"/>
+            <text class="d-s" x="232" y="194" style="fill: var(--accent)">4w₁</text>
+            <text class="d-s" x="48" y="205" text-anchor="end" style="fill: var(--accent)">2w₂</text>
+            <text class="d-s" x="210" y="134">residue</text>
+            <text class="d-s" x="210" y="148">= 2w₂</text>
+            <circle class="pt-new" cx="85" cy="255" r="3"/>
+          </svg>
+          <div class="tbl-wrap">
+            <table class="mini">
+              <thead><tr><th>Quantity</th><th>Value</th></tr></thead>
+              <tbody>
+                <tr><td>Coordinates in \(\mathbf{e}_1, \mathbf{e}_2\)</td><td>\([2.46,\ 3.73]\)</td></tr>
+                <tr><td>Coordinates in \(\mathbf{w}_1, \mathbf{w}_2\): \([\mathbf{x}^\top\mathbf{w}_1,\ \mathbf{x}^\top\mathbf{w}_2]\)</td><td>\([4,\ 2]\)</td></tr>
+                <tr><td>Residue after round 1</td><td>\(\mathbf{x} - 4\mathbf{w}_1 = 2\mathbf{w}_2\)</td></tr>
+                <tr><td>Residue after round 2</td><td>\(2\mathbf{w}_2 - 2\mathbf{w}_2 = \mathbf{0}\)</td></tr>
+                <tr><td>\(\lVert\mathbf{x}\rVert^2\) in either basis</td><td>\(2.46^2 + 3.73^2 = 4^2 + 2^2 = 20\)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <figcaption><b>One point, two bases.</b> With \(\mathbf{w}_1\) at 30° and \(\mathbf{w}_2\) perpendicular to it, the same point \(\mathbf{x}\) has coordinates \([2.46, 3.73]\) in the standard basis and \([4, 2]\) in the new one. Each round peels off one coordinate; after two rounds (in 2-D) nothing remains.</figcaption>
+      </figure>
+    </section>
+
+    <section id="compression">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1030s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 17:10</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1112s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 18:32 the 3-round example</a>
+        </div>
+        <h2>Where the compression happens</h2>
+      </div>
+      <p>The gain appears when the data lives in a low-dimensional linear subspace. Then the residues become zero well before \(d\) rounds. Once every residue is zero, another line adds no information, so the procedure stops there.</p>
+      <p>In the lecture's example the data is in \(\mathbb{R}^{100}\) and the residues are all zero after 3 rounds. Then we have found \(\mathbf{w}_1, \mathbf{w}_2, \mathbf{w}_3\) with</p>
+      <div class="eq">\[ \mathbf{x}_i = (\mathbf{x}_i^\top\mathbf{w}_1)\,\mathbf{w}_1 + (\mathbf{x}_i^\top\mathbf{w}_2)\,\mathbf{w}_2 + (\mathbf{x}_i^\top\mathbf{w}_3)\,\mathbf{w}_3 \qquad\text{for all } i. \]</div>
+      <ul>
+        <li><b>Representatives</b>: \(\mathbf{w}_1, \mathbf{w}_2, \mathbf{w}_3\), each in \(\mathbb{R}^{100}\). They are common to the whole data set.</li>
+        <li><b>Coefficients</b>: \([\mathbf{x}_i^\top\mathbf{w}_1,\ \mathbf{x}_i^\top\mathbf{w}_2,\ \mathbf{x}_i^\top\mathbf{w}_3] \in \mathbb{R}^3\), three numbers per point. They are specific to each data point <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1357s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:37</a>.</li>
+        <li><b>Reconstruction</b>: the linear combination of the representatives, weighted by the point's coefficients. Here it is exact.</li>
+      </ul>
+      <p>To put numbers on it the lecture takes \(n = 100\) points as well, so \(d = 100,\ k = 3,\ n = 100\):</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>What is stored</th><th>General</th><th class="num">Example</th></tr></thead>
+          <tbody>
+            <tr><td>Raw points</td><td>\(d \times n\)</td><td class="num">10,000</td></tr>
+            <tr><td>Representatives \(\mathbf{w}_1, \dots, \mathbf{w}_k\)</td><td>\(d \times k\)</td><td class="num">300</td></tr>
+            <tr><td>Coefficients, \(k\) per point</td><td>\(k \times n\)</td><td class="num">300</td></tr>
+            <tr><td><b>Compressed total</b></td><td>\(dk + kn\)</td><td class="num"><b>600</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="result">
+        <span class="lbl">Answer to question 3 <a class="ts" style="margin-left:6px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1257s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:57</a></span>
+        <p>If the residues vanish after \(k\) rounds, store \(dk + kn\) numbers instead of \(dn\). When \(k\) is small this is far less: 600 instead of 10,000 in the example. The one-line case in <a href="part-02.html#example">Part 2</a>, \(d + n\), is \(k = 1\).</p>
+      </div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 252" role="img" aria-label="Storage drawn to scale. Left: the raw data as a 100 by 100 block of numbers. Right: a 100 by 3 sliver for the representatives times a 3 by 100 sliver for the coefficients. Column i of the raw block equals the representatives times column i of the coefficients.">
+            <text class="d-h" x="24" y="26">Raw data</text>
+            <rect class="d-box" x="24" y="50" width="160" height="160"/>
+            <rect x="122" y="50" width="3" height="160" style="fill: var(--mark); stroke: var(--ink); stroke-width: .8"/>
+            <text class="d-s" x="123.5" y="45" text-anchor="middle">xᵢ</text>
+            <text class="d-s" x="104" y="228" text-anchor="middle">d × n = 100 × 100</text>
+            <text class="d-t" x="104" y="245" text-anchor="middle">10,000 numbers</text>
+
+            <text class="d-t" x="206" y="136" text-anchor="middle" style="font-size:18px">=</text>
+
+            <text class="d-t" x="230.4" y="45" text-anchor="middle">W</text>
+            <rect class="d-box-acc" x="228" y="50" width="4.8" height="160"/>
+            <text class="d-s" x="230.4" y="228" text-anchor="middle">100 × 3</text>
+            <text class="d-t" x="230.4" y="245" text-anchor="middle">300</text>
+
+            <text class="d-t" x="248" y="58" text-anchor="middle">×</text>
+
+            <text class="d-t" x="342" y="45" text-anchor="middle">coefficients</text>
+            <rect class="d-box-acc" x="262" y="50" width="160" height="4.8"/>
+            <rect x="361.2" y="50" width="3" height="4.8" style="fill: var(--mark); stroke: var(--ink); stroke-width: .8"/>
+            <text class="d-s" x="262" y="74">3 × 100 = 300</text>
+            <line class="d-ln" x1="362.7" y1="58" x2="362.7" y2="86"/>
+            <text class="d-s" x="362.7" y="100" text-anchor="middle">xᵢᵀw₁, xᵢᵀw₂, xᵢᵀw₃</text>
+            <text class="d-s" x="262" y="150">column i of the raw data</text>
+            <text class="d-s" x="262" y="166">= W × (column i of the coefficients):</text>
+            <text class="d-s" x="262" y="182">xᵢ = (xᵢᵀw₁)w₁ + (xᵢᵀw₂)w₂ + (xᵢᵀw₃)w₃</text>
+
+            <line class="d-rule" x1="470" y1="14" x2="470" y2="244"/>
+            <text class="d-h" x="486" y="26">What is stored</text>
+            <text class="d-s" x="486" y="62">representatives</text><text class="d-t" x="662" y="62" text-anchor="end">dk = 300</text>
+            <text class="d-s" x="486" y="88">coefficients</text><text class="d-t" x="662" y="88" text-anchor="end">kn = 300</text>
+            <line class="d-rule" x1="486" y1="102" x2="662" y2="102"/>
+            <text class="d-s" x="486" y="122">compressed</text><text class="d-t" x="662" y="122" text-anchor="end" style="fill: var(--accent)">600</text>
+            <text class="d-s" x="486" y="148">raw</text><text class="d-t" x="662" y="148" text-anchor="end">dn = 10,000</text>
+            <text class="d-al" x="486" y="190">one cell = one stored number</text>
+            <text class="d-al" x="486" y="206">(1.6 px per number, to scale)</text>
+          </svg>
+        </div>
+        <figcaption><b>The same data, two ways of storing it, drawn to scale.</b> The raw block is \(100 \times 100\). The representatives and coefficients are two thin slivers, \(100 \times 3\) and \(3 \times 100\). Each column (data point) of the raw block is rebuilt from the shared \(W\) and that point's three coefficients.</figcaption>
+      </figure>
+    </section>
+
+    <section id="how-many">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1392s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 23:12</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1465s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 24:25 Pythagoras</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1723s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 28:43 the elbow</a>
+        </div>
+        <h2>Approximately low-dimensional data: when to stop</h2>
+      </div>
+      <p>Residues that become exactly zero after a few rounds may or may not happen in practice. The relevant case is data that lies <i>approximately</i> in a low-dimensional space. The simplest example is a 2-D cloud that no single line fits, where a 1-D representation is still good enough. Then we accept some error, and we have to decide how much error to tolerate.</p>
+
+      <h3>Pythagoras splits each point</h3>
+      <p>For any unit vector \(\mathbf{w}\), a point, its proxy \((\mathbf{x}_i^\top\mathbf{w})\mathbf{w}\) and its error vector form a right triangle. So the squared length of the point is the squared length of its projection plus the squared length of its error. This holds for any line, not only the best one:</p>
+      <div class="eq">\[ \lVert\mathbf{x}_i\rVert^2 = \big\lVert \mathbf{x}_i - (\mathbf{x}_i^\top\mathbf{w})\mathbf{w} \big\rVert^2 + \big\lVert (\mathbf{x}_i^\top\mathbf{w})\mathbf{w} \big\rVert^2, \qquad \big\lVert (\mathbf{x}_i^\top\mathbf{w})\mathbf{w} \big\rVert^2 = (\mathbf{x}_i^\top\mathbf{w})^2\,\lVert\mathbf{w}\rVert^2 = (\mathbf{x}_i^\top\mathbf{w})^2 . \]</div>
+      <p>Average over all points <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1563s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>26:03</a>:</p>
+      <div class="eq">\[ \underbrace{\frac1n\sum_{i=1}^n \lVert\mathbf{x}_i\rVert^2}_{\text{fixed by the data}} = \underbrace{\frac1n\sum_{i=1}^n \big\lVert \mathbf{x}_i - (\mathbf{x}_i^\top\mathbf{w})\mathbf{w} \big\rVert^2}_{\text{average error}} + \underbrace{\frac1n\sum_{i=1}^n (\mathbf{x}_i^\top\mathbf{w})^2}_{\text{larger = better fit}} . \]</div>
+      <p>The left side is the same for every line. So a small average error and a large \(\frac1n\sum(\mathbf{x}_i^\top\mathbf{w})^2\) go together: this is the derivation of <a href="part-02.html#derivation">Part 2</a> seen as geometry. After finding a line, we can look at the size of that second term to judge how good the fit is.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 235" role="img" aria-label="Left: a point, its proxy on a line through the origin and its error form a right triangle, so the squared length of the point equals the squared projection plus the squared error. Right: two bars of the same total length, one for a good line with a long kept part and short error, one for a poor line with a short kept part and long error.">
+            <text class="d-h" x="20" y="22">One point: a right triangle</text>
+            <line class="d-ln" x1="40" y1="195" x2="325.3" y2="102.3" style="stroke-width:1.6"/>
+            <text class="d-t" x="330" y="104">w</text>
+            <line class="d-ln" x1="40" y1="195" x2="227" y2="58.5"/>
+            <line class="d-ln-acc" x1="40" y1="195" x2="249.2" y2="127" style="stroke-width:3"/>
+            <path class="d-ln-acc d-dash" d="M249.2 127 L227 58.5"/>
+            <path class="d-ln" d="M240.7 129.8 L237.9 121.2 L246.5 118.5" style="stroke-width:1.2"/>
+            <circle class="pt-new" cx="40" cy="195" r="3.5"/><text class="d-al" x="34" y="212">0</text>
+            <circle class="pt-plain" cx="227" cy="58.5" r="5"/><text class="d-t" x="219" y="50" text-anchor="end">xᵢ</text>
+            <circle class="c-proxy" cx="249.2" cy="127" r="4"/>
+            <text class="d-s" x="118" y="112" text-anchor="end">‖xᵢ‖²</text>
+            <text class="d-s" x="152" y="182" style="fill: var(--accent)">(xᵢᵀw)²</text>
+            <text class="d-s" x="246" y="82">‖xᵢ − (xᵢᵀw)w‖²</text>
+            <text class="d-s" x="258" y="145">proxy</text>
+            <text class="d-s" x="20" y="228">‖xᵢ‖² = ‖xᵢ − (xᵢᵀw)w‖² + (xᵢᵀw)² for every unit w</text>
+
+            <line class="d-rule" x1="350" y1="10" x2="350" y2="230"/>
+
+            <text class="d-h" x="370" y="22">Averaged over all points</text>
+            <text class="d-s" x="370" y="52">a good line</text>
+            <rect x="370" y="60" width="220" height="24" style="fill: var(--accent)"/>
+            <rect class="d-off" x="590" y="60" width="44" height="24"/>
+            <text class="d-s" x="378" y="76" style="fill: var(--surface)">kept: (1/n) Σ (xᵢᵀw)²</text>
+            <text class="d-s" x="612" y="76" text-anchor="middle">error</text>
+            <text class="d-s" x="370" y="112">a poor line</text>
+            <rect x="370" y="120" width="110" height="24" style="fill: var(--accent)"/>
+            <rect class="d-off" x="480" y="120" width="154" height="24"/>
+            <text class="d-s" x="378" y="136" style="fill: var(--surface)">kept</text>
+            <text class="d-s" x="557" y="136" text-anchor="middle">error</text>
+            <path class="d-ln" d="M370 160 L370 168 L634 168 L634 160"/>
+            <text class="d-s" x="502" y="186" text-anchor="middle">same total: (1/n) Σ ‖xᵢ‖²</text>
+            <text class="d-s" x="370" y="220">more kept means less error, for every line</text>
+          </svg>
+        </div>
+        <figcaption><b>Pythagoras fixes the budget.</b> Each point's squared length splits into the part kept by the line and the error. Averaged over the data, the total is the same for every line, so the line that keeps the most is the line with the least error. Bar lengths are illustrative.</figcaption>
+      </figure>
+
+      <h3>Track the kept amount round by round <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1657s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 27:37</a></h3>
+      <p>In round \(k\) record the value \(\frac1n\sum_i(\mathbf{x}_i^\top\mathbf{w}_k)^2\). (By the residue formula above, the residue from round \(k-1\) has the same dot product with \(\mathbf{w}_k\) as \(\mathbf{x}_i\) itself, so it does not matter which one you use.)</p>
+      <ul>
+        <li>The value is largest in round 1, because round 1 maximizes exactly this quantity.</li>
+        <li>Whatever round 2 finds is smaller: if it were larger, round 1 would have found that line instead. So the values fall as \(k\) grows.</li>
+        <li>Often they fall steeply and then flatten out close to zero, with an <dfn>elbow</dfn> at some \(k\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1757s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>29:17</a>. The top \(k\) directions are the <b>signal</b> directions, where most of the information is. The later, tiny ones can be treated as <b>error</b> directions. (What "information" means is made precise in L7, as <a href="#variance">variance</a>.)</li>
+      </ul>
+      <p class="rule-of-thumb">Rule of thumb <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1790s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>29:50</a>: keep the top \(k\) directions, where the values of the first \(k\) rounds add up to at least 95% of the sum over all \(d\) rounds.</p>
+      <p>This is only a rule of thumb. Without further assumptions about the data, nothing says this \(k\) is the best one. After \(d\) rounds the residues are zero, so the sum over all \(d\) rounds covers everything. The lecture does not spell out the next step, but it follows by applying the Pythagoras split once per round: that sum equals the fixed total \(\frac1n\sum\lVert\mathbf{x}_i\rVert^2\), and the average error after \(k\) rounds is the sum of the values not kept. L7 restates the rule with eigenvalues; the <a href="#eigenvalues">widget there</a> lets you try it.</p>
+
+      <ol class="algo">
+        <li class="algo-title">The algorithm at the end of L6 <a class="ts" style="margin-left:6px" href="https://www.youtube.com/watch?v=_GOADM-SdKU&amp;t=1827s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>30:27</a></li>
+        <li>Centre the data set.</li>
+        <li>Find the best line \(\mathbf{w}_1\): maximize \(\mathbf{w}^\top C\mathbf{w}\) over unit vectors \(\mathbf{w}\).</li>
+        <li>Replace each point by its residue and find the best line for the residues. Repeat.</li>
+        <li>After each round compare its value \(\frac1n\sum(\mathbf{x}_i^\top\mathbf{w}_k)^2\) with the total. Stop when it becomes too small, for example once the rounds so far explain 95%.</li>
+      </ol>
+    </section>
+
+    <!-- ============ LECTURE 7 ============ -->
+    <section id="eigenvectors">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=14s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 0:14</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=84s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 1:24 min–max theorem</a>
+        </div>
+        <h2>The solution: eigenvectors of \(C\)</h2>
+      </div>
+      <p>L7 looks at the same procedure through linear algebra. The problem is \(\max_{\lVert\mathbf{w}\rVert=1}\mathbf{w}^\top C\mathbf{w}\) with \(C = \frac1n\sum\mathbf{x}_i\mathbf{x}_i^\top\), the covariance matrix (with the caveat from Part 2 that the data must be centred). Its solution is \(\mathbf{w}_1\), the <b>eigenvector of \(C\) for the largest eigenvalue</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=45s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>0:45</a>.</p>
+      <p>This comes from a general result that you may have met in a linear algebra course. The lecture calls it the Hilbert min–max theorem (standard name: the Courant–Fischer min–max theorem). It says more than this <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=114s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:54</a>:</p>
+      <ul>
+        <li>The eigenvectors of \(C\) form an orthonormal basis. The orthonormal basis that our error minimization finds on centred data is exactly this eigenvector basis.</li>
+        <li>The eigenvector for the \(k\)-th largest eigenvalue is exactly the best line found in round \(k\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=148s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:28</a>.</li>
+        <li>Equivalently <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=181s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:01</a>, maximize the same \(\mathbf{w}^\top C\mathbf{w}\) over unit vectors that are also orthogonal to the subspace spanned by the top \(k-1\) eigenvectors. The answer is the \(k\)-th eigenvector.</li>
+      </ul>
+      <p>The round-by-round view gives the orthogonality directly <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=217s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:37</a>. The line found in round \(k\) is orthogonal to the earlier lines by construction, because the residues it fits are orthogonal to them.</p>
+      <div class="result">
+        <span class="lbl">Answer to question 1</span>
+        <p>Let \(\lambda_1 \ge \lambda_2 \ge \dots \ge \lambda_d\) be the eigenvalues of \(C\), with orthonormal eigenvectors \(\mathbf{w}_1, \dots, \mathbf{w}_d\), so \(C\mathbf{w}_k = \lambda_k\mathbf{w}_k\). Then</p>
+        \[ \mathbf{w}_1 = \arg\max_{\lVert\mathbf{w}\rVert = 1} \mathbf{w}^\top C\,\mathbf{w}, \qquad \mathbf{w}_k = \text{the best line in round } k \text{ of the residue procedure.} \]
+      </div>
+    </section>
+
+    <section id="eigenvalues">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=249s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 4:09</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=422s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 7:02 the 95% rule</a>
+        </div>
+        <h2>What the eigenvalues measure</h2>
+      </div>
+      <p>Calling \(\mathbf{w}_k\) an eigenvector names a well-studied object, but it says little about what the eigenvalues mean. Start from \(C\mathbf{w}_1 = \lambda_1\mathbf{w}_1\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=283s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:43</a> and multiply on the left by \(\mathbf{w}_1^\top\), using \(\mathbf{w}_1^\top\mathbf{w}_1 = 1\):</p>
+      <div class="eq">\[ \lambda_1 = \lambda_1\,\mathbf{w}_1^\top\mathbf{w}_1 = \mathbf{w}_1^\top C\,\mathbf{w}_1 = \mathbf{w}_1^\top\Big(\frac1n\sum_{i=1}^n\mathbf{x}_i\mathbf{x}_i^\top\Big)\mathbf{w}_1 = \frac1n\sum_{i=1}^n(\mathbf{x}_i^\top\mathbf{w}_1)^2 . \]</div>
+      <p>The same steps work for every \(k\): \(\lambda_k = \frac1n\sum_i(\mathbf{x}_i^\top\mathbf{w}_k)^2\). This is exactly the round-\(k\) value that L6 used to decide how many rounds to run <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=351s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:51</a>. So the falling curve of L6 is the list of eigenvalues of \(C\), from largest to smallest.</p>
+      <div class="result">
+        <span class="lbl">Answer to question 2, in eigenvalues</span>
+        <p>Keep the smallest number \(\ell\) of directions with</p>
+        \[ \frac{\sum_{i=1}^{\ell} \lambda_i(C)}{\sum_{i=1}^{d} \lambda_i(C)} \;\ge\; 0.95 , \]
+        <p>where \(\lambda_i(C)\) is the \(i\)-th largest eigenvalue. We then say we retain about 95% of the information in the data set. The 0.95 is a common rule of thumb in practice.</p>
+      </div>
+      <p>The ratio only makes sense if the eigenvalues are non-negative <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=452s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:32</a>. They are: each \(\lambda_k\) is an average of squares. So the covariance matrix has non-negative eigenvalues, which means it is <dfn>positive semidefinite</dfn>, and the formula above is a proof of that.</p>
+
+      <figure id="k-fig">
+        <div class="controls">
+          <label for="k-range">Number of directions kept, \(k\)</label>
+          <input type="range" id="k-range" min="1" max="10" step="1" value="1">
+          <output id="k-out" for="k-range">k = 1</output>
+          <button class="btn" id="k-snap" type="button">Apply the 95% rule</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Variance explained</span><span class="v mine" id="k-frac">–</span></div>
+          <div><span class="k">Avg reconstruction error</span><span class="v" id="k-err">–</span></div>
+          <div><span class="k">Numbers stored (raw 2,000)</span><span class="v" id="k-store">–</span></div>
+        </div>
+        <div class="status" id="k-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="k-svg" viewBox="0 0 640 336" role="img" aria-label="Bar chart of the ten values found in rounds 1 to 10 for synthetic 10-dimensional data: three large bars, then seven small ones. Bars for the kept directions are highlighted. Below, one bar splits the fixed total into the kept part and the reconstruction error, with a mark at 95 percent."></svg></div>
+        <figcaption><b>Synthetic data: 200 centred points in \(\mathbb{R}^{10}\)</b>, generated for this page from 3 hidden directions plus small noise. The page runs L6's procedure (best line for the residues, then remove it) ten times. The bar heights are the round values, which are the eigenvalues of \(C\); they fall sharply after round 3. The error readout is computed directly from the residues and always equals the total minus the kept bars.</figcaption>
+      </figure>
+    </section>
+
+    <section id="variance">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=548s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 9:08</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=744s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 12:24 the variance</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=845s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 14:05 spread vs crowding</a>
+        </div>
+        <h2>Minimizing error is maximizing variance</h2>
+      </div>
+      <p>The eigenvalue view still does not say what \(\frac1n\sum(\mathbf{x}_i^\top\mathbf{w})^2\) <i>is</i> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=518s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:38</a>. Fix any unit vector \(\mathbf{w}\), not necessarily the best line, and project the data onto it. Collect the \(n\) numbers</p>
+      <div class="eq">\[ \mathbf{x}_1^\top\mathbf{w},\ \ \mathbf{x}_2^\top\mathbf{w},\ \ \dots,\ \ \mathbf{x}_n^\top\mathbf{w} . \]</div>
+      <p>Squared, these are the squared lengths of the proxies. Treat them as a one-dimensional data set and compute its mean and variance.</p>
+      <h3>Their mean is zero <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=608s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 10:08</a></h3>
+      <div class="eq">\[ \frac1n\sum_{i=1}^n \mathbf{x}_i^\top\mathbf{w} = \Big(\frac1n\sum_{i=1}^n \mathbf{x}_i\Big)^{\!\top}\mathbf{w} = \boldsymbol{\mu}^\top\mathbf{w} = 0 \qquad\text{for centred data } (\boldsymbol{\mu} = \mathbf{0}). \]</div>
+      <h3>Their variance is \(\mathbf{w}^\top C\mathbf{w}\) <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=744s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 12:24</a></h3>
+      <div class="eq">\[ \frac1n\sum_{i=1}^n \big(\mathbf{x}_i^\top\mathbf{w} - 0\big)^2 = \frac1n\sum_{i=1}^n (\mathbf{x}_i^\top\mathbf{w})^2 = \mathbf{w}^\top C\,\mathbf{w} . \]</div>
+      <p>So for any direction \(\mathbf{w}\), \(\mathbf{w}^\top C\mathbf{w}\) is the variance of the projected values. It is the quantity the procedure maximizes, and for an eigenvector it equals the eigenvalue.</p>
+      <div class="result">
+        <span class="lbl">Result <a class="ts" style="margin-left:6px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=812s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:32</a></span>
+        <p>On centred data, <b>error minimization is equivalent to variance maximization</b>. The line with the smallest reconstruction error is the line along which the projected values have the largest variance. Centring matters: only then is the mean of the projections zero, so that \(\frac1n\sum(\mathbf{x}_i^\top\mathbf{w})^2\) is a variance.</p>
+      </div>
+
+      <figure id="var-fig">
+        <div class="controls">
+          <label for="var-th">Direction of \(\mathbf{w}\)</label>
+          <input type="range" id="var-th" min="0" max="179" step="1" value="70">
+          <output id="var-th-out" for="var-th">70°</output>
+          <button class="btn" id="var-snap1" type="button">Top eigenvector</button>
+          <button class="btn" id="var-snap2" type="button">Second eigenvector</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Mean of xᵢᵀw</span><span class="v" id="var-mean">–</span></div>
+          <div><span class="k">Variance of xᵢᵀw</span><span class="v mine" id="var-var">–</span></div>
+          <div><span class="k">wᵀCw from the 2×2 matrix</span><span class="v" id="var-q">–</span></div>
+        </div>
+        <div class="status" id="var-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="var-svg" viewBox="0 0 400 526" role="img" aria-label="Sixty synthetic centred points with a rotatable line through the origin and each point's projection onto it. Below, the projected values are shown on a number line with their mean and a bracket of one standard deviation either side. The spread is widest along the long axis of the cloud and narrowest across it."></svg></div>
+        <figcaption><b>Synthetic, centred data (60 points)</b>, generated for this page. Each point's projection gives one number \(\mathbf{x}_i^\top\mathbf{w}\); the strip under the plot shows those numbers. Their mean stays at 0 because the data is centred, and their variance always equals \(\mathbf{w}^\top C\mathbf{w}\) computed from the matrix. The spread is largest along the top eigenvector (\(\lambda_1\)) and smallest along the perpendicular one (\(\lambda_2\)).</figcaption>
+      </figure>
+
+      <h3>Why we want the variance high <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=911s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 15:11</a></h3>
+      <p>The lecture draws two lines through the same cloud. Projected onto the best line, the proxies are spread out. Projected onto another line, they bunch together. When proxies crowd together it becomes hard to tell the points apart, and if several land on the same spot it is impossible.</p>
+      <p>We do want compression, but the compressed representation is used downstream, for example as input to a supervised learning task. There we still need to tell one data point from another, and a badly chosen line destroys that ability. In the extreme case <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=947s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:47</a>, all the data lies on one line and we project onto the perpendicular line instead. Every point lands on the zero vector, and the representation is useless.</p>
+      <p class="rule-of-thumb">In the lecture's words, "we want directions where projections do not crowd": directions where the variance of the projections is as high as possible, so the information retained is as high as possible.</p>
+    </section>
+
+    <section id="height-weight">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1046s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 17:26</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1223s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 20:23 re-plotting</a>
+        </div>
+        <h2>Example: height and weight become de-correlated</h2>
+      </div>
+      <p>Take centred heights and weights (hence the negative values). Taller people tend to be heavier, so knowing the height tells you something about the weight. Loosely speaking, the two features are not independent; the lecture is careful with that word. If each person is stored as two numbers, height and weight, one number partly repeats the other.</p>
+      <ul>
+        <li><b>First direction</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1112s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:32</a>. Suppose the best line points along \([1, 1]\). It must have length 1, so \(\mathbf{w}_1 = [1/\sqrt2,\ 1/\sqrt2]\). With one number per person we store the coefficient \(\mathbf{x}_i^\top\mathbf{w}_1 = (\text{height} + \text{weight})/\sqrt2\).</li>
+        <li><b>Second direction</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1189s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:49</a>. The line that fits the residues is perpendicular: \(\mathbf{w}_2 = [-1/\sqrt2,\ 1/\sqrt2]\), with coefficient \((\text{weight} - \text{height})/\sqrt2\). Its negative \([1/\sqrt2, -1/\sqrt2]\) works equally well.</li>
+        <li><b>Re-plot</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1262s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:02</a> every person using these two numbers as coordinates. The new axes are the old ones rotated by 45°. Now knowing the first coordinate says nothing about the second: as \((\text{height} + \text{weight})/\sqrt2\) increases, the other coordinate is above or below zero with no pattern.</li>
+      </ul>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 302" role="img" aria-label="Left: fourteen centred height and weight points rising together along a 45 degree line w1, with the perpendicular direction w2 dashed. Right: the same people plotted with coordinates (height plus weight) over root 2 and (weight minus height) over root 2; the cloud lies flat along the horizontal axis with no trend.">
+            <defs><marker id="p03-ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="20" y="18">Height and weight (centred)</text>
+            <line class="d-rule" x1="40" y1="150" x2="290" y2="150"/>
+            <line class="d-rule" x1="165" y1="32" x2="165" y2="272"/>
+            <text class="d-al" x="290" y="166" text-anchor="end">height →</text>
+            <text class="d-al" x="171" y="40">weight ↑</text>
+            <line class="d-ln-acc" x1="55" y1="260" x2="275" y2="40" style="stroke-width:2"/>
+            <text class="d-t" x="279" y="44" style="fill: var(--accent)">w₁</text>
+            <line class="d-ln d-dash" x1="225" y1="210" x2="95" y2="80"/>
+            <text class="d-t" x="90" y="78" text-anchor="end">w₂</text>
+            <circle class="pt-plain" cx="74.6" cy="224.5" r="3.8"/><circle class="pt-plain" cx="108.1" cy="233.9" r="3.8"/><circle class="pt-plain" cx="93.4" cy="190.4" r="3.8"/><circle class="pt-plain" cx="126.8" cy="199.8" r="3.8"/><circle class="pt-plain" cx="155.4" cy="199.5" r="3.8"/><circle class="pt-plain" cx="136" cy="156" r="3.8"/><circle class="pt-plain" cx="155" cy="151" r="3.8"/><circle class="pt-plain" cx="186" cy="158" r="3.8"/><circle class="pt-plain" cx="161.7" cy="109.6" r="3.8"/><circle class="pt-plain" cx="202.4" cy="126.3" r="3.8"/><circle class="pt-plain" cx="202.1" cy="97.1" r="3.8"/><circle class="pt-plain" cx="238" cy="108.9" r="3.8"/><circle class="pt-plain" cx="218.5" cy="65.4" r="3.8"/><circle class="pt-plain" cx="252" cy="79.7" r="3.8"/>
+            <text class="d-s" x="20" y="294">taller tends to mean heavier: the features overlap</text>
+
+            <line class="d-rule" x1="330" y1="34" x2="330" y2="296"/>
+            <line class="d-ln" x1="306" y1="24" x2="352" y2="24" marker-end="url(#p03-ah2)"/>
+            <text class="d-al" x="329" y="14" text-anchor="middle">rotate 45°</text>
+
+            <text class="d-h" x="370" y="18">Same people, new coordinates</text>
+            <line class="d-ln-acc" x1="370" y1="150" x2="620" y2="150" style="stroke-width:2"/>
+            <line class="d-rule" x1="495" y1="48" x2="495" y2="252"/>
+            <text class="d-al" x="620" y="202" text-anchor="end">(height + weight)/√2 →</text>
+            <text class="d-al" x="501" y="56">(weight − height)/√2 ↑</text>
+            <text class="d-t" x="626" y="154" style="fill: var(--accent)">w₁</text>
+            <circle class="pt-tree" cx="378.4" cy="138.8" r="3.8"/><circle class="pt-tree" cx="395.4" cy="169.1" r="3.8"/><circle class="pt-tree" cx="415.8" cy="127.9" r="3.8"/><circle class="pt-tree" cx="432.8" cy="158.2" r="3.8"/><circle class="pt-tree" cx="453.2" cy="178.2" r="3.8"/><circle class="pt-tree" cx="470.2" cy="133.7" r="3.8"/><circle class="pt-tree" cx="487.2" cy="143.6" r="3.8"/><circle class="pt-tree" cx="504.2" cy="170.5" r="3.8"/><circle class="pt-tree" cx="521.2" cy="119.2" r="3.8"/><circle class="pt-tree" cx="538.2" cy="159.6" r="3.8"/><circle class="pt-tree" cx="558.6" cy="138.9" r="3.8"/><circle class="pt-tree" cx="575.6" cy="172.6" r="3.8"/><circle class="pt-tree" cx="592.6" cy="128" r="3.8"/><circle class="pt-tree" cx="606.2" cy="161.8" r="3.8"/>
+            <text class="d-s" x="370" y="294">no trend left: the two coordinates are de-correlated</text>
+          </svg>
+        </div>
+        <figcaption><b>Before and after the change of basis.</b> Fourteen illustrative people (made-up centred values, drawn to scale with the same scale in both panels). On the left, height and weight rise together. On the right, each person is plotted at \([\mathbf{x}^\top\mathbf{w}_1,\ \mathbf{x}^\top\mathbf{w}_2]\): the cloud is the same shape, turned by 45°, and the vertical coordinate shows no trend against the horizontal one.</figcaption>
+      </figure>
+
+      <div class="result">
+        <span class="lbl">De-correlated directions <a class="ts" style="margin-left:6px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1325s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:05</a></span>
+        <p>\((\text{height} + \text{weight})/\sqrt2\) gives no information about \((\text{weight} - \text{height})/\sqrt2\). The directions \(\mathbf{w}_1, \mathbf{w}_2\), and the values projected onto them, are <dfn>de-correlated</dfn> for this data set. Each new direction gives information that the previous ones do not. Finding such directions is what the algorithm does.</p>
+      </div>
+      <p class="note">Standard fact, not derived in the lecture: the covariance of the coordinates along two different eigenvectors is \(\frac1n\sum_i(\mathbf{x}_i^\top\mathbf{w}_j)(\mathbf{x}_i^\top\mathbf{w}_k) = \mathbf{w}_j^\top C\,\mathbf{w}_k = \lambda_k\,\mathbf{w}_j^\top\mathbf{w}_k = 0\) for \(j \neq k\). That is the precise sense of "de-correlated".</p>
+    </section>
+
+    <section id="pca">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1359s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 22:39</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1427s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 23:47 the algorithm</a>
+        </div>
+        <h2>The algorithm: principal component analysis</h2>
+      </div>
+      <p>This algorithm is called <dfn>principal component analysis</dfn> (PCA). You may have met it in the Machine Learning Foundations course; this course starts with it because ideas that come up along the way lead to something more fundamental in machine learning. The vectors \(\mathbf{w}_1, \dots, \mathbf{w}_k\) it finds are the <dfn>principal components</dfn> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1392s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:12</a>, and the projections along them are de-correlated.</p>
+      <ol class="algo">
+        <li class="algo-title">Principal component analysis</li>
+        <li>Input \(\{\mathbf{x}_1, \dots, \mathbf{x}_n\}\), \(\mathbf{x}_i \in \mathbb{R}^d\). Centre it: subtract the mean from every point.</li>
+        <li>Compute the covariance matrix \(C = \frac1n\sum_i\mathbf{x}_i\mathbf{x}_i^\top\).</li>
+        <li>Find its eigenvalues \(\lambda_1 \ge \dots \ge \lambda_d\) and orthonormal eigenvectors \(\mathbf{w}_1, \dots, \mathbf{w}_d\).</li>
+        <li>Choose \(k\), for example the smallest \(k\) with \(\sum_{j \le k}\lambda_j \big/ \sum_{j \le d}\lambda_j \ge 0.95\).</li>
+        <li>Project: represent each \(\mathbf{x}_i\) by \([\mathbf{x}_i^\top\mathbf{w}_1, \dots, \mathbf{x}_i^\top\mathbf{w}_k] \in \mathbb{R}^k\). To reconstruct, use \(\sum_{j \le k}(\mathbf{x}_i^\top\mathbf{w}_j)\,\mathbf{w}_j\).</li>
+      </ol>
+      <p>Going from \(\mathbb{R}^d\) to \(\mathbb{R}^k\) with \(k\) much smaller than \(d\) makes PCA a <dfn>dimensionality reduction</dfn> technique. The essential dimension we believe the data has is \(k\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1463s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>24:23</a>: the top \(k\) eigenvectors explain 95% of the variance in the data. That is what the 0.95 meant all along. "Information" is the amount of variance explained, and each direction counts as one dimension.</p>
+      <p>PCA finds new axes, and each new axis is a combination of the original features <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1498s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>24:58</a>. The coordinate \(\mathbf{x}_i^\top\mathbf{w}_1 = \sum_j (\mathbf{w}_1)_j\,x_{ij}\) weighs the features of \(\mathbf{x}_i\) by the entries of the eigenvector; in the example above it is \((\text{height} + \text{weight})/\sqrt2\). The combinations PCA finds are de-correlated, loosely speaking independent of each other.</p>
+      <div class="result">
+        <span class="lbl">Answer to question 4</span>
+        <p>The learned representation has two parts. The shared part is the principal components \(\mathbf{w}_1, \dots, \mathbf{w}_k\), a new orthonormal set of axes, each a combination of the original features. The per-point part is the \(k\) coordinates \(\mathbf{x}_i^\top\mathbf{w}_1, \dots, \mathbf{x}_i^\top\mathbf{w}_k\) of each point along those axes.</p>
+      </div>
+      <h3>What comes next <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=o__dWBLqPhQ&amp;t=1570s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L7 · 26:10</a></h3>
+      <p>The next lecture applies PCA to face images, the <i>eigenfaces</i> example of a simple face-recognition system. It then looks at issues with PCA and cases where it does not work well. Fixing those issues reveals what matters in a data set and leads to more foundational ideas. See <a href="part-04.html">Part 4</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Residue (round \(k\))</dt><dd>What is left of a point after removing its projections onto \(\mathbf{w}_1, \dots, \mathbf{w}_k\): \(\mathbf{x}_i - \sum_{j\le k}(\mathbf{x}_i^\top\mathbf{w}_j)\mathbf{w}_j\).</dd></div>
+        <div><dt>Orthonormal set</dt><dd>Unit vectors that are mutually perpendicular: \(\lVert\mathbf{w}_k\rVert = 1\), \(\mathbf{w}_i^\top\mathbf{w}_j = 0\) for \(i \neq j\).</dd></div>
+        <div><dt>Change of basis</dt><dd>Writing each point by its coordinates \(\mathbf{x}_i^\top\mathbf{w}_k\) in the basis \(\mathbf{w}_1, \dots, \mathbf{w}_d\) instead of the standard basis.</dd></div>
+        <div><dt>Compressed storage</dt><dd>\(dk\) numbers for \(k\) shared representatives plus \(kn\) coefficients, instead of \(dn\) raw numbers.</dd></div>
+        <div><dt>Elbow</dt><dd>The round after which the values \(\frac1n\sum(\mathbf{x}_i^\top\mathbf{w}_k)^2\) become very small.</dd></div>
+        <div><dt>Signal and error directions</dt><dd>The top directions before the elbow carry most of the information; the later ones are treated as error.</dd></div>
+        <div><dt>95% rule</dt><dd>Rule of thumb: keep the smallest \(k\) with \(\sum_{j\le k}\lambda_j / \sum_{j\le d}\lambda_j \ge 0.95\).</dd></div>
+        <div><dt>Eigenvector, eigenvalue of \(C\)</dt><dd>\(C\mathbf{w}_k = \lambda_k\mathbf{w}_k\). The \(k\)-th eigenvector is the best line of round \(k\); \(\lambda_k = \frac1n\sum(\mathbf{x}_i^\top\mathbf{w}_k)^2\).</dd></div>
+        <div><dt>Min–max theorem</dt><dd>The linear-algebra result behind "the top eigenvector maximizes \(\mathbf{w}^\top C\mathbf{w}\)" (the lecture says Hilbert; usually Courant–Fischer).</dd></div>
+        <div><dt>Positive semidefinite</dt><dd>A matrix with no negative eigenvalues. \(C\) is one, since each \(\lambda_k\) is an average of squares.</dd></div>
+        <div><dt>Variance of the projections</dt><dd>\(\frac1n\sum(\mathbf{x}_i^\top\mathbf{w})^2 = \mathbf{w}^\top C\mathbf{w}\) for centred data; PCA maximizes it.</dd></div>
+        <div><dt>De-correlated</dt><dd>Coordinates along different principal components carry no linear information about each other.</dd></div>
+        <div><dt>Principal components</dt><dd>The eigenvectors \(\mathbf{w}_1, \dots, \mathbf{w}_k\) of \(C\) with the largest eigenvalues.</dd></div>
+        <div><dt>Dimensionality reduction</dt><dd>Representing each point by \(k\) numbers instead of \(d\), here its coordinates along the top \(k\) principal components.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Why must \(\mathbf{w}_2\), the best line for the residues, be orthogonal to \(\mathbf{w}_1\)?</span><span class="tog"></span></summary>
+          <p>Every residue is perpendicular to \(\mathbf{w}_1\), because projections meet the line at a right angle. If a candidate \(\mathbf{w}\) had a component along \(\mathbf{w}_1\), that component would contribute nothing to \(\mathbf{x}_i'^\top\mathbf{w}\) and would only shrink the useful part, lowering \(\frac1n\sum(\mathbf{x}_i'^\top\mathbf{w})^2\). So the maximizer has no \(\mathbf{w}_1\) component: \(\mathbf{w}_2^\top\mathbf{w}_1 = 0\).</p></details>
+        <details><summary><span class="q">Q2</span><span>1,000 points in \(\mathbb{R}^{50}\) have zero residues after 4 rounds. How many numbers must be stored, and how many did the raw data need?</span><span class="tog"></span></summary>
+          <p>\(dk + kn = 50 \times 4 + 4 \times 1000 = 200 + 4000 = 4200\), instead of \(dn = 50{,}000\). Reconstruction is exact.</p></details>
+        <details><summary><span class="q">Q3</span><span>The eigenvalues of \(C\) are 6, 3, 0.6, 0.3 and 0.1. Which \(k\) does the 95% rule pick, and what is the average reconstruction error for \(k = 2\)?</span><span class="tog"></span></summary>
+          <p>The total is 10. Cumulative fractions: 60%, 90%, 96%, … so \(k = 3\). With \(k = 2\) the error is the sum of the dropped eigenvalues, \(0.6 + 0.3 + 0.1 = 1.0\) (10% of the total).</p></details>
+        <details><summary><span class="q">Q4</span><span>Show that \(\lambda_k = \frac1n\sum_i(\mathbf{x}_i^\top\mathbf{w}_k)^2\). What does this tell you about the eigenvalues of \(C\)?</span><span class="tog"></span></summary>
+          <p>From \(C\mathbf{w}_k = \lambda_k\mathbf{w}_k\) and \(\mathbf{w}_k^\top\mathbf{w}_k = 1\): \(\lambda_k = \mathbf{w}_k^\top C\mathbf{w}_k = \frac1n\sum_i \mathbf{w}_k^\top\mathbf{x}_i\mathbf{x}_i^\top\mathbf{w}_k = \frac1n\sum_i(\mathbf{x}_i^\top\mathbf{w}_k)^2\). An average of squares is never negative, so \(C\) is positive semidefinite and the 95% ratio is a ratio of non-negative numbers.</p></details>
+        <details><summary><span class="q">Q5</span><span>Why is centring needed for "minimizing error = maximizing variance"?</span><span class="tog"></span></summary>
+          <p>The mean of the projections is \(\boldsymbol{\mu}^\top\mathbf{w}\). Only when \(\boldsymbol{\mu} = \mathbf{0}\) is \(\frac1n\sum(\mathbf{x}_i^\top\mathbf{w})^2\) the variance of the projections. Otherwise it is the variance plus \((\boldsymbol{\mu}^\top\mathbf{w})^2\), and the best line gets pulled toward the mean.</p></details>
+        <details><summary><span class="q">Q6</span><span>Let \(C = \begin{bmatrix}2 &amp; 1\\ 1 &amp; 2\end{bmatrix}\). Check that \(\mathbf{w}_1 = [1, 1]/\sqrt2\) gives \(\mathbf{w}_1^\top C\mathbf{w}_1 = 3\). What fraction of the variance does the first principal component explain?</span><span class="tog"></span></summary>
+          <p>\(C\mathbf{w}_1 = [3, 3]/\sqrt2 = 3\mathbf{w}_1\), so \(\mathbf{w}_1^\top C\mathbf{w}_1 = 3\). The other eigenvector is \([1, -1]/\sqrt2\) with eigenvalue 1. The total is \(3 + 1 = 4\) (the trace), so the first component explains \(3/4 = 75\%\).</p></details>
+        <details><summary><span class="q">Q7</span><span>A centred person has height 4 and weight 2. What are the coordinates along \(\mathbf{w}_1 = [1, 1]/\sqrt2\) and \(\mathbf{w}_2 = [-1, 1]/\sqrt2\)?</span><span class="tog"></span></summary>
+          <p>\((4 + 2)/\sqrt2 = 3\sqrt2 \approx 4.24\) and \((2 - 4)/\sqrt2 = -\sqrt2 \approx -1.41\). The squared length is unchanged: \(16 + 4 = 18 + 2 = 20\).</p></details>
+        <details><summary><span class="q">Q8</span><span>All points lie on one line through the origin, and you project them onto the perpendicular line. What goes wrong?</span><span class="tog"></span></summary>
+          <p>Every point projects to the zero vector, so the variance of the projections is 0 and no two points can be told apart. The compressed representation is useless for any downstream task, and the reconstruction error is as large as it can be.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-02.html"><span class="dir">← Part 2</span><span class="nm">Representation learning</span></a><a class="next" href="part-04.html"><span class="dir">Part 4 →</span><span class="nm">Issues with PCA, and computing it fast</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const seeded = s0 => {
+    let seed = s0;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    return normal;
+  };
+  const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+
+  /* ---------- How many directions: L6's rounds on 10-D synthetic data ---------- */
+  (() => {
+    const svg = document.getElementById('k-svg'); if (!svg) return;
+    const normal = seeded(6061);
+    const d = 10, n = 200, sd = [2.8, 1.8, 1.2], noise = 0.28;
+    const U = [];
+    for (let j = 0; j < sd.length; j++) {
+      let v = Array.from({ length: d }, normal);
+      U.forEach(u => { const p = dot(v, u); v = v.map((x, i) => x - p * u[i]); });
+      const L = Math.hypot(...v); U.push(v.map(x => x / L));
+    }
+    let X = [];
+    for (let i = 0; i < n; i++) { const z = sd.map(s => s * normal()); X.push(Array.from({ length: d }, (_, r) => U.reduce((s, u, j) => s + u[r] * z[j], 0) + noise * normal())); }
+    const mu = Array.from({ length: d }, (_, r) => X.reduce((s, x) => s + x[r], 0) / n);
+    X = X.map(x => x.map((v, r) => v - mu[r]));
+    // Repeat: best line for the current residues (power iteration on their C), record its value, remove it.
+    let R = X.map(x => x.slice());
+    const total = R.reduce((s, r) => s + dot(r, r), 0) / n;
+    const vals = [], errs = [total];
+    for (let k = 0; k < d; k++) {
+      const C = Array.from({ length: d }, (_, a) => Array.from({ length: d }, (_, b) => R.reduce((s, r) => s + r[a] * r[b], 0) / n));
+      let w = Array.from({ length: d }, normal), L = Math.hypot(...w); w = w.map(x => x / L);
+      for (let it = 0; it < 3000; it++) { const v = C.map(row => dot(row, w)); L = Math.hypot(...v); if (L < 1e-300) break; w = v.map(x => x / L); }
+      vals.push(R.reduce((s, r) => s + dot(r, w) ** 2, 0) / n);
+      R = R.map(r => { const c = dot(r, w); return r.map((x, i) => x - c * w[i]); });
+      errs.push(R.reduce((s, r) => s + dot(r, r), 0) / n);
+    }
+    const cum = []; vals.reduce((s, v, i) => (cum[i] = s + v, s + v), 0);
+    const k95 = cum.findIndex(c => c / total >= 0.95) + 1;
+
+    const x0 = 64, x1 = 620, yTop = 46, yBase = 222, vmax = 8;
+    const sy = v => yBase - (v / vmax) * (yBase - yTop);
+    const slot = (x1 - x0) / d, bw = 34;
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = 0; v <= vmax; v += 2) {
+      mk('line', { x1: x0, x2: x1, y1: sy(v), y2: sy(v) }, g);
+      mk('text', { x: x0 - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+    }
+    mk('text', { x: x0 - 40, y: 24, class: 'c-title' }, svg).textContent = 'Value of round k:  (1/n) Σ (xᵢᵀwₖ)²  =  λₖ, the k-th eigenvalue of C';
+    const bars = vals.map((v, k) => {
+      const cx = x0 + slot * (k + 0.5);
+      const rect = mk('rect', { x: cx - bw / 2, y: sy(v), width: bw, height: Math.max(0.5, yBase - sy(v)), rx: 2 }, svg);
+      mk('text', { x: cx, y: sy(v) - 6, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v.toFixed(2);
+      mk('text', { x: cx, y: yBase + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = k + 1;
+      return rect;
+    });
+    mk('line', { x1: x0, x2: x1, y1: yBase, y2: yBase, class: 'c-axis' }, svg);
+    mk('text', { x: (x0 + x1) / 2, y: yBase + 32, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = 'round k';
+    // budget bar: fixed total = kept + reconstruction error
+    const yB = 292, hB = 20, wB = x1 - x0;
+    mk('text', { x: x0, y: yB - 10, class: 'c-title' }, svg).textContent = `Total (1/n) Σ ‖xᵢ‖² = ${total.toFixed(2)} = kept + reconstruction error`;
+    const kept = mk('rect', { x: x0, y: yB, height: hB, style: 'fill: var(--accent)' }, svg);
+    const lost = mk('rect', { y: yB, height: hB, style: 'fill: var(--muted); fill-opacity: .3' }, svg);
+    const x95 = x0 + 0.95 * wB;
+    mk('line', { x1: x95, x2: x95, y1: yB - 6, y2: yB + hB + 6, style: 'stroke: var(--ink); stroke-width: 1.5' }, svg);
+    mk('text', { x: x95, y: yB - 10, 'text-anchor': 'middle', class: 'c-note' }, svg).textContent = '95%';
+    mk('text', { x: x0, y: yB + hB + 18, class: 'c-lbl' }, svg).textContent = 'kept';
+    mk('text', { x: x1, y: yB + hB + 18, 'text-anchor': 'end', class: 'c-note' }, svg).textContent = 'error';
+
+    const slider = document.getElementById('k-range'), out = document.getElementById('k-out');
+    const fOut = document.getElementById('k-frac'), eOut = document.getElementById('k-err'), sOut = document.getElementById('k-store'), status = document.getElementById('k-status');
+    const draw = () => {
+      const k = parseInt(slider.value, 10);
+      bars.forEach((b, i) => b.setAttribute('style', i < k ? 'fill: var(--accent)' : 'fill: var(--muted); fill-opacity: .35'));
+      const frac = cum[k - 1] / total, wk = wB * Math.min(1, frac);
+      kept.setAttribute('width', wk); lost.setAttribute('x', x0 + wk); lost.setAttribute('width', Math.max(0, wB - wk));
+      out.textContent = 'k = ' + k;
+      fOut.textContent = (100 * frac).toFixed(1) + '%';
+      eOut.textContent = Math.abs(errs[k]) < 0.005 ? '0.00' : errs[k].toFixed(2);
+      sOut.textContent = (d * k + k * n).toLocaleString('en-US');
+      if (k === k95) status.textContent = `k = ${k95} is the smallest k that explains at least 95%. Every later bar is small: those are error directions.`;
+      else if (k === d) status.textContent = 'k = d: zero error, but W and the coefficients now take 2,100 numbers, more than the raw 2,000.';
+      else status.textContent = '';
+    };
+    draw();
+    slider.addEventListener('input', draw);
+    document.getElementById('k-snap').addEventListener('click', () => { slider.value = k95; draw(); });
+  })();
+
+  /* ---------- Variance of the projections equals wᵀCw ---------- */
+  (() => {
+    const svg = document.getElementById('var-svg'); if (!svg) return;
+    const normal = seeded(7071);
+    const ang = 118 * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);
+    let pts = [];
+    for (let i = 0; i < 60; i++) { const a = 2.2 * normal(), b = 0.7 * normal(); pts.push([a * ca - b * sa, a * sa + b * ca]); }
+    const n = pts.length;
+    const m0 = pts.reduce((s, p) => s + p[0], 0) / n, m1 = pts.reduce((s, p) => s + p[1], 0) / n;
+    pts = pts.map(p => [p[0] - m0, p[1] - m1]);
+    const A = pts.reduce((s, p) => s + p[0] * p[0], 0) / n, B = pts.reduce((s, p) => s + p[0] * p[1], 0) / n, D = pts.reduce((s, p) => s + p[1] * p[1], 0) / n;
+    const half = (A + D) / 2, rad = Math.hypot((A - D) / 2, B), lam1 = half + rad, lam2 = half - rad;
+    let th1 = 0.5 * Math.atan2(2 * B, A - D) * 180 / Math.PI; if (th1 < 0) th1 += 180;
+    const th2 = (th1 + 90) % 180;
+    const lo = -6, hi = 6, P = 22, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    axes(svg, sx, sy, lo, hi, 2);
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'p03-var-clip' }, defs); mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P }, cp);
+    const gRes = mk('g', { class: 'c-resid', 'clip-path': 'url(#p03-var-clip)' }, svg);
+    const res = pts.map(() => mk('line', {}, gRes));
+    const line = mk('line', { class: 'c-user', 'clip-path': 'url(#p03-var-clip)' }, svg);
+    const gProj = mk('g', { class: 'c-proj' }, svg);
+    const proj = pts.map(() => mk('circle', { r: 2.6 }, gProj));
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    pts.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.8 }, gDots));
+    // number line of the projected values
+    const yS = 468;
+    mk('text', { x: P, y: 418, class: 'c-title' }, svg).textContent = 'The projected values xᵢᵀw on a number line';
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: yS, y2: yS, class: 'c-axis' }, svg);
+    for (let v = lo; v <= hi; v += 2) {
+      mk('line', { x1: sx(v), x2: sx(v), y1: yS, y2: yS + 4, class: 'c-axis' }, svg);
+      mk('text', { x: sx(v), y: yS + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+    }
+    const strip = pts.map((p, i) => mk('circle', { r: 3.2, cy: yS - 6 - ((i * 7) % 5) * 2.4, style: 'fill: var(--accent); fill-opacity: .55' }, svg));
+    const meanTick = mk('line', { y1: yS - 24, y2: yS + 2, style: 'stroke: var(--ink); stroke-width: 2' }, svg);
+    const meanLbl = mk('text', { y: yS - 28, 'text-anchor': 'middle', class: 'c-note' }, svg);
+    const br = mk('path', { class: 'c-hl' }, svg);
+    const brLbl = mk('text', { y: yS + 46, 'text-anchor': 'middle', class: 'c-lbl' }, svg);
+
+    const slider = document.getElementById('var-th'), out = document.getElementById('var-th-out');
+    const meanOut = document.getElementById('var-mean'), varOut = document.getElementById('var-var'), qOut = document.getElementById('var-q'), status = document.getElementById('var-status');
+    let th = parseFloat(slider.value);
+    const near = t => { const dd = Math.abs(((th - t) % 180 + 180) % 180); return Math.min(dd, 180 - dd) < 0.6; };
+    const draw = () => {
+      const r = th * Math.PI / 180, w = [Math.cos(r), Math.sin(r)];
+      line.setAttribute('x1', sx(-10 * w[0])); line.setAttribute('y1', sy(-10 * w[1])); line.setAttribute('x2', sx(10 * w[0])); line.setAttribute('y2', sy(10 * w[1]));
+      const c = pts.map(p => p[0] * w[0] + p[1] * w[1]);
+      const mean = c.reduce((s, v) => s + v, 0) / n;
+      const vr = c.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+      const q = w[0] * w[0] * A + 2 * w[0] * w[1] * B + w[1] * w[1] * D;
+      pts.forEach((p, i) => {
+        const qx = c[i] * w[0], qy = c[i] * w[1];
+        res[i].setAttribute('x1', sx(p[0])); res[i].setAttribute('y1', sy(p[1])); res[i].setAttribute('x2', sx(qx)); res[i].setAttribute('y2', sy(qy));
+        proj[i].setAttribute('cx', sx(qx)); proj[i].setAttribute('cy', sy(qy));
+        strip[i].setAttribute('cx', sx(Math.max(lo, Math.min(hi, c[i]))));
+      });
+      const sdv = Math.sqrt(vr), xm = sx(mean), xl = sx(mean - sdv), xr = sx(mean + sdv), yb = yS + 28;
+      meanTick.setAttribute('x1', xm); meanTick.setAttribute('x2', xm);
+      meanLbl.setAttribute('x', xm); meanLbl.textContent = 'mean';
+      br.setAttribute('d', `M${xl} ${yb - 6} L${xl} ${yb} L${xr} ${yb} L${xr} ${yb - 6}`);
+      brLbl.setAttribute('x', xm); brLbl.textContent = `±1 s.d. = ±${sdv.toFixed(2)}`;
+      const m = Math.abs(mean) < 0.005 ? 0 : mean;
+      meanOut.textContent = m.toFixed(2); varOut.textContent = vr.toFixed(2); qOut.textContent = q.toFixed(2);
+      out.textContent = Math.round(th) + '°';
+      if (near(th1)) status.textContent = `Top eigenvector (${th1.toFixed(1)}°): variance = λ₁ = ${lam1.toFixed(2)}, the largest possible. The projections spread out.`;
+      else if (near(th2)) status.textContent = `Second eigenvector (${th2.toFixed(1)}°): variance = λ₂ = ${lam2.toFixed(2)}, the smallest. The projections crowd together.`;
+      else status.textContent = '';
+    };
+    draw();
+    slider.addEventListener('input', () => { th = parseFloat(slider.value); draw(); });
+    const snap = t => () => { let target = t; if (Math.abs(target - th) > 90) target += target < th ? 180 : -180; tween(th, target, v => { th = ((v % 180) + 180) % 180; slider.value = Math.round(th); draw(); }); };
+    document.getElementById('var-snap1').addEventListener('click', snap(th1));
+    document.getElementById('var-snap2').addEventListener('click', snap(th2));
+  })();
+})();
+</script>
+</body>
+</html>
