@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 10 · Linear regression and gradient descent · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 10: lectures 27–31 on supervised learning, linear regression with squared error, the closed-form solution, its projection view, and gradient and stochastic gradient descent.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 10 of 18</span></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Linear regression: squared error, a closed form, and gradient descent</h1>
+    <p class="lede">Notes for lectures 27 to 31, which open supervised learning. Regression is set up as minimizing squared error over linear functions, solved in closed form, read geometrically as a projection of the labels, and finally solved step by step with gradient descent and its stochastic version.</p>
+    <div class="meta">
+      <span><b>Part 10</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>76 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=AIKTk9KtPJ0&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L27 · 7:46</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L28 · 17:08</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JQPLz5YhjaM&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L29 · 12:50</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L30 · 13:17</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L31 · 25:17</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 27</h4>
+      <ul>
+        <li><a href="#supervised">Data plus labels</a></li>
+        <li><a href="#label-types">Kinds of labels</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 28</h4>
+      <ul>
+        <li><a href="#squared-error">Measuring a function's error</a></li>
+        <li><a href="#memorizing">Zero error by memorizing</a></li>
+        <li><a href="#linear-structure">Restrict to linear functions</a></li>
+        <li><a href="#linear-regression">The linear regression problem</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 29</h4>
+      <ul>
+        <li><a href="#matrix-form">Matrix form</a></li>
+        <li><a href="#normal-equations">Gradient to zero</a></li>
+        <li><a href="#covariance-link">A covariance inside</a></li>
+        <li><a href="#four-questions">Four questions</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 30</h4>
+      <ul>
+        <li><a href="#feature-space">One vector per feature</a></li>
+        <li><a href="#projection-view">Projection of the labels</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 31</h4>
+      <ul>
+        <li><a href="#cost-of-inverse">Cost of the inverse</a></li>
+        <li><a href="#gradient-descent">Gradient descent</a></li>
+        <li><a href="#gd-regression">GD for linear regression</a></li>
+        <li><a href="#sgd">Stochastic gradient descent</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>Supervised learning adds a <b>label</b> \(y_i\) to every data point \(\mathbf{x}_i\). Labels in \(\{+1, -1\}\) give binary classification, a finite set of classes gives multi-class classification, and real-valued labels give <dfn>regression</dfn>.</li>
+        <li>Regression scores a function \(h\) by its <b>squared error</b> \(\sum_i (h(\mathbf{x}_i) - y_i)^2\). Over all functions the error can be driven to 0 by memorizing, which overfits. So the search is restricted to linear functions \(\mathbf{w}^\top\mathbf{x}\).</li>
+        <li><b>Linear regression</b> minimizes \(\lVert X^\top\mathbf{w} - \mathbf{y}\rVert^2\). Setting the gradient \(2XX^\top\mathbf{w} - 2X\mathbf{y}\) to zero gives \(\mathbf{w}^* = (XX^\top)^{\dagger}X\mathbf{y}\), which contains a covariance-like matrix and the labels.</li>
+        <li>Geometrically, the prediction vector \(X^\top\mathbf{w}^*\) is the <b>projection</b> of the label vector \(\mathbf{y}\) onto the subspace spanned by the feature vectors.</li>
+        <li>The inverse costs about \(d^3\), so use <b>gradient descent</b>; the objective is convex, so it reaches \(\mathbf{w}^*\). When \(n\) is huge, <b>stochastic gradient descent</b> steps on \(k\) random points at a time and outputs the average iterate.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 27 ============ -->
+    <section id="supervised">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=AIKTk9KtPJ0&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L27 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=AIKTk9KtPJ0&amp;t=61s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L27 · 1:01 the setup</a>
+        </div>
+        <h2>Supervised learning: data plus labels</h2>
+      </div>
+      <p>Parts 2 to 9 covered unsupervised learning: representation learning, clustering and estimation. L27 begins the second half of the course with a different paradigm, <dfn>supervised learning</dfn>, which the lecture calls the more popular one. From here on most algorithms are supervised, and the course also asks why some algorithms are better than others. The paradigms themselves were introduced in <a href="part-01.html">Part 1</a>.</p>
+      <p>The data looks the same as before: points \(\mathbf{x}_1, \dots, \mathbf{x}_n \in \mathbb{R}^d\). Their coordinates are the <dfn>features</dfn>. Other names are attributes, and statisticians say predictors or predictor variables; the course says features. What is new is a <dfn>label</dfn> \(y_i\) attached to each point <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=AIKTk9KtPJ0&amp;t=97s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:37</a>. The labels are the supervision, which is where the name comes from.</p>
+      <div class="eq">\[ \text{Input: } \{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}, \qquad \mathbf{x}_i \in \mathbb{R}^d \text{ (features)}, \quad y_i \text{ (label of } \mathbf{x}_i) \]</div>
+    </section>
+
+    <section id="label-types">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=AIKTk9KtPJ0&amp;t=127s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L27 · 2:07 binary</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=AIKTk9KtPJ0&amp;t=226s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L27 · 3:46 multi-class</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=AIKTk9KtPJ0&amp;t=330s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L27 · 5:30 regression</a>
+        </div>
+        <h2>The label set decides the problem</h2>
+      </div>
+      <p>The values a label may take split supervised learning into different problems. Each kind needs its own type of algorithm, and the course will justify why as it goes.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Labels \(y_i\) come from</th><th>Problem</th><th>Lecture's example</th></tr></thead>
+          <tbody>
+            <tr><td>\(\{+1, -1\}\) or \(\{0, 1\}\)</td><td><b>Binary classification</b></td><td>Is an email spam or not spam?</td></tr>
+            <tr><td>\(\{0, 1, \dots, 9\}\), or any finite \(\{0, \dots, k\}\)</td><td><b>Multi-class classification</b></td><td>Which digit is handwritten in this image?</td></tr>
+            <tr><td>\(\mathbb{R}\), anything from \(-\infty\) to \(+\infty\)</td><td><b>Regression</b></td><td>How much rain will fall today?</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li><b>Binary classification.</b> Two possible labels, hence "binary". The two encodings \(\pm1\) and \(\{0,1\}\) are almost equivalent for the course. For a new feature vector not seen in the data, predict which of the two buckets it falls in. For spam, each email is first turned into numbers somehow (how to do this well comes later); someone marks some emails as spam or not spam; the classifier must then label new emails automatically.</li>
+        <li><b>Multi-class classification.</b> A finite set of more than two classes. In digit recognition the image is the feature vector and the label is the digit written in it. People write the same digit in different ways, and the system should still recognize it.</li>
+        <li><b>Regression.</b> The label is any real number. To predict rainfall, the features might be temperature, precipitation and atmospheric pressure, and the label is an amount such as 100.23 cm. Regression is perhaps the earliest supervised problem and has strong roots in statistics.</li>
+      </ul>
+      <p>The plan <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=AIKTk9KtPJ0&amp;t=399s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:39</a>: regression for a couple of weeks, then binary classification for a long time, then a brief look at how binary-classification ideas give multi-class algorithms. Multi-class is not a major focus of the course.</p>
+    </section>
+
+    <!-- ============ LECTURE 28 ============ -->
+    <section id="squared-error">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=31s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L28 · 0:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=165s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L28 · 2:45 squared error</a>
+        </div>
+        <h2>Regression: pick a function, measure its error</h2>
+      </div>
+      <p>The training data is \(\mathbf{x}_1, \dots, \mathbf{x}_n \in \mathbb{R}^d\) with labels \(y_1, \dots, y_n \in \mathbb{R}\). The goal is to learn a function \(h : \mathbb{R}^d \to \mathbb{R}\), from the feature space to the label space, that predicts well on new feature vectors.</p>
+      <p>There are endlessly many such functions. To choose among them we need a score for any given \(h\) on the data set we have: one number saying how good \(h\) is. Then we can search for the \(h\) with the best score.</p>
+      <p>Start with one point. Its label is \(y_i\) and \(h\) predicts \(h(\mathbf{x}_i)\). A natural comparison is the squared difference. Adding this over all points gives the error of \(h\) on the data set:</p>
+      <div class="eq">\[ \text{error}(h) = \sum_{i=1}^{n} \big(h(\mathbf{x}_i) - y_i\big)^2 \]</div>
+      <p>Why square? The error should be non-negative <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=197s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:17</a>. With the plain difference \(h(\mathbf{x}_i) - y_i\), a function that outputs \(-\infty\) for every point would make the "error" as small as possible while being useless for prediction. Squared error is not the only reasonable choice; it is where the course starts, and it gets a proper justification later from a probabilistic view (<a href="part-11.html">Part 11</a>).</p>
+    </section>
+
+    <section id="memorizing">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=296s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L28 · 4:56</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=423s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L28 · 7:03 memorizing</a>
+        </div>
+        <h2>Zero training error by memorizing</h2>
+      </div>
+      <p>The goal is now to find the \(h\) with the smallest error. How small can it be? It is a sum of squares, so it cannot go below 0, and it equals 0 exactly when</p>
+      <div class="eq">\[ h(\mathbf{x}_i) = y_i \quad \text{for every } i = 1, \dots, n. \]</div>
+      <p>Such an \(h\) is easy to build: when given a training point \(\mathbf{x}_i\), output its label \(y_i\). Training error is then fully minimized. But this \(h\) has only memorized the mapping from \(\mathbf{x}_i\) to \(y_i\). It is the exam analogy from <a href="part-01.html">Part 1</a>: memorizing the exercise problems scores well on the exercises and says little about the exam.</p>
+      <p>The lecture names the worry: we may be <dfn>overfitting</dfn> to the training data, so that doing well on it does not carry over to test data. Our goal is never the training data itself <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=495s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:15</a>. A rainfall predictor that is perfect on the last three years and wrong from tomorrow onward is useless. What counts is performance on test data.</p>
+    </section>
+
+    <section id="linear-structure">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=555s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L28 · 9:15</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=696s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L28 · 11:36 linear functions</a>
+        </div>
+        <h2>Restrict the search to linear functions</h2>
+      </div>
+      <p>What went wrong? The squared error is not the problem. The problem is that the search ran over <i>all</i> functions from \(\mathbb{R}^d\) to \(\mathbb{R}\). A space that large always contains a function that memorizes the data, and that function fits the noise as well.</p>
+      <p>The remedy is to search a smaller space. That amounts to assuming that the true mapping from features to labels has some structure. The simplest structure is linear:</p>
+      <div class="eq">\[ \mathcal{H}_{\text{linear}} = \big\{\, h_{\mathbf{w}} : \mathbb{R}^d \to \mathbb{R} \;\big|\; h_{\mathbf{w}}(\mathbf{x}) = \mathbf{w}^\top\mathbf{x}, \ \mathbf{w} \in \mathbb{R}^d \,\big\} \]</div>
+      <p>Each function in this set is fixed by its parameter vector \(\mathbf{w}\). In one dimension it is the line \(y = mx\). The line \(y = mx + c\) corresponds to \(\mathbf{w}^\top\mathbf{x} + b\); the lecture uses plain \(\mathbf{w}^\top\mathbf{x}\) for simplicity and says the shifted version is a straightforward adaptation, shown later <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=764s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:44</a>.</p>
+      <p>The assumption being made <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=797s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:17</a>: the real relation between features and labels is linear, and the labels may not look exactly linear only because of noise in the output. Searching all functions would fit that noise too, which is what overfitting means here. Searching only linear functions fits just the structure.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 300" role="img" aria-label="Two panels with the same seven training points and one new point. Left: a polynomial curve passes through all seven training points but predicts far below the new point. Right: the best line through the origin misses the training points slightly and predicts close to the new point.">
+            <defs><clipPath id="p10-clip-a"><rect x="40" y="50" width="270" height="175"/></clipPath></defs>
+            <text class="d-h" x="20" y="20">Search all functions</text>
+            <text class="d-s" x="20" y="37">one choice: a curve through every training point</text>
+            <rect class="d-plot" x="40" y="50" width="270" height="175"/>
+            <line class="d-rule" x1="40" y1="200" x2="310" y2="200"/>
+            <text class="d-al" x="40" y="239" text-anchor="middle">0</text><text class="d-al" x="117.1" y="239" text-anchor="middle">2</text><text class="d-al" x="194.3" y="239" text-anchor="middle">4</text><text class="d-al" x="271.4" y="239" text-anchor="middle">6</text>
+            <text class="d-al" x="34" y="204" text-anchor="end">0</text><text class="d-al" x="34" y="154" text-anchor="end">2</text><text class="d-al" x="34" y="104" text-anchor="end">4</text><text class="d-al" x="34" y="54" text-anchor="end">6</text>
+            <text class="d-al" x="306" y="239" text-anchor="end">x</text>
+            <path class="d-ln-acc" clip-path="url(#p10-clip-a)" d="M55.4 61.1 L57.4 92 L59.3 118.2 L61.2 140.1 L63.1 158.2 L65.1 172.8 L67 184.4 L68.9 193.3 L70.9 199.7 L72.8 204.1 L74.7 206.7 L76.6 207.7 L78.6 207.4 L80.5 206.1 L82.4 203.8 L84.4 200.8 L86.3 197.2 L88.2 193.3 L90.1 189.1 L92.1 184.7 L94 180.2 L95.9 175.8 L97.9 171.5 L99.8 167.4 L101.7 163.5 L103.6 160 L105.6 156.7 L107.5 153.8 L109.4 151.2 L111.4 149 L113.3 147.2 L115.2 145.8 L117.1 144.8 L119.1 144.1 L121 143.8 L122.9 143.8 L124.9 144.1 L126.8 144.7 L128.7 145.6 L130.6 146.7 L132.6 148 L134.5 149.4 L136.4 151 L138.4 152.7 L140.3 154.4 L142.2 156.1 L144.1 157.8 L146.1 159.5 L148 161.1 L149.9 162.6 L151.9 164 L153.8 165.2 L155.7 166.2 L157.6 167 L159.6 167.5 L161.5 167.8 L163.4 167.9 L165.4 167.6 L167.3 167.1 L169.2 166.3 L171.1 165.2 L173.1 163.7 L175 162 L176.9 160 L178.9 157.7 L180.8 155.2 L182.7 152.3 L184.6 149.3 L186.6 146 L188.5 142.5 L190.4 138.9 L192.4 135.1 L194.3 131.2 L196.2 127.2 L198.1 123.2 L200.1 119.1 L202 115.1 L203.9 111.1 L205.9 107.3 L207.8 103.5 L209.7 100 L211.6 96.6 L213.6 93.5 L215.5 90.8 L217.4 88.3 L219.4 86.2 L221.3 84.5 L223.2 83.2 L225.1 82.3 L227.1 82 L229 82.1 L230.9 82.7 L232.9 83.9 L234.8 85.5 L236.7 87.7 L238.6 90.4 L240.6 93.6 L242.5 97.2 L244.4 101.3 L246.4 105.7 L248.3 110.5 L250.2 115.6 L252.1 120.8 L254.1 126.2 L256 131.6 L257.9 136.8 L259.9 141.8 L261.8 146.4 L263.7 150.5 L265.6 153.8 L267.6 156.3 L269.5 157.5 L271.4 157.4 L273.4 155.7 L275.3 152 L277.2 146.1 L279.1 137.7 L281.1 126.4 L283 111.8 L284.9 93.6 L286.9 71.2 L288.8 44.3 L290.7 12.3"/>
+            <circle class="pt-plain" cx="66.1" cy="179.3" r="4"/><circle class="pt-plain" cx="106.5" cy="155.3" r="4"/><circle class="pt-plain" cx="140.3" cy="154.4" r="4"/><circle class="pt-plain" cx="176.3" cy="160.7" r="4"/><circle class="pt-plain" cx="214.4" cy="92.2" r="4"/><circle class="pt-plain" cx="246.8" cy="106.9" r="4"/><circle class="pt-plain" cx="285" cy="92.7" r="4"/>
+            <line class="d-ln d-dash" x1="265.6" y1="77" x2="265.6" y2="149"/>
+            <circle class="pt-no" cx="265.6" cy="153.8" r="4.5"/>
+            <circle class="pt-new" cx="265.6" cy="71" r="5.5"/>
+            <text class="d-s" x="20" y="262">training error 0</text>
+            <text class="d-s" x="20" y="280">squared error on the new point 10.98</text>
+
+            <line class="d-rule" x1="340" y1="8" x2="340" y2="286"/>
+
+            <defs><clipPath id="p10-clip-b"><rect x="390" y="50" width="270" height="175"/></clipPath></defs>
+            <text class="d-h" x="370" y="20">Search linear functions w x</text>
+            <text class="d-s" x="370" y="37">the least-squares line through the origin</text>
+            <rect class="d-plot" x="390" y="50" width="270" height="175"/>
+            <line class="d-rule" x1="390" y1="200" x2="660" y2="200"/>
+            <text class="d-al" x="390" y="239" text-anchor="middle">0</text><text class="d-al" x="467.1" y="239" text-anchor="middle">2</text><text class="d-al" x="544.3" y="239" text-anchor="middle">4</text><text class="d-al" x="621.4" y="239" text-anchor="middle">6</text>
+            <text class="d-al" x="384" y="204" text-anchor="end">0</text><text class="d-al" x="384" y="154" text-anchor="end">2</text><text class="d-al" x="384" y="104" text-anchor="end">4</text><text class="d-al" x="384" y="54" text-anchor="end">6</text>
+            <text class="d-al" x="656" y="239" text-anchor="end">x</text>
+            <line class="d-ln-acc" clip-path="url(#p10-clip-b)" x1="390" y1="200" x2="660" y2="74.2"/>
+            <line class="d-ln d-dash" x1="416.1" y1="179.3" x2="416.1" y2="187.8"/><line class="d-ln d-dash" x1="456.5" y1="155.3" x2="456.5" y2="169"/><line class="d-ln d-dash" x1="490.3" y1="154.4" x2="490.3" y2="153.3"/><line class="d-ln d-dash" x1="526.3" y1="160.7" x2="526.3" y2="136.5"/><line class="d-ln d-dash" x1="564.4" y1="92.2" x2="564.4" y2="118.7"/><line class="d-ln d-dash" x1="596.8" y1="106.9" x2="596.8" y2="103.6"/><line class="d-ln d-dash" x1="635" y1="92.7" x2="635" y2="85.9"/>
+            <circle class="pt-plain" cx="416.1" cy="179.3" r="4"/><circle class="pt-plain" cx="456.5" cy="155.3" r="4"/><circle class="pt-plain" cx="490.3" cy="154.4" r="4"/><circle class="pt-plain" cx="526.3" cy="160.7" r="4"/><circle class="pt-plain" cx="564.4" cy="92.2" r="4"/><circle class="pt-plain" cx="596.8" cy="106.9" r="4"/><circle class="pt-plain" cx="635" cy="92.7" r="4"/>
+            <line class="d-ln d-dash" x1="615.6" y1="77" x2="615.6" y2="90.4"/>
+            <circle class="pt-no" cx="615.6" cy="94.9" r="4.5"/>
+            <circle class="pt-new" cx="615.6" cy="71" r="5.5"/>
+            <text class="d-s" x="370" y="262">training error 2.58 (dashes: the errors)</text>
+            <text class="d-s" x="370" y="280">squared error on the new point 0.91</text>
+          </svg>
+        </div>
+        <figcaption><b>Memorizing versus a linear fit.</b> Seven synthetic training points (seeded, generated for these notes) scattered around a line through the origin, plus one new point (yellow); rings mark each model's prediction for it. A curve through every training point (here the degree-6 polynomial) has zero training error but misses the new point badly. The least-squares line \(y = w^* x\) accepts some training error and predicts the new point well.</figcaption>
+      </figure>
+    </section>
+
+    <section id="linear-regression">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=827s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L28 · 13:47</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=RkcCmmN0TY4&amp;t=929s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L28 · 15:29 can it be zero?</a>
+        </div>
+        <h2>The linear regression problem</h2>
+      </div>
+      <p>Keep the squared error and minimize it over \(h_{\mathbf{w}} \in \mathcal{H}_{\text{linear}}\) only. Since each \(h_{\mathbf{w}}\) is fixed by \(\mathbf{w}\), this is a search over \(\mathbf{w} \in \mathbb{R}^d\):</p>
+      <div class="result">
+        <span class="lbl">Linear regression</span>
+        \[ \min_{h_{\mathbf{w}} \in \mathcal{H}_{\text{linear}}} \sum_{i=1}^n \big(h_{\mathbf{w}}(\mathbf{x}_i) - y_i\big)^2 \;=\; \min_{\mathbf{w} \in \mathbb{R}^d} \sum_{i=1}^n \big(\mathbf{w}^\top\mathbf{x}_i - y_i\big)^2 \]
+        <p>Each label is explained by a weighted combination \(\mathbf{w}^\top\mathbf{x}_i\) of the features. The weights say how important each feature is.</p>
+      </div>
+      <p>Can this objective reach 0? Yes: it is still a sum of non-negative numbers, and it is 0 when \(\mathbf{w}^\top\mathbf{x}_i = y_i\) for every \(i\). This time that is not overfitting. It means the labels follow the hypothesized linear structure exactly, with no noise, so the best structured fit happens to be perfect. Overfitting is what happens when the search space is bigger than the actual relation from inputs to outputs, so the fit starts to follow noise. Noise gets a probabilistic treatment later (<a href="part-11.html">Part 11</a>); for now it is whatever the labels contain beyond the structure, and it is useless for prediction.</p>
+    </section>
+
+    <!-- ============ LECTURE 29 ============ -->
+    <section id="matrix-form">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JQPLz5YhjaM&amp;t=31s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L29 · 0:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JQPLz5YhjaM&amp;t=100s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L29 · 1:40 as a norm</a>
+        </div>
+        <h2>The objective in matrix form</h2>
+      </div>
+      <p>Matrices make the problem easier to handle. Stack the data points as the columns of \(X\), so \(X^\top\) has them as rows. Collect the labels in a vector \(\mathbf{y}\):</p>
+      <div class="eq">\[ X = \begin{bmatrix} \mathbf{x}_1 & \mathbf{x}_2 & \cdots & \mathbf{x}_n \end{bmatrix} \in \mathbb{R}^{d \times n}, \qquad \mathbf{y} = \begin{bmatrix} y_1 \\ \vdots \\ y_n \end{bmatrix} \in \mathbb{R}^{n}, \qquad \mathbf{w} = \begin{bmatrix} w_1 \\ \vdots \\ w_d \end{bmatrix} \in \mathbb{R}^{d} \]</div>
+      <p>Then \(X^\top\mathbf{w} = [\mathbf{x}_1^\top\mathbf{w}, \dots, \mathbf{x}_n^\top\mathbf{w}]^\top\) is the vector of all \(n\) predictions. Subtracting \(\mathbf{y}\) leaves the \(n\) errors, and the squared L2 norm of that vector is the sum of their squares. A squared norm is also the vector transposed times itself:</p>
+      <div class="eq">\[ \min_{\mathbf{w} \in \mathbb{R}^d} \sum_{i=1}^n (\mathbf{w}^\top\mathbf{x}_i - y_i)^2 \;=\; \min_{\mathbf{w} \in \mathbb{R}^d} \lVert X^\top\mathbf{w} - \mathbf{y} \rVert^2 \;=\; \min_{\mathbf{w} \in \mathbb{R}^d} (X^\top\mathbf{w} - \mathbf{y})^\top (X^\top\mathbf{w} - \mathbf{y}) \]</div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 720 272" role="img" aria-label="Left: the d by n matrix X with data points as columns and one highlighted row holding one feature for all points. Right: X transpose (n by d) times w (d by 1) minus y (n by 1) equals the error vector (n by 1), whose squared length is the sum of squared errors.">
+            <defs><marker id="p10m-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="20" y="20">X: data points as columns</text>
+            <text class="d-al" x="43.75" y="42" text-anchor="middle">x₁</text><text class="d-al" x="91.25" y="42" text-anchor="middle">x₂</text><text class="d-al" x="138.75" y="42" text-anchor="middle">⋯</text><text class="d-al" x="186.25" y="42" text-anchor="middle">xₙ</text>
+            <rect class="d-box" x="20" y="48" width="190" height="92" rx="4"/>
+            <rect x="21" y="86" width="188" height="18" style="fill: var(--accent-soft)"/>
+            <path class="d-ln d-dash" d="M67.5 48 V86 M67.5 104 V140 M115 48 V86 M115 104 V140 M162.5 48 V86 M162.5 104 V140"/>
+            <text class="d-s" x="115" y="99" text-anchor="middle" style="fill: var(--accent)">row j = fⱼᵀ</text>
+            <text class="d-al" x="115" y="157" text-anchor="middle">d × n</text>
+            <text class="d-s" x="20" y="182">column i: the data point xᵢ ∈ ℝᵈ</text>
+            <text class="d-s" x="20" y="199">row j: feature j of all n points,</text>
+            <text class="d-s" x="20" y="216">the vector fⱼ ∈ ℝⁿ of Lecture 30</text>
+            <line class="d-ln" x1="216" y1="94" x2="282" y2="94" marker-end="url(#p10m-ah)"/>
+            <text class="d-al" x="249" y="86" text-anchor="middle">transpose</text>
+
+            <text class="d-h" x="290" y="20">Xᵀw − y: all n errors at once</text>
+            <rect class="d-box" x="290" y="40" width="90" height="180" rx="4"/>
+            <line class="d-rule" x1="290" y1="76" x2="380" y2="76"/><line class="d-rule" x1="290" y1="112" x2="380" y2="112"/><line class="d-rule" x1="290" y1="184" x2="380" y2="184"/>
+            <text class="d-t" x="335" y="63" text-anchor="middle">x₁ᵀ</text><text class="d-t" x="335" y="99" text-anchor="middle">x₂ᵀ</text><text class="d-t" x="335" y="152" text-anchor="middle">⋮</text><text class="d-t" x="335" y="207" text-anchor="middle">xₙᵀ</text>
+            <rect class="d-box-acc" x="392" y="40" width="28" height="90" rx="4"/>
+            <text class="d-t" x="406" y="90" text-anchor="middle">w</text>
+            <text class="d-t" x="436" y="135" text-anchor="middle" style="font-size:18px">−</text>
+            <rect class="d-box" x="450" y="40" width="36" height="180" rx="4"/>
+            <line class="d-rule" x1="450" y1="76" x2="486" y2="76"/><line class="d-rule" x1="450" y1="112" x2="486" y2="112"/><line class="d-rule" x1="450" y1="184" x2="486" y2="184"/>
+            <text class="d-t" x="468" y="63" text-anchor="middle">y₁</text><text class="d-t" x="468" y="99" text-anchor="middle">y₂</text><text class="d-t" x="468" y="152" text-anchor="middle">⋮</text><text class="d-t" x="468" y="207" text-anchor="middle">yₙ</text>
+            <text class="d-t" x="502" y="135" text-anchor="middle" style="font-size:18px">=</text>
+            <rect class="d-box-acc" x="518" y="40" width="120" height="180" rx="4"/>
+            <line class="d-rule" x1="518" y1="76" x2="638" y2="76"/><line class="d-rule" x1="518" y1="112" x2="638" y2="112"/><line class="d-rule" x1="518" y1="184" x2="638" y2="184"/>
+            <text class="d-t" x="578" y="63" text-anchor="middle">x₁ᵀw − y₁</text><text class="d-t" x="578" y="99" text-anchor="middle">x₂ᵀw − y₂</text><text class="d-t" x="578" y="152" text-anchor="middle">⋮</text><text class="d-t" x="578" y="207" text-anchor="middle">xₙᵀw − yₙ</text>
+            <text class="d-s" x="646" y="128">one error</text><text class="d-s" x="646" y="144">per point</text>
+            <text class="d-al" x="335" y="237" text-anchor="middle">n × d</text><text class="d-al" x="406" y="146" text-anchor="middle">d × 1</text><text class="d-al" x="468" y="237" text-anchor="middle">n × 1</text><text class="d-al" x="578" y="237" text-anchor="middle">n × 1</text>
+            <text class="d-t" x="578" y="262" text-anchor="middle">‖Xᵀw − y‖² = Σᵢ (xᵢᵀw − yᵢ)²</text>
+          </svg>
+        </div>
+        <figcaption><b>From a sum to a norm.</b> \(X\) holds the data points as columns, so \(X^\top\) holds them as rows. Multiplying by \(\mathbf{w}\) produces every prediction \(\mathbf{x}_i^\top\mathbf{w}\) at once, subtracting \(\mathbf{y}\) gives the error vector, and its squared length is the sum of squared errors. The rows of \(X\), one per feature, are the vectors Lecture 30 draws.</figcaption>
+      </figure>
+    </section>
+
+    <section id="normal-equations">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JQPLz5YhjaM&amp;t=165s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L29 · 2:45</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JQPLz5YhjaM&amp;t=261s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L29 · 4:21 the gradient</a>
+        </div>
+        <h2>Set the gradient to zero: a closed form</h2>
+      </div>
+      <p>This is an <b>unconstrained quadratic optimization</b> problem. Unconstrained, because any \(\mathbf{w} \in \mathbb{R}^d\) is allowed. Quadratic, because of the squared error. The simplest approach is to take the derivative with respect to \(\mathbf{w}\), which in higher dimensions is the <dfn>gradient</dfn> \(\nabla f(\mathbf{w})\), and set it to zero. The gradient is the vector of partial derivatives: for each component \(w_j\), differentiate while treating all other components as constants, and collect the results. Sometimes this gives a closed form, sometimes not.</p>
+      <p>The lecture leaves the gradient as an exercise. Expanding the objective:</p>
+      <div class="eq">\[ f(\mathbf{w}) = (X^\top\mathbf{w} - \mathbf{y})^\top(X^\top\mathbf{w} - \mathbf{y}) = \mathbf{w}^\top XX^\top\mathbf{w} - 2\,\mathbf{w}^\top X\mathbf{y} + \mathbf{y}^\top\mathbf{y} \]</div>
+      <p>With \(\nabla_{\mathbf{w}}(\mathbf{w}^\top A\mathbf{w}) = 2A\mathbf{w}\) for a symmetric \(A\) (here \(A = XX^\top\)), \(\nabla_{\mathbf{w}}(\mathbf{w}^\top\mathbf{b}) = \mathbf{b}\), and the last term constant:</p>
+      <div class="eq">\[ \nabla f(\mathbf{w}) = 2XX^\top\mathbf{w} - 2X\mathbf{y} \]</div>
+      <p>Setting this to zero gives the equation the solution \(\mathbf{w}^*\) must satisfy. Standard name: the <dfn>normal equations</dfn>.</p>
+      <div class="result">
+        <span class="lbl">Closed-form solution</span>
+        \[ XX^\top\,\mathbf{w}^* = X\mathbf{y} \qquad\Longrightarrow\qquad \mathbf{w}^* = (XX^\top)^{\dagger}\,X\mathbf{y} \]
+        <p>If \(XX^\top\) is invertible, \((XX^\top)^{\dagger}\) is simply its inverse: premultiply both sides by it. Otherwise it is the <b>pseudo-inverse</b>, written with a dagger.</p>
+      </div>
+      <p>When is \(XX^\top\) not invertible <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JQPLz5YhjaM&amp;t=324s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:24</a>? When it is not full rank, that is, it has a non-trivial null space. Then it maps many vectors to the same vector, a whole subspace landing on one point, so the normal equations have many solutions. The pseudo-inverse is a matrix with the good properties of an inverse that is available even when no inverse exists. Among the many solutions it returns the one with the <b>smallest length</b>, which is why it is called the least-norm solution <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JQPLz5YhjaM&amp;t=393s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:33</a>. For now the lecture assumes \(XX^\top\) is invertible; nothing conceptual changes, and the pseudo-inverse is discussed later.</p>
+      <p class="note">With a single feature (\(d = 1\)), \(XX^\top = \sum_i x_i^2\) is a number and \(X\mathbf{y} = \sum_i x_i y_i\), so \(w^* = \sum_i x_i y_i \big/ \sum_i x_i^2\). The gradient-descent widget in Lecture 31 uses this case.</p>
+    </section>
+
+    <section id="covariance-link">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JQPLz5YhjaM&amp;t=459s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L29 · 7:39</a>
+        <h2>A covariance matrix inside the solution</h2>
+      </div>
+      <p>What does \(\mathbf{w}^*\) depend on? \(X\) is \(d \times n\) and \(X^\top\) is \(n \times d\), so \(XX^\top\) is \(d \times d\). It is a scaled covariance matrix: \(XX^\top = \sum_i \mathbf{x}_i\mathbf{x}_i^\top = n\,C\), where \(C = \frac1n\sum_i\mathbf{x}_i\mathbf{x}_i^\top\) is the matrix of <a href="part-02.html#derivation">Part 2</a>. So, as in PCA (<a href="part-03.html">Part 3</a>), a covariance-like matrix shows up, here through its inverse. Its exact role is explained later.</p>
+      <p>The key difference is the labels. PCA was completely unsupervised. Regression tries to match the labels as well as possible, so the labels must shape the answer, and they enter through \(X\mathbf{y}\). Given a data set, \(\mathbf{w}^*\) can be computed directly in code from the data and the labels, though possibly at a high computational cost (Lecture 31).</p>
+    </section>
+
+    <section id="four-questions">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JQPLz5YhjaM&amp;t=591s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L29 · 9:51</a>
+        <h2>Four questions about the solution</h2>
+      </div>
+      <p>Having a closed form is a great start, but \((XX^\top)^{\dagger}X\mathbf{y}\) still needs an interpretation. L29 lists four questions. Answering them gives a solid understanding of linear regression:</p>
+      <ol>
+        <li><b>Geometry.</b> Can the solution be described geometrically? Answered in <a href="#feature-space">Lecture 30</a> below.</li>
+        <li><b>Computation.</b> Are there computational issues, as there were for PCA (<a href="part-04.html">Part 4</a>)? Answered in <a href="#cost-of-inverse">Lecture 31</a> below.</li>
+        <li><b>Non-linear relationships.</b> The features were assumed to be linearly related to the labels. What if the relation is quadratic or cubic? PCA faced a similar question (<a href="part-05.html">Part 5</a>), but the answer here has a different flavour. This becomes kernel regression in <a href="part-11.html">Part 11</a>.</li>
+        <li><b>Noise.</b> What exactly is the noise mentioned in L28? The right language for noise is probability, so: is there a probabilistic view of linear regression? Also in <a href="part-11.html">Part 11</a>.</li>
+      </ol>
+      <p>The answers lead to two algorithmic changes to the standard problem, covered in <a href="part-12.html">Part 12</a>.</p>
+    </section>
+
+    <!-- ============ LECTURE 30 ============ -->
+    <section id="feature-space">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=65s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L30 · 1:05</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=135s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L30 · 2:15 vectors, not points</a>
+        </div>
+        <h2>A different picture: one vector per feature</h2>
+      </div>
+      <p>To be able to draw it, take \(d = 2\) features and \(n = 3\) data points: the height and weight of three people. Everything said here carries over to higher dimensions.</p>
+      <p>The usual picture would plot the three data points, each in \(\mathbb{R}^2\). This picture is different. It draws one vector per <i>feature</i>, in \(\mathbb{R}^n = \mathbb{R}^3\):</p>
+      <ul>
+        <li>\(\mathbf{f}_1 \in \mathbb{R}^3\): the heights of all three people (in general an \(n\)-dimensional vector);</li>
+        <li>\(\mathbf{f}_2 \in \mathbb{R}^3\): their weights;</li>
+        <li>\(\mathbf{y} \in \mathbb{R}^3\): their labels, one per person <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=202s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:22</a>.</li>
+      </ul>
+      <p>These feature vectors are the rows of \(X\), so \(X^\top = [\,\mathbf{f}_1 \ \ \mathbf{f}_2\,]\). Combining them gives other vectors, such as \(3\mathbf{f}_1 + 2.5\mathbf{f}_2\) or \(-5\mathbf{f}_1 + 3\mathbf{f}_2\) (the lecture's arbitrary examples). All combinations \(a\,\mathbf{f}_1 + b\,\mathbf{f}_2\) together form a 2-D plane sitting inside \(\mathbb{R}^3\), the plane <b>spanned</b> by \(\mathbf{f}_1\) and \(\mathbf{f}_2\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=270s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:30</a>.</p>
+      <p>In matrix form a combination is \([\,\mathbf{f}_1 \ \ \mathbf{f}_2\,]\begin{bmatrix} a \\ b \end{bmatrix} = X^\top\boldsymbol\alpha\). So the prediction vector \(X^\top\mathbf{w}\) of any linear model is a point of this plane, and every point of the plane is the prediction vector of some \(\mathbf{w}\).</p>
+    </section>
+
+    <section id="projection-view">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=303s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L30 · 5:03</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=464s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L30 · 7:44 the right angle</a>
+        </div>
+        <h2>The prediction vector is a projection of y</h2>
+      </div>
+      <p>The label vector \(\mathbf{y}\) need not lie in the plane. We want to explain the labels as a combination of height and weight, so we look for the point of the plane closest to \(\mathbf{y}\). That point is the <dfn>projection</dfn> of \(\mathbf{y}\) onto the subspace spanned by the feature vectors <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=333s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:33</a>.</p>
+      <p>Being in the plane, the closest point is \(\alpha_1^*\mathbf{f}_1 + \alpha_2^*\mathbf{f}_2 = X^\top\boldsymbol\alpha^*\) for some unknown \(\boldsymbol\alpha^*\). Being the closest, the gap \(\mathbf{y} - X^\top\boldsymbol\alpha^*\), the vector to add to reach \(\mathbf{y}\), meets the plane at a right angle. In particular it is orthogonal to \(X^\top\boldsymbol\alpha^*\) itself:</p>
+      <div class="eq">\[ (\mathbf{y} - X^\top\boldsymbol\alpha^*)^\top X^\top\boldsymbol\alpha^* = 0 \quad\Longleftrightarrow\quad \mathbf{y}^\top X^\top\boldsymbol\alpha^* - \boldsymbol\alpha^{*\top} XX^\top\boldsymbol\alpha^* = 0 \]</div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 320" role="img" aria-label="Three-dimensional sketch. Two feature vectors f1 (heights) and f2 (weights) start at the origin and span a shaded plane. The label vector y rises out of the plane. A dashed perpendicular drops from y to its foot in the plane, which is X transpose w star, the projection; a right-angle mark sits at the foot. A dotted line from y to another point of the plane is longer. Inset: a three-row data table whose height and weight columns are f1 and f2 and whose label column is y.">
+            <defs>
+              <marker id="p10p-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p10p-aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <path class="d-plot" d="M30 253.5 L390 307.5 L618 203 L258 149 Z" style="fill: var(--accent-soft); fill-opacity:.45"/>
+            <text class="d-s" x="24" y="172">the plane = span{f₁, f₂}</text>
+            <text class="d-s" x="24" y="188">= all vectors Xᵀα</text>
+            <line class="d-ln" x1="150" y1="235" x2="350" y2="265" marker-end="url(#p10p-ah)" style="stroke-width:2"/>
+            <line class="d-ln" x1="150" y1="235" x2="270" y2="180" marker-end="url(#p10p-ah)" style="stroke-width:2"/>
+            <line class="d-ln" x1="150" y1="235" x2="382" y2="36" marker-end="url(#p10p-ah)" style="stroke-width:2"/>
+            <line class="d-dash" x1="382" y1="38" x2="456" y2="259" style="stroke: var(--muted); stroke-width:1.3"/>
+            <line class="d-ln d-dash" x1="382" y1="226" x2="382" y2="40"/>
+            <line class="d-ln-acc" x1="150" y1="235" x2="380" y2="226" marker-end="url(#p10p-aha)" style="stroke-width:2.4"/>
+            <path class="d-ln" d="M371 226.4 L371 215.4 L382 215"/>
+            <circle class="pt-plain" cx="150" cy="235" r="3"/>
+            <text class="d-al" x="140" y="250" text-anchor="end">0</text>
+            <circle class="pt-tree" cx="382" cy="226" r="4.5"/>
+            <circle class="pt-no" cx="456" cy="259" r="4"/>
+            <text class="d-t" x="358" y="272">f₁</text><text class="d-s" x="374" y="272">heights</text>
+            <text class="d-t" x="276" y="176">f₂</text><text class="d-s" x="292" y="176">weights</text>
+            <text class="d-t" x="390" y="40">y</text><text class="d-s" x="402" y="40">labels</text>
+            <text class="d-t" x="376" y="120" text-anchor="end">y − Xᵀw*</text>
+            <text class="d-s" x="376" y="136" text-anchor="end">⟂ to the plane</text>
+            <text class="d-s" x="366" y="196" text-anchor="end">projection of y</text>
+            <text class="d-t" x="366" y="211" text-anchor="end" style="fill: var(--accent)">Xᵀw*</text>
+            <text class="d-s" x="505" y="266">another combination</text>
+            <text class="d-s" x="505" y="281">is farther from y</text>
+
+            <rect class="d-box" x="470" y="14" width="200" height="124" rx="6"/>
+            <text class="d-row" x="482" y="32">data · d = 2, n = 3</text>
+            <rect x="522" y="58" width="46" height="58" rx="3" style="fill: var(--accent-soft)"/>
+            <rect x="577" y="58" width="46" height="58" rx="3" style="fill: var(--accent-soft)"/>
+            <text class="d-al" x="545" y="52" text-anchor="middle">height</text><text class="d-al" x="600" y="52" text-anchor="middle">weight</text><text class="d-al" x="650" y="52" text-anchor="middle">label</text>
+            <text class="d-s" x="488" y="73">x₁</text><text class="d-s" x="488" y="91">x₂</text><text class="d-s" x="488" y="109">x₃</text>
+            <rect class="d-plot" x="527" y="63" width="36" height="12"/><rect class="d-plot" x="527" y="81" width="36" height="12"/><rect class="d-plot" x="527" y="99" width="36" height="12"/>
+            <rect class="d-plot" x="582" y="63" width="36" height="12"/><rect class="d-plot" x="582" y="81" width="36" height="12"/><rect class="d-plot" x="582" y="99" width="36" height="12"/>
+            <rect class="d-plot" x="634" y="63" width="32" height="12"/><rect class="d-plot" x="634" y="81" width="32" height="12"/><rect class="d-plot" x="634" y="99" width="32" height="12"/>
+            <text class="d-t" x="545" y="131" text-anchor="middle">f₁</text><text class="d-t" x="600" y="131" text-anchor="middle">f₂</text><text class="d-t" x="650" y="131" text-anchor="middle">y</text>
+          </svg>
+        </div>
+        <figcaption><b>Linear regression as a projection.</b> Three people, two features (an illustrative sketch, no data values). The columns of the data table are vectors in \(\mathbb{R}^3\): \(\mathbf{f}_1\) and \(\mathbf{f}_2\) span a plane holding every prediction vector \(X^\top\boldsymbol\alpha\), and \(\mathbf{y}\) sticks out of it. The closest point of the plane to \(\mathbf{y}\) is the foot of the perpendicular, \(X^\top\mathbf{w}^*\). Any other combination of the features is farther away.</figcaption>
+      </figure>
+
+      <h3>Does the closed-form w* satisfy it? <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=528s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L30 · 8:48</a></h3>
+      <p>Substitute \(\boldsymbol\alpha^* = \mathbf{w}^* = (XX^\top)^{-1}X\mathbf{y}\) from L29 and check that the left side is 0. Write \(A = XX^\top\) and use the inverse for readability. The lecture leaves the algebra as an exercise and points to the key fact: \(A\) is symmetric, so \(A^{-1}\) is symmetric too, and \(\mathbf{w}^{*\top} = \mathbf{y}^\top X^\top A^{-1}\). The two terms become</p>
+      <div class="eq">\[ \mathbf{y}^\top X^\top\mathbf{w}^* = \mathbf{y}^\top X^\top A^{-1}X\mathbf{y}, \qquad \mathbf{w}^{*\top} A\,\mathbf{w}^* = \mathbf{y}^\top X^\top A^{-1}\,A\,A^{-1}X\mathbf{y} = \mathbf{y}^\top X^\top A^{-1}X\mathbf{y} \]</div>
+      <p>They are equal, so their difference is 0. With the pseudo-inverse the same steps work, because \(A^{\dagger}AA^{\dagger} = A^{\dagger}\) is one of its defining properties.</p>
+      <div class="result">
+        <span class="lbl">Geometric interpretation <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=654s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:54</a></span>
+        <p>\(X^\top\mathbf{w}^*\) is the <b>projection of the labels \(\mathbf{y}\) onto the subspace spanned by the features</b> (the columns \(\mathbf{f}_1, \dots, \mathbf{f}_d\) of \(X^\top\)). Linear regression projects the label vector onto the feature subspace, and \(\mathbf{w}^*\) holds the coefficients of that projection.</p>
+      </div>
+      <p class="callout">Standard fact, not in the lecture: the gap \(\mathbf{y} - X^\top\mathbf{w}^*\) is perpendicular to every vector in the plane, in particular to each feature vector \(\mathbf{f}_j\). Stacking those \(d\) conditions gives \(X(\mathbf{y} - X^\top\mathbf{w}^*) = \mathbf{0}\), which is exactly the normal equations \(XX^\top\mathbf{w}^* = X\mathbf{y}\) of L29. Projection onto a single line in <a href="part-02.html#projection">Part 2</a> is the one-feature version of this picture.</p>
+      <p>An exercise from the lecture <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=SGbelq087Qs&amp;t=727s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:07</a>: what if \(\mathbf{y}\) already lies in the plane? Then its projection is \(\mathbf{y}\) itself. The lecture leaves the meaning as an exercise; in terms of the error it means \(X^\top\mathbf{w}^* = \mathbf{y}\), so the squared error is 0 and every label is exactly \(\mathbf{w}^{*\top}\mathbf{x}_i\). That is the noise-free case from <a href="#linear-regression">L28</a>.</p>
+    </section>
+
+    <!-- ============ LECTURE 31 ============ -->
+    <section id="cost-of-inverse">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=62s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 1:02</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=131s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 2:11 the inverse</a>
+        </div>
+        <h2>The cost of the closed form</h2>
+      </div>
+      <p>L31 takes up the second question, computation. The closed form \(\mathbf{w}^* = (XX^\top)^{\dagger}X\mathbf{y}\) is convenient: given data, compute \(\mathbf{w}^*\) once and use it to predict on test data. The question is how expensive that computation is.</p>
+      <p>The obvious culprit is the inverse (or pseudo-inverse) of the \(d \times d\) matrix \(XX^\top\). Inverting it takes on the order of \(d^3\) operations. That is the same cost as the eigenvector computation for PCA (<a href="part-04.html">Part 4</a>), and the lecture notes the two are equally hard: once the eigenvectors are known, the inverse follows by inverting the eigenvalues, \(XX^\top = \sum_j \lambda_j\mathbf{u}_j\mathbf{u}_j^\top \Rightarrow (XX^\top)^{-1} = \sum_j \frac{1}{\lambda_j}\mathbf{u}_j\mathbf{u}_j^\top\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=166s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:46</a>. Special-purpose algorithms can do slightly better, but \(d^3\) is the general picture.</p>
+      <p>With a billion features, inverting a billion-by-billion matrix takes far too much computation. Can we reach the same \(\mathbf{w}^*\) without computing an inverse? The theory is the foundation, but what goes wrong in practice matters too.</p>
+    </section>
+
+    <section id="gradient-descent">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=265s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 4:25</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=338s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 5:38 the method</a>
+        </div>
+        <h2>Gradient descent</h2>
+      </div>
+      <p>\(\mathbf{w}^*\) is the minimizer of an unconstrained problem: the sum (or average) of squared errors, over all of \(\mathbb{R}^d\). So general-purpose tools for unconstrained minimization apply, and the most popular of them is <dfn>gradient descent</dfn>.</p>
+      <p>Gradient descent is an iterative way to find minimizers that uses only first-order information, the gradient. Start at some guess \(\mathbf{w}_0\), an arbitrary point in \(\mathbb{R}^d\). The gradient at the current point gives the direction in which the function increases fastest. We want to decrease it, so we move the opposite way: to climb a mountain follow the gradient, to reach the bottom follow its negative.</p>
+      <div class="result">
+        <span class="lbl">Gradient descent update <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=406s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:46</a></span>
+        \[ \mathbf{w}_{t+1} = \mathbf{w}_t - \eta_t\,\nabla f(\mathbf{w}_t) \]
+        <p>The minus sign moves against the gradient. The scalar \(\eta_t > 0\) is the <dfn>step size</dfn>: how far to move in the direction of the negative gradient, since a full step is not necessarily taken.</p>
+      </div>
+      <p>At the new point the gradient may point a different way, so the step is repeated. If the step size is chosen carefully, repeating it eventually reaches a <b>local minimum</b>, a point where the gradient is 0. There the update stops changing \(\mathbf{w}\).</p>
+
+      <h3>Local and global minima <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=468s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 7:48</a></h3>
+      <p>A local minimum need not be the global minimum. On a wiggly function with several valleys, gradient descent started on one side slides into the nearest valley and stops there, even if a deeper valley exists elsewhere.</p>
+      <p>On a "nice" function without wiggles, every local minimum is a global minimum, and gradient descent converges to it wherever it starts <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=533s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:53</a>. The squared-error objective is of this kind. It is quadratic in \(\mathbf{w}\), and the lecture places it among the <dfn>convex functions</dfn> (see <a href="part-09.html">Part 9</a>), for which all local minima are global. So gradient descent converges to the optimal \(\mathbf{w}^*\). (Standard detail: it is convex because its matrix of second derivatives, \(2XX^\top\), is positive semidefinite.)</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 262" role="img" aria-label="Left: a curve with two valleys. Gradient descent starts high on the right and its iterates slide into the right valley, a local minimum, while the deeper global minimum is on the left. Right: a convex bowl; iterates from a left start and a right start both reach the single minimum.">
+            <text class="d-h" x="20" y="18">A wiggly function</text>
+            <text class="d-s" x="20" y="34">gradient descent stops in the nearest valley</text>
+            <rect class="d-plot" x="30" y="40" width="280" height="170"/>
+            <path class="d-ln" d="M34 103.8 L36 102.3 L38 100.8 L40 99.5 L42 98.3 L44 97.4 L46 96.6 L48 96.1 L50 95.9 L52 96 L54 96.4 L56 97.1 L58 98.1 L60 99.6 L62 101.3 L64 103.4 L66 105.9 L68 108.7 L70 111.8 L72 115.2 L74 118.9 L76 122.8 L78 126.9 L80 131.3 L82 135.8 L84 140.4 L86 145.1 L88 149.8 L90 154.5 L92 159.2 L94 163.9 L96 168.4 L98 172.7 L100 176.9 L102 180.8 L104 184.4 L106 187.8 L108 190.8 L110 193.5 L112 195.8 L114 197.7 L116 199.3 L118 200.4 L120 201.1 L122 201.3 L124 201.2 L126 200.6 L128 199.7 L130 198.3 L132 196.6 L134 194.5 L136 192.2 L138 189.5 L140 186.6 L142 183.5 L144 180.1 L146 176.6 L148 173.1 L150 169.4 L152 165.7 L154 162.1 L156 158.4 L158 154.9 L160 151.5 L162 148.3 L164 145.2 L166 142.4 L168 139.9 L170 137.6 L172 135.6 L174 134 L176 132.7 L178 131.7 L180 131.1 L182 130.8 L184 130.9 L186 131.3 L188 132 L190 133.1 L192 134.4 L194 136.1 L196 137.9 L198 140 L200 142.3 L202 144.7 L204 147.2 L206 149.8 L208 152.5 L210 155.1 L212 157.7 L214 160.2 L216 162.6 L218 164.8 L220 166.9 L222 168.6 L224 170.2 L226 171.4 L228 172.3 L230 172.8 L232 172.9 L234 172.7 L236 172.1 L238 171 L240 169.5 L242 167.7 L244 165.3 L246 162.6 L248 159.5 L250 156 L252 152.1 L254 147.9 L256 143.4 L258 138.6 L260 133.6 L262 128.3 L264 122.9 L266 117.3 L268 111.6 L270 105.8 L272 100 L274 94.3 L276 88.6 L278 83 L280 77.5 L282 72.2 L284 67.1 L286 62.2 L288 57.6 L290 53.3 L292 49.3 L294 45.6 L296 42.3 L298 39.2 L300 36.6"/>
+            <circle class="pt-no" cx="122.4" cy="201.4" r="4.5"/><circle class="pt-no" cx="232" cy="172.9" r="6"/>
+            <circle class="pt-tree" cx="300" cy="36.6" r="3.6"/><circle class="pt-tree" cx="294.8" cy="44.2" r="3.6"/><circle class="pt-tree" cx="287.8" cy="58.1" r="3.6"/><circle class="pt-tree" cx="278.4" cy="81.8" r="3.6"/><circle class="pt-tree" cx="267" cy="114.5" r="3.6"/><circle class="pt-tree" cx="255.1" cy="145.4" r="3.6"/><circle class="pt-tree" cx="245.7" cy="163.1" r="3.6"/><circle class="pt-tree" cx="239.7" cy="169.8" r="3.6"/><circle class="pt-tree" cx="236.4" cy="171.9" r="3.6"/><circle class="pt-tree" cx="234.4" cy="172.6" r="3.6"/><circle class="pt-tree" cx="233.4" cy="172.8" r="3.6"/><circle class="pt-tree" cx="232.7" cy="172.9" r="3.6"/>
+            <text class="d-al" x="300" y="27" text-anchor="middle">w₀</text>
+            <text class="d-s" x="240" y="192" text-anchor="middle">local minimum:</text>
+            <text class="d-s" x="240" y="205" text-anchor="middle">GD stops here</text>
+            <text class="d-s" x="122" y="226" text-anchor="middle">global minimum</text>
+            <text class="d-al" x="36" y="54">f(w)</text>
+            <text class="d-al" x="306" y="226" text-anchor="end">w</text>
+
+            <line class="d-rule" x1="340" y1="8" x2="340" y2="232"/>
+
+            <text class="d-h" x="370" y="18">A convex bowl</text>
+            <text class="d-s" x="370" y="34">every start reaches the one minimum</text>
+            <rect class="d-plot" x="380" y="40" width="280" height="170"/>
+            <path class="d-ln" d="M384 79.4 L386 82.8 L388 86.1 L390 89.4 L392 92.6 L394 95.8 L396 98.9 L398 102 L400 105 L402 108 L404 110.9 L406 113.8 L408 116.6 L410 119.4 L412 122.1 L414 124.8 L416 127.4 L418 130 L420 132.5 L422 135 L424 137.4 L426 139.8 L428 142.1 L430 144.4 L432 146.6 L434 148.8 L436 150.9 L438 153 L440 155 L442 157 L444 158.9 L446 160.8 L448 162.6 L450 164.4 L452 166.1 L454 167.8 L456 169.4 L458 171 L460 172.5 L462 174 L464 175.4 L466 176.8 L468 178.1 L470 179.4 L472 180.6 L474 181.8 L476 182.9 L478 184 L480 185 L482 186 L484 186.9 L486 187.8 L488 188.6 L490 189.4 L492 190.1 L494 190.8 L496 191.4 L498 192 L500 192.5 L502 193 L504 193.4 L506 193.8 L508 194.1 L510 194.4 L512 194.6 L514 194.8 L516 194.9 L518 195 L520 195 L522 195 L524 194.9 L526 194.8 L528 194.6 L530 194.4 L532 194.1 L534 193.8 L536 193.4 L538 193 L540 192.5 L542 192 L544 191.4 L546 190.8 L548 190.1 L550 189.4 L552 188.6 L554 187.8 L556 186.9 L558 186 L560 185 L562 184 L564 182.9 L566 181.8 L568 180.6 L570 179.4 L572 178.1 L574 176.8 L576 175.4 L578 174 L580 172.5 L582 171 L584 169.4 L586 167.8 L588 166.1 L590 164.4 L592 162.6 L594 160.8 L596 158.9 L598 157 L600 155 L602 153 L604 150.9 L606 148.8 L608 146.6 L610 144.4 L612 142.1 L614 139.8 L616 137.4 L618 135 L620 132.5 L622 130 L624 127.4 L626 124.8 L628 122.1 L630 119.4 L632 116.6 L634 113.8 L636 110.9 L638 108 L640 105 L642 102 L644 98.9 L646 95.8 L648 92.6 L650 89.4 L652 86.1 L654 82.8 L656 79.4"/>
+            <circle class="pt-no" cx="520" cy="195" r="4.5"/>
+            <circle class="pt-tree" cx="396" cy="98.9" r="3.6"/><circle class="pt-tree" cx="445.6" cy="160.4" r="3.6"/><circle class="pt-tree" cx="475.4" cy="182.5" r="3.6"/><circle class="pt-tree" cx="493.2" cy="190.5" r="3.6"/><circle class="pt-tree" cx="503.9" cy="193.4" r="3.6"/><circle class="pt-tree" cx="510.4" cy="194.4" r="3.6"/><circle class="pt-tree" cx="514.2" cy="194.8" r="3.6"/>
+            <circle class="pt-tree" cx="644" cy="98.9" r="3.6"/><circle class="pt-tree" cx="594.4" cy="160.4" r="3.6"/><circle class="pt-tree" cx="564.6" cy="182.5" r="3.6"/><circle class="pt-tree" cx="546.8" cy="190.5" r="3.6"/><circle class="pt-tree" cx="536.1" cy="193.4" r="3.6"/><circle class="pt-tree" cx="529.6" cy="194.4" r="3.6"/><circle class="pt-tree" cx="525.8" cy="194.8" r="3.6"/>
+            <text class="d-al" x="404" y="92">w₀</text>
+            <text class="d-al" x="636" y="92" text-anchor="end">w₀</text>
+            <text class="d-s" x="520" y="226" text-anchor="middle">global minimum, the only one</text>
+            <text class="d-al" x="386" y="54">f(w)</text>
+            <text class="d-al" x="656" y="226" text-anchor="end">w</text>
+            <text class="d-s" x="20" y="252">dots: iterates w₀, w₁, w₂, … of gradient descent with a fixed step size · ring: a minimum</text>
+          </svg>
+        </div>
+        <figcaption><b>Where gradient descent ends up.</b> Two illustrative one-dimensional functions. Left: started at \(w_0\) on a function with two valleys, the iterates slide into the nearer valley, a local minimum, and stop there because the gradient is zero. Right: on a convex function such as the squared error there is a single minimum, and gradient descent reaches it from either side.</figcaption>
+      </figure>
+    </section>
+
+    <section id="gd-regression">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=595s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 9:55</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=666s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 11:06 the update</a>
+        </div>
+        <h2>Gradient descent for linear regression</h2>
+      </div>
+      <p>Does gradient descent actually remove the inverse here? The objective and its gradient, as in <a href="#normal-equations">L29</a>:</p>
+      <div class="eq">\[ f(\mathbf{w}) = \lVert X^\top\mathbf{w} - \mathbf{y}\rVert^2 = \sum_{i=1}^n (\mathbf{w}^\top\mathbf{x}_i - y_i)^2, \qquad \nabla f(\mathbf{w}) = 2XX^\top\mathbf{w} - 2X\mathbf{y} \]</div>
+      <p>The lecture again suggests verifying the gradient component by component. Each partial derivative is \(\partial f/\partial w_j = \sum_i 2(\mathbf{w}^\top\mathbf{x}_i - y_i)\,x_{ij}\), and stacking them over \(j\) gives \(2X(X^\top\mathbf{w} - \mathbf{y})\), the same vector.</p>
+      <div class="result">
+        <span class="lbl">Gradient descent for linear regression</span>
+        \[ \mathbf{w}_{t+1} = \mathbf{w}_t - \eta_t\,\big(2XX^\top\mathbf{w}_t - 2X\mathbf{y}\big) \]
+        <p>The factor 2 is unimportant. Defining \(f\) with a \(\tfrac12\) in front cancels it, which is the usual practice, or it can be absorbed into \(\eta_t\); the steps are the same.</p>
+      </div>
+      <p>There is no inverse anywhere <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=729s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:09</a>. Each step is the current \(\mathbf{w}\) minus a scalar times a quantity computed directly. Gradient descent mimics \((XX^\top)^{-1}X\mathbf{y}\) in many steps instead of one, and converges to the same \(\mathbf{w}^*\). So it still runs when inverting is the bottleneck, even with millions of features.</p>
+      <p class="callout">Why "chosen carefully" matters (standard analysis, not derived in the lecture). With one feature and the average error, \(f(w) = a w^2 - 2bw + c\) with \(a = \frac1n\sum_i x_i^2\), \(b = \frac1n\sum_i x_i y_i\) and \(w^* = b/a\). One step gives \(w_{t+1} - w^* = (1 - 2\eta a)(w_t - w^*)\). The gap shrinks only if \(|1 - 2\eta a| < 1\), that is \(0 < \eta < 1/a\). Between \(1/(2a)\) and \(1/a\) the factor is negative, so every step lands on the other side of \(w^*\).</p>
+
+      <figure id="gd-fig">
+        <div class="controls">
+          <label for="gd-eta">Step size \(\eta\)</label>
+          <input type="range" id="gd-eta" min="0.02" max="0.46" step="0.01" value="0.08">
+          <output id="gd-eta-out" for="gd-eta">0.08</output>
+          <label class="check"><input type="checkbox" id="gd-sgd"> Stochastic: 4 random points per step</label>
+          <button class="btn" id="gd-step" type="button">One step</button>
+          <button class="btn" id="gd-run" type="button">Run 10 steps</button>
+          <button class="btn" id="gd-reset" type="button">Reset</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Step t</span><span class="v" id="gd-t">–</span></div>
+          <div><span class="k">wₜ</span><span class="v" id="gd-w">–</span></div>
+          <div><span class="k">Avg squared error f(wₜ)</span><span class="v mine" id="gd-loss">–</span></div>
+          <div><span class="k">Closed form w*</span><span class="v" id="gd-wstar">–</span></div>
+          <div><span class="k">Average w̄ (SGD)</span><span class="v" id="gd-wbar">–</span></div>
+        </div>
+        <div class="status" id="gd-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="gd-svg" viewBox="0 0 760 364" role="img" aria-label="Left: thirty synthetic data points with the best line through the origin (dashed) and the current gradient-descent line. Right: the average squared error as a parabola in w, with the gradient-descent iterates marked on it and joined in order."></svg></div>
+        <figcaption><b>Gradient descent on synthetic data</b> (30 points from a seeded generator, made for this page; the feature is rescaled so that \(a = \frac1n\sum_i x_i^2 = 2.5\)). Left: the data and the current line \(y = w_t x\). Right: the average squared error \(f(w)\), with the iterates from \(w_0 = 0\) marked on it. Small steps creep down one side; for \(\eta\) above \(1/(2a) = 0.2\) the iterates cross back and forth over \(w^*\); above \(1/a = 0.4\) they climb out of the bowl. Moving the slider replays the same number of steps with the new \(\eta\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="sgd">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=793s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 13:13 when n is large</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=933s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 15:33 SGD</a>
+        </div>
+        <h2>Stochastic gradient descent</h2>
+      </div>
+      <p>Gradient descent fixed the problem of large \(d\). What if \(n\), the number of data points, is large, say hundreds of millions? Gradient descent is iterative and needs the gradient in every round, and the gradient needs \(XX^\top\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=827s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:47</a>. That matrix is only \(d \times d\), but it comes from multiplying a \(d \times n\) matrix by an \(n \times d\) one, so a dependence on \(n\) hides inside it. With billions of points even computing \(XX^\top\) may be too hard. (Writing the gradient as \(2X(X^\top\mathbf{w} - \mathbf{y})\) avoids forming \(XX^\top\), but each step still touches all \(n\) points.)</p>
+      <p>Can gradient descent be adapted to this situation? Surprisingly, yes. A variant called <dfn>stochastic gradient descent</dfn> (SGD) removes the \(n\) problem in the way gradient descent removed the \(d\) problem, and it is used in practice all the time. There are several variants; this is one simple version.</p>
+      <ol class="algo">
+        <li class="algo-title">Stochastic gradient descent for linear regression</li>
+        <li>Start from some \(\mathbf{w}_0 \in \mathbb{R}^d\). Fix a budget of \(T\) rounds (or use a convergence criterion, as for gradient descent).</li>
+        <li>In each round \(t = 0, 1, \dots, T-1\), sample \(k\) data points uniformly at random from all \(n\). Put them in \(\tilde X \in \mathbb{R}^{d \times k}\) and their labels in \(\tilde{\mathbf{y}} \in \mathbb{R}^k\).</li>
+        <li>Pretend the sample is the entire data set and take one gradient step for it: \(\mathbf{w}_{t+1} = \mathbf{w}_t - \eta_t \cdot 2\big(\tilde X\tilde X^\top\mathbf{w}_t - \tilde X\tilde{\mathbf{y}}\big)\).</li>
+        <li>After \(T\) rounds output the average iterate \(\bar{\mathbf{w}}_T = \frac1T\sum_{t=1}^{T}\mathbf{w}_t\), not the last one.</li>
+      </ol>
+      <p>Sampling is cheap <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=994s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:34</a>. With a billion points and \(k = 100\), draw 100 indices uniformly from 1 to \(10^9\), which is fast, then fetch those 100 points, which is easy if the data is stored sensibly. The matrix \(\tilde X\) is only \(d \times k\), so the step is manageable <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=1151s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:11</a>. The most important detail is that every round draws a <b>fresh sample</b>; the \(k\) points are not the same from round to round.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 300" role="img" aria-label="Three rows. Gradient descent: every one of twenty point columns is used to compute the gradient 2 times (X X transpose w minus X y), then w is updated. SGD step t: four highlighted columns form X tilde and give a sampled gradient. SGD step t plus 1: a different four columns are highlighted. SGD reports the average of its iterates.">
+            <defs><marker id="p10s-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-row" x="20" y="24">Gradient descent · every step</text>
+            <rect class="d-box-acc" x="20" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="34" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="48" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="62" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="76" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="90" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="104" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="118" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="132" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="146" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="160" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="174" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="188" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="202" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="216" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="230" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="244" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="258" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="272" y="34" width="11" height="30" rx="2"/><rect class="d-box-acc" x="286" y="34" width="11" height="30" rx="2"/>
+            <text class="d-s" x="20" y="82">all n points: X is d × n</text>
+            <line class="d-ln" x1="306" y1="49" x2="352" y2="49" marker-end="url(#p10s-ah)"/>
+            <rect class="d-box" x="358" y="30" width="200" height="38" rx="6"/>
+            <text class="d-t" x="458" y="54" text-anchor="middle">2(XXᵀwₜ − Xy)</text>
+            <text class="d-s" x="458" y="84" text-anchor="middle">cost grows with n</text>
+            <line class="d-ln" x1="562" y1="49" x2="596" y2="49" marker-end="url(#p10s-ah)"/>
+            <rect class="d-box" x="602" y="30" width="78" height="38" rx="6"/>
+            <text class="d-t" x="641" y="54" text-anchor="middle">wₜ₊₁</text>
+
+            <text class="d-row" x="20" y="124">SGD · step t</text>
+            <rect class="d-box" x="20" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="34" y="134" width="11" height="30" rx="2"/><rect class="d-box-acc" x="48" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="62" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="76" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="90" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="104" y="134" width="11" height="30" rx="2"/><rect class="d-box-acc" x="118" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="132" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="146" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="160" y="134" width="11" height="30" rx="2"/><rect class="d-box-acc" x="174" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="188" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="202" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="216" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="230" y="134" width="11" height="30" rx="2"/><rect class="d-box-acc" x="244" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="258" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="272" y="134" width="11" height="30" rx="2"/><rect class="d-box" x="286" y="134" width="11" height="30" rx="2"/>
+            <text class="d-s" x="20" y="182">k = 4 random points: X̃ is d × k</text>
+            <line class="d-ln" x1="306" y1="149" x2="352" y2="149" marker-end="url(#p10s-ah)"/>
+            <rect class="d-box-acc" x="358" y="130" width="200" height="38" rx="6"/>
+            <text class="d-t" x="458" y="154" text-anchor="middle">2(X̃X̃ᵀwₜ − X̃ỹ)</text>
+            <text class="d-s" x="458" y="184" text-anchor="middle">cost depends on k, not n</text>
+            <line class="d-ln" x1="562" y1="149" x2="596" y2="149" marker-end="url(#p10s-ah)"/>
+            <rect class="d-box" x="602" y="130" width="78" height="38" rx="6"/>
+            <text class="d-t" x="641" y="154" text-anchor="middle">wₜ₊₁</text>
+
+            <text class="d-row" x="20" y="214">SGD · step t + 1</text>
+            <rect class="d-box-acc" x="20" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="34" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="48" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="62" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="76" y="224" width="11" height="30" rx="2"/><rect class="d-box-acc" x="90" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="104" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="118" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="132" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="146" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="160" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="174" y="224" width="11" height="30" rx="2"/><rect class="d-box-acc" x="188" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="202" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="216" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="230" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="244" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="258" y="224" width="11" height="30" rx="2"/><rect class="d-box-acc" x="272" y="224" width="11" height="30" rx="2"/><rect class="d-box" x="286" y="224" width="11" height="30" rx="2"/>
+            <text class="d-s" x="20" y="272">a fresh sample every round</text>
+            <line class="d-ln" x1="306" y1="239" x2="352" y2="239" marker-end="url(#p10s-ah)"/>
+            <rect class="d-box-acc" x="358" y="220" width="200" height="38" rx="6"/>
+            <text class="d-t" x="458" y="244" text-anchor="middle">2(X̃X̃ᵀwₜ₊₁ − X̃ỹ)</text>
+            <line class="d-ln" x1="562" y1="239" x2="596" y2="239" marker-end="url(#p10s-ah)"/>
+            <rect class="d-box" x="602" y="220" width="78" height="38" rx="6"/>
+            <text class="d-t" x="641" y="244" text-anchor="middle">wₜ₊₂</text>
+            <text class="d-s" x="680" y="290" text-anchor="end">after T rounds SGD reports w̄ = (1/T) Σ wₜ</text>
+          </svg>
+        </div>
+        <figcaption><b>What one step touches.</b> Each small bar is one data point, a column of \(X\). A gradient-descent step uses all \(n\) of them. An SGD step uses \(k\) points drawn at random, a different set every round, so its cost depends on \(k\) and not on \(n\). SGD then reports the average of its iterates.</figcaption>
+      </figure>
+
+      <h3>Noisy steps and the averaged output <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=1212s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L31 · 20:12</a></h3>
+      <p>The gradient computed from a sample is a <b>noisy</b> version of the full gradient, so SGD moves in noisy directions. Because the sampling is uniform, the noise cancels out over time and SGD still makes progress toward the same \(\mathbf{w}^*\) that gradient descent approaches. (Standard reasoning: averaged over the random choice of sample, the sampled gradient points the same way as the full gradient, scaled by \(k/n\).)</p>
+      <p>One caveat <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=1246s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:46</a>. Gradient descent outputs its last iterate \(\mathbf{w}_T\). In SGD the last round may have drawn an unlucky sample and moved in a direction that leads away from the minimizer. So SGD outputs the average of all the iterates it has seen.</p>
+      <div class="result">
+        <span class="lbl">SGD output and guarantee <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=1341s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:21</a></span>
+        \[ \bar{\mathbf{w}}_T = \frac{1}{T}\sum_{t=1}^{T}\mathbf{w}_t \;\longrightarrow\; \mathbf{w}^* \quad \text{with high probability} \]
+        <p>The guarantee is probabilistic because the points are chosen at random. It converges to the desired \(\mathbf{w}^*\) with very high chance.</p>
+      </div>
+      <p>\(k\) is the <dfn>batch size</dfn> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=1376s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:56</a>. Pick it to match the computation you can afford, larger or smaller. The guarantee holds whatever the batch size; a smaller batch typically needs somewhat more rounds than standard gradient descent to reach the minimizer. That extra work is still far more manageable than computing \(XX^\top\) when \(n\) is very large. In short, switching to gradient descent removed the problem with large \(d\), and switching to its stochastic version removed the problem with large \(n\). In the widget above, tick <i>Stochastic</i> to watch \(w_t\) jitter around \(w^*\) while the running average \(\bar w\) settles near it.</p>
+      <p>L31 ends with the next question <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=vS1LK8xoM4g&amp;t=1441s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>24:01</a>: why linear? If the relation between features and labels is quadratic, or otherwise non-linear, what then? Just as PCA was kernelized into kernel PCA (<a href="part-05.html">Part 5</a>), linear regression gets a kernelized version, kernel regression, in <a href="part-11.html">Part 11</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Supervised learning</dt><dd>Learning from data points \(\mathbf{x}_i\) that each come with a label \(y_i\), the supervision.</dd></div>
+        <div><dt>Features and labels</dt><dd>Features (attributes, predictors) are the coordinates of \(\mathbf{x}_i \in \mathbb{R}^d\); the label \(y_i\) is what we want to predict.</dd></div>
+        <div><dt>Binary / multi-class classification</dt><dd>Labels from two values (\(\pm1\) or \(\{0,1\}\)) / from a finite set such as \(\{0, \dots, 9\}\).</dd></div>
+        <div><dt>Regression</dt><dd>Supervised learning with real-valued labels, such as a rainfall amount.</dd></div>
+        <div><dt>Squared error</dt><dd>\(\sum_i (h(\mathbf{x}_i) - y_i)^2\): a non-negative score of a function \(h\) on the data set.</dd></div>
+        <div><dt>Overfitting</dt><dd>Fitting the training data, noise included, so closely (for example by memorizing) that performance on test data suffers.</dd></div>
+        <div><dt>\(\mathcal{H}_{\text{linear}}\)</dt><dd>The restricted search space of linear functions \(h_{\mathbf{w}}(\mathbf{x}) = \mathbf{w}^\top\mathbf{x}\), \(\mathbf{w} \in \mathbb{R}^d\).</dd></div>
+        <div><dt>Linear regression</dt><dd>\(\min_{\mathbf{w}} \sum_i(\mathbf{w}^\top\mathbf{x}_i - y_i)^2 = \min_{\mathbf{w}}\lVert X^\top\mathbf{w} - \mathbf{y}\rVert^2\), with \(X \in \mathbb{R}^{d\times n}\).</dd></div>
+        <div><dt>Normal equations</dt><dd>\(XX^\top\mathbf{w}^* = X\mathbf{y}\), from setting the gradient to zero; solved by \(\mathbf{w}^* = (XX^\top)^{\dagger}X\mathbf{y}\).</dd></div>
+        <div><dt>Pseudo-inverse \(A^{\dagger}\)</dt><dd>Stands in for the inverse when \(A\) is not invertible; it returns the least-norm solution.</dd></div>
+        <div><dt>Projection view</dt><dd>\(X^\top\mathbf{w}^*\) is the projection of the label vector onto the subspace spanned by the feature vectors.</dd></div>
+        <div><dt>Gradient descent, step size</dt><dd>\(\mathbf{w}_{t+1} = \mathbf{w}_t - \eta_t\nabla f(\mathbf{w}_t)\); \(\eta_t\) sets how far each step goes.</dd></div>
+        <div><dt>Convex function</dt><dd>A function whose local minima are all global; the squared-error objective is one.</dd></div>
+        <div><dt>SGD, batch size</dt><dd>Gradient steps on \(k\) randomly sampled points per round (\(k\) is the batch size), with the average iterate as output.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Which kind of supervised problem is each? (a) Predicting tomorrow's maximum temperature. (b) Deciding whether a card transaction is fraudulent. (c) Reading which of the 26 capital letters is in an image.</span><span class="tog"></span></summary>
+          <p>(a) Regression: the label is a real number. (b) Binary classification: two labels. (c) Multi-class classification with 26 classes.</p></details>
+        <details><summary><span class="q">Q2</span><span>Why does L28 square the difference \(h(\mathbf{x}_i) - y_i\) instead of adding the raw differences?</span><span class="tog"></span></summary>
+          <p>The error should be non-negative. Raw differences can be negative, so a function that outputs \(-\infty\) everywhere would drive the "error" down without bound while predicting nothing useful.</p></details>
+        <details><summary><span class="q">Q3</span><span>Over all functions \(h\), the training error can always be made 0. What does such an \(h\) do, and what does L28 change to avoid it?</span><span class="tog"></span></summary>
+          <p>It memorizes: \(h(\mathbf{x}_i) = y_i\) on every training point, fitting the noise too, so it can fail on test data (overfitting). L28 keeps the squared error and restricts the search to linear functions \(\mathbf{w}^\top\mathbf{x}\).</p></details>
+        <details><summary><span class="q">Q4</span><span>A linear regression fit reaches 0 training error. Is that overfitting? What does it say about \(\mathbf{y}\) in the L30 picture?</span><span class="tog"></span></summary>
+          <p>No. It means \(\mathbf{w}^\top\mathbf{x}_i = y_i\) for all \(i\): the labels follow the linear structure exactly, with no noise. Geometrically, \(\mathbf{y}\) already lies in the plane spanned by the feature vectors, so its projection is itself.</p></details>
+        <details><summary><span class="q">Q5</span><span>One feature, two points: \(x_1 = 1, x_2 = 2\) with labels \(y_1 = 2, y_2 = 3\). Find \(w^*\).</span><span class="tog"></span></summary>
+          <p>\(XX^\top = 1^2 + 2^2 = 5\) and \(X\mathbf{y} = 1\cdot2 + 2\cdot3 = 8\), so \(w^* = 8/5 = 1.6\).</p></details>
+        <details><summary><span class="q">Q6</span><span>For the data in Q5, check that the error vector is perpendicular to the feature vector.</span><span class="tog"></span></summary>
+          <p>The feature vector is \(\mathbf{f} = (1, 2)\) and the predictions are \(1.6\mathbf{f} = (1.6, 3.2)\). The error vector is \(\mathbf{y} - X^\top w^* = (0.4, -0.2)\), and \((0.4)(1) + (-0.2)(2) = 0\). So the predictions are the projection of \(\mathbf{y}\) onto the line spanned by \(\mathbf{f}\).</p></details>
+        <details><summary><span class="q">Q7</span><span>Run gradient descent on Q5's sum of squared errors from \(w_0 = 0\) with \(\eta = 0.05\). What are \(w_1\) and \(w_2\)? For which step sizes does it converge?</span><span class="tog"></span></summary>
+          <p>\(f(w) = 5w^2 - 16w + 13\), so \(f'(w) = 10w - 16\). Then \(w_1 = 0 - 0.05(-16) = 0.8\) and \(w_2 = 0.8 - 0.05(8 - 16) = 1.2\). The gap to \(w^* = 1.6\) halves each step, because \(w_{t+1} - w^* = (1 - 10\eta)(w_t - w^*)\). It converges exactly when \(|1 - 10\eta| < 1\), that is \(0 < \eta < 0.2\).</p></details>
+        <details><summary><span class="q">Q8</span><span>With \(d = 10^6\) features and \(n = 10^9\) points, why might both the closed form and plain gradient descent struggle, and how does SGD help? Why does SGD output an average?</span><span class="tog"></span></summary>
+          <p>The closed form inverts a \(10^6 \times 10^6\) matrix, about \(d^3 = 10^{18}\) operations; gradient descent avoids that, but every step needs all \(10^9\) points. SGD steps on \(k\) random points, so a step costs about the same whatever \(n\) is. Its last step may come from an unlucky sample, so the average of the iterates is the safer output.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a class="next" href="index.html"><span class="dir">Part 11 · coming</span><span class="nm">Kernel and probabilistic regression</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- Gradient descent and SGD on synthetic 1-D regression ---------- */
+  (() => {
+    const svg = document.getElementById('gd-svg'); if (!svg) return;
+    let seed = 2731;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const n = 30, k = 4, a = 2.5, w0 = 0, TMAX = 300;
+    let px = [];
+    for (let i = 0; i < n; i++) px.push(0.2 + 2.6 * rand());
+    const m2 = px.reduce((s, x) => s + x * x, 0) / n, sc = Math.sqrt(a / m2);
+    px = px.map(x => x * sc);
+    const py = px.map(x => 1.5 * x + 0.6 * normal());
+    const b = px.reduce((s, x, i) => s + x * py[i], 0) / n, c = py.reduce((s, y) => s + y * y, 0) / n;
+    const wStar = b / a, loss = w => a * w * w - 2 * b * w + c;
+
+    /* panels: left = data, right = loss curve */
+    const panel = (x0, y0, w, h, xlo, xhi, ylo, yhi, xstep, ystep, clipId) => {
+      const sx = v => x0 + (v - xlo) / (xhi - xlo) * w, sy = v => y0 + h - (v - ylo) / (yhi - ylo) * h;
+      const g = mk('g', { class: 'c-grid' }, svg);
+      for (let i = Math.ceil(xlo / xstep); i * xstep <= xhi + 1e-9; i++) {
+        const v = i * xstep;
+        mk('line', { x1: sx(v), x2: sx(v), y1: y0, y2: y0 + h }, g);
+        mk('text', { x: sx(v), y: y0 + h + 15, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = +v.toFixed(2);
+      }
+      for (let i = Math.ceil(ylo / ystep); i * ystep <= yhi + 1e-9; i++) {
+        const v = i * ystep;
+        mk('line', { x1: x0, x2: x0 + w, y1: sy(v), y2: sy(v) }, g);
+        mk('text', { x: x0 - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = +v.toFixed(2);
+      }
+      if (ylo < 0 && yhi > 0) mk('line', { x1: x0, x2: x0 + w, y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+      else mk('line', { x1: x0, x2: x0 + w, y1: y0 + h, y2: y0 + h, class: 'c-axis' }, svg);
+      if (xlo < 0 && xhi > 0) mk('line', { x1: sx(0), x2: sx(0), y1: y0, y2: y0 + h, class: 'c-axis' }, svg);
+      else mk('line', { x1: x0, x2: x0, y1: y0, y2: y0 + h, class: 'c-axis' }, svg);
+      const cp = mk('clipPath', { id: clipId }, defs); mk('rect', { x: x0, y: y0, width: w, height: h }, cp);
+      return { sx, sy };
+    };
+    const defs = mk('defs', {}, svg);
+    const L = panel(50, 36, 290, 290, 0, 3, -1, 6, 1, 1, 'gd-clip-l');
+    const R = panel(440, 36, 290, 290, -1, 4, 0, 18, 1, 3, 'gd-clip-r');
+    mk('text', { x: 50, y: 22, class: 'c-title' }, svg).textContent = 'Data and the current line y = wₜ x';
+    mk('text', { x: 440, y: 22, class: 'c-title' }, svg).textContent = 'Average squared error f(w) and the iterates';
+    mk('text', { x: 340, y: 356, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = 'x';
+    mk('text', { x: 730, y: 356, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = 'w';
+
+    /* left panel content */
+    const gL = mk('g', { 'clip-path': 'url(#gd-clip-l)' }, svg);
+    mk('line', { x1: L.sx(0), y1: L.sy(0), x2: L.sx(3), y2: L.sy(3 * wStar), class: 'c-line', style: 'stroke-dasharray: 6 5' }, gL);
+    const cur = mk('line', { class: 'c-user' }, gL);
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    px.forEach((x, i) => mk('circle', { cx: L.sx(x), cy: L.sy(py[i]), r: 3.6 }, gDots));
+    mk('line', { x1: 62, y1: 52, x2: 86, y2: 52, class: 'c-line', style: 'stroke-dasharray: 6 5' }, svg);
+    mk('text', { x: 92, y: 56, class: 'c-note' }, svg).textContent = 'best line (slope w*)';
+    mk('line', { x1: 62, y1: 70, x2: 86, y2: 70, class: 'c-user' }, svg);
+    mk('text', { x: 92, y: 74, class: 'c-note' }, svg).textContent = 'current line (slope wₜ)';
+
+    /* right panel content */
+    const gR = mk('g', { 'clip-path': 'url(#gd-clip-r)' }, svg);
+    let d = '';
+    for (let i = 0; i <= 250; i++) { const w = -1 + 5 * i / 250; d += (i ? ' L' : 'M') + R.sx(w).toFixed(1) + ' ' + R.sy(loss(w)).toFixed(1); }
+    mk('path', { d, class: 'c-line', style: 'fill: none' }, gR);
+    mk('line', { x1: R.sx(wStar), x2: R.sx(wStar), y1: R.sy(0), y2: R.sy(18), class: 'c-faint' }, gR);
+    mk('text', { x: R.sx(wStar) + 5, y: R.sy(17), class: 'c-note' }, svg).textContent = 'w*';
+    const trail = mk('g', {}, gR);
+    const past = mk('g', { class: 'c-proj' }, gR);
+    const avg = mk('path', { class: 'c-centroid' }, gR);
+    const avgLbl = mk('text', { class: 'c-lbl' }, gR); avgLbl.textContent = 'w̄';
+    const hi = mk('circle', { r: 6, class: 'c-pt-hi' }, gR);
+
+    const etaIn = document.getElementById('gd-eta'), etaOut = document.getElementById('gd-eta-out'), sgdIn = document.getElementById('gd-sgd');
+    const oT = document.getElementById('gd-t'), oW = document.getElementById('gd-w'), oL = document.getElementById('gd-loss'), oS = document.getElementById('gd-wstar'), oB = document.getElementById('gd-wbar'), status = document.getElementById('gd-status');
+    oS.textContent = wStar.toFixed(3);
+    let eta = parseFloat(etaIn.value), sgd = sgdIn.checked, t = 0, running = false;
+
+    const trajectory = () => {
+      let s = 917;
+      const r2 = () => { s |= 0; s = s + 0x6D2B79F5 | 0; let q = Math.imul(s ^ s >>> 15, 1 | s); q = q + Math.imul(q ^ q >>> 7, 61 | q) ^ q; return ((q ^ q >>> 14) >>> 0) / 4294967296; };
+      const ws = [w0]; let w = w0;
+      for (let step = 0; step < t; step++) {
+        let g;
+        if (sgd) {
+          const idx = [...Array(n).keys()];
+          g = 0;
+          for (let j = 0; j < k; j++) { const r = j + Math.floor(r2() * (n - j)); const tmp = idx[j]; idx[j] = idx[r]; idx[r] = tmp; g += (w * px[idx[j]] - py[idx[j]]) * px[idx[j]]; }
+          g *= 2 / k;
+        } else g = 2 * a * w - 2 * b;
+        w -= eta * g; ws.push(w);
+        if (!isFinite(w) || Math.abs(w) > 1e6) break;
+      }
+      return ws;
+    };
+    const fmt = v => !isFinite(v) ? '∞' : Math.abs(v) >= 1e4 ? v.toExponential(2) : v.toFixed(3);
+    const clampW = v => Math.max(-3, Math.min(6, v)), clampF = v => Math.min(60, v);
+
+    const draw = () => {
+      const ws = trajectory(), T = ws.length - 1, w = ws[T];
+      t = T;
+      const diverged = !isFinite(w) || Math.abs(w) > 1e4;
+      const wd = Math.max(-50, Math.min(50, w));
+      cur.setAttribute('x1', L.sx(0)); cur.setAttribute('y1', L.sy(0)); cur.setAttribute('x2', L.sx(3)); cur.setAttribute('y2', L.sy(3 * wd));
+      trail.replaceChildren(); past.replaceChildren();
+      const from = Math.max(0, T - 120);
+      for (let i = from; i < T; i++) {
+        mk('line', { x1: R.sx(clampW(ws[i])), y1: R.sy(clampF(loss(ws[i]))), x2: R.sx(clampW(ws[i + 1])), y2: R.sy(clampF(loss(ws[i + 1]))), class: 'c-err' }, trail);
+        mk('circle', { cx: R.sx(clampW(ws[i])), cy: R.sy(clampF(loss(ws[i]))), r: 3 }, past);
+      }
+      hi.setAttribute('cx', R.sx(clampW(w))); hi.setAttribute('cy', R.sy(clampF(loss(w))));
+      let wbar = NaN;
+      if (sgd && T > 0) { wbar = ws.slice(1).reduce((s, v) => s + v, 0) / T; }
+      if (isFinite(wbar) && !diverged) {
+        const ax = R.sx(clampW(wbar)), ay = R.sy(clampF(loss(wbar)));
+        avg.setAttribute('d', `M${ax} ${ay - 8} L${ax + 8} ${ay} L${ax} ${ay + 8} L${ax - 8} ${ay} Z`);
+        avgLbl.setAttribute('x', ax - 4); avgLbl.setAttribute('y', ay - 14);
+        avg.style.display = ''; avgLbl.style.display = '';
+      } else { avg.style.display = 'none'; avgLbl.style.display = 'none'; }
+      oT.textContent = T; oW.textContent = fmt(w); oL.textContent = fmt(loss(w)); oB.textContent = isFinite(wbar) ? fmt(wbar) : '–';
+      etaOut.textContent = eta.toFixed(2);
+      const e = eta.toFixed(2);
+      let msg;
+      if (diverged) msg = sgd ? `Diverged: η = ${e} is too large even for these noisy steps, and the error explodes.` : `Diverged: with η = ${e} above 1/a = 0.4, every step overshoots w* by more than the last.`;
+      else if (sgd) msg = T === 0 ? 'Stochastic mode: each step uses the gradient of 4 random points out of 30. Press One step or Run 10 steps.' : `Stochastic: wₜ is ${fmt(Math.abs(w - wStar))} from w* and keeps jittering; the running average w̄ (diamond) is ${fmt(Math.abs(wbar - wStar))} from w*.`;
+      else if (Math.abs(w - wStar) < 5e-4 && T > 0) msg = `Converged after ${T} steps: wₜ equals the closed-form w* to three decimals, with no inverse computed.`;
+      else if (eta < 0.195) msg = `η = ${e} is below 1/(2a) = 0.2: each step moves toward w* without passing it, and the error falls every step.`;
+      else if (eta < 0.395) msg = `η = ${e} is between 0.2 and 0.4: each step jumps past w*, but by less each time, so it still converges.`;
+      else if (eta < 0.405) msg = 'η = 0.40 = 1/a: the iterates bounce between two points and never settle.';
+      else msg = `η = ${e} is above 1/a = 0.4: each jump overshoots by more than the last, so the error grows.`;
+      status.textContent = msg;
+      return diverged;
+    };
+
+    const stepOnce = () => { if (t < TMAX) t += 1; return draw(); };
+    draw();
+    etaIn.addEventListener('input', () => { eta = parseFloat(etaIn.value); draw(); });
+    sgdIn.addEventListener('change', () => { sgd = sgdIn.checked; draw(); });
+    document.getElementById('gd-step').addEventListener('click', () => { if (!running) stepOnce(); });
+    document.getElementById('gd-reset').addEventListener('click', () => { if (running) return; t = 0; draw(); });
+    document.getElementById('gd-run').addEventListener('click', () => {
+      if (running) return;
+      if (reduce) { t = Math.min(TMAX, t + 10); draw(); return; }
+      running = true; let left = 10;
+      const tick = () => { const stop = stepOnce(); left -= 1; if (left > 0 && !stop && t < TMAX) setTimeout(tick, 110); else running = false; };
+      tick();
+    });
+  })();
+})();
+</script>
+</body>
+</html>
