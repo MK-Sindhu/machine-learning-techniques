@@ -1,0 +1,1207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 18 · Loss functions, neural networks and summary · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 18: lectures 69–74 on classification loss functions and convex surrogates, neural networks and backpropagation, and a summary of the whole course.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<style>
+.controls input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+</style>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 18 of 18</span><span class="sep">·</span><a href="part-17.html">← Part 17</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Loss functions, neural networks and a look back at the course</h1>
+    <p class="lede">Notes for lectures 69 to 74, the last of the course. Every classifier met so far is recast as minimizing a convex stand-in for the 0-1 loss, which explains why classification has so many algorithms, and neural networks are introduced as the method that gives up convexity. The final lecture reviews the whole course and lists the open problems of deploying machine learning.</p>
+    <div class="meta">
+      <span><b>Part 18</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>128 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L69 · 23:47</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L70 · 25:13</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L71 · 14:48</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L72 · 24:41</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L73 · 22:44</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L74 · 16:19</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 69</h4>
+      <ul>
+        <li><a href="#why-many">Why so many classifiers?</a></li>
+        <li><a href="#zero-one">Counting mistakes</a></li>
+        <li><a href="#loss-view">The loss-function view</a></li>
+        <li><a href="#squared-loss">Regression as a surrogate</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 70</h4>
+      <ul>
+        <li><a href="#hinge-loss">SVM: hinge loss</a></li>
+        <li><a href="#logistic-loss">Logistic loss</a></li>
+        <li><a href="#surrogates">Surrogates, in short</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 71</h4>
+      <ul>
+        <li><a href="#perceptron-loss">Perceptron as SGD</a></li>
+        <li><a href="#exponential-loss">Boosting: exponential loss</a></li>
+        <li><a href="#convex-surrogates">All losses on one plot</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 72</h4>
+      <ul>
+        <li><a href="#beyond-convexity">Beyond convexity</a></li>
+        <li><a href="#nn-architecture">From perceptron to network</a></li>
+        <li><a href="#hidden-votes">Hidden neurons vote</a></li>
+        <li><a href="#activations">Activation functions</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 73</h4>
+      <ul>
+        <li><a href="#training">Training by gradient descent</a></li>
+        <li><a href="#backpropagation">Backpropagation</a></li>
+        <li><a href="#nn-classification">Networks for classification</a></li>
+        <li><a href="#feature-learning">Learning the features</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 74</h4>
+      <ul>
+        <li><a href="#course-summary">The course in one table</a></li>
+        <li><a href="#not-covered">What was left out</a></li>
+        <li><a href="#deployable-ml">Deployable ML</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>What we want to minimize in classification is the <dfn>0-1 loss</dfn>, the number of mistakes. Over linear classifiers this is NP-hard unless the data is separable, because the loss jumps and is not convex. That is why classification has so many algorithms.</li>
+        <li>Every per-point loss here depends only on \(z = y\,g(\mathbf{x})\), which is positive exactly when the prediction is correct. Each algorithm swaps the 0-1 step for a <b>surrogate</b>: squared \((z-1)^2\) (regression, a bad choice), hinge \(\max(0, 1-z)\) (SVM), logistic \(\log(1+e^{-z})\) (logistic regression).</li>
+        <li>The perceptron fits as stochastic subgradient descent on \(\max(0, -z)\) with step size 1, and boosting as coordinate descent on the exponential loss \(e^{-z}\). The convex surrogates are easy to minimize; SVM is hinge loss plus L2 regularization, just as ridge is squared loss plus L2.</li>
+        <li><b>Neural networks</b> give up convexity. Hidden neurons compute \(a(\mathbf{w}_j^\top\mathbf{x})\) with a non-linear activation (sigmoid, ReLU), the output layer combines them, and the weights are learned by gradient descent with gradients from <b>backpropagation</b>. This reaches a local minimum, which works well in practice.</li>
+        <li>The hidden layers learn a feature map and the output layer is linear on top, like a kernel machine whose map is learned rather than chosen. Networks lead on unstructured data; boosting, SVMs and logistic regression remain strong on tabular data.</li>
+        <li>The course: unsupervised learning (representation learning, clustering, estimation), then supervised learning (regression, classification). Deploying ML still raises open questions of fairness, explainability, privacy, small devices and changing data.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 69 ============ -->
+    <section id="why-many">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=0s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 0:00</a>
+        <h2>Why does classification have so many algorithms?</h2>
+      </div>
+      <p>For binary classification the course has built up a long list: logistic regression, support vector machines, boosting and the perceptron, plus decision trees and k-nearest neighbours. Regression had essentially one method. Linear regression minimizes the squared loss, and ridge and LASSO add different regularizers to the same loss (<a href="part-10.html">Part 10</a>, <a href="part-12.html">Part 12</a>).</p>
+      <p>This lecture asks why classification is different, and answers with one framework that holds most of the classifiers: each one minimizes a different <i>loss function</i>.</p>
+    </section>
+
+    <section id="zero-one">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=92s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 1:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=401s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 6:41 NP-hard</a>
+        </div>
+        <h2>Counting training mistakes</h2>
+      </div>
+      <p>The data set is \(\{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}\) with \(\mathbf{x}_i \in \mathbb{R}^d\) and \(y_i \in \{+1, -1\}\), and the goal is a classifier \(h: \mathbb{R}^d \to \{+1, -1\}\). The most natural measure of how good \(h\) is: count its mistakes on the training set.</p>
+      <div class="eq">\[ \text{error}(h) = \sum_{i=1}^{n} \mathbb{1}\big(h(\mathbf{x}_i) \neq y_i\big), \qquad \mathbb{1}(\text{statement}) = \begin{cases} 1 & \text{if the statement is true} \\ 0 & \text{otherwise} \end{cases} \]</div>
+      <p>Minimizing this over every possible \(h\) is pointless: some \(h\) memorizes the training set, reaches zero error and learns nothing. So we search a restricted class \(\mathcal{H}\) of functions, and the most natural one is the linear classifiers <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=218s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:38</a>.</p>
+      <div class="eq">\[ \min_{h \in \mathcal{H}_{\text{linear}}} \sum_{i=1}^{n} \mathbb{1}\big(h(\mathbf{x}_i) \neq y_i\big) \;=\; \min_{\mathbf{w} \in \mathbb{R}^d,\; b \in \mathbb{R}} \; \sum_{i=1}^{n} \mathbb{1}\big(\operatorname{sign}(\mathbf{w}^\top\mathbf{x}_i + b) \neq y_i\big) \]</div>
+
+      <h3>The bias term comes for free <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=310s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 5:10</a></h3>
+      <p>The algorithms so far learned only \(\mathbf{w}\), so their lines passed through the origin. A bias \(b\) lets the line sit anywhere, which is more natural, but it needs no new algorithm. Append a constant feature 1 to every point:</p>
+      <div class="eq">\[ \mathbf{x}' = \begin{bmatrix} \mathbf{x} \\ 1 \end{bmatrix} \in \mathbb{R}^{d+1}, \qquad \mathbf{w}' = \begin{bmatrix} \mathbf{w} \\ b \end{bmatrix} \qquad\Longrightarrow\qquad \mathbf{w}'^\top\mathbf{x}' = \mathbf{w}^\top\mathbf{x} + b \]</div>
+      <p>A line through the origin in the padded space is a general line in the original space. So from here on it is enough to learn \(\mathbf{w}\), with \(d\) understood as the padded dimension.</p>
+
+      <h3>This problem is NP-hard</h3>
+      <p>Finding the \(\mathbf{w}\) with the fewest training mistakes is <dfn>NP-hard</dfn> in general: we do not expect any polynomial-time algorithm for it. If the data is linearly separable the problem is easy, since the perceptron or the SVM finds a \(\mathbf{w}\) with zero training error (<a href="part-15.html">Part 15</a>, <a href="part-16.html">Part 16</a>). The general, non-separable case is the hard one.</p>
+      <p class="rule-of-thumb">This is the fundamental reason classification has no single algorithm: nobody knows how to minimize the training error efficiently, so each method gets around the problem its own way.</p>
+      <p>One way around it is to make assumptions about the data. Generative models do this (<a href="part-14.html">Part 14</a>), and the perceptron's analysis assumes the data is linearly separable with margin \(\gamma\) (<a href="part-15.html">Part 15</a>). Under such assumptions the problem becomes easy. The loss-function view shows the other ways <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=464s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:44</a>.</p>
+    </section>
+
+    <section id="loss-view">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=495s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 8:15</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=741s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 12:21 the plot</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=863s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 14:23 why it is hard</a>
+        </div>
+        <h2>The loss-function view</h2>
+      </div>
+      <p>Look at one point \((\mathbf{x}, y)\) at a time. Its loss under \(h\) is 0 if \(h(\mathbf{x}) = y\) and 1 otherwise. With \(h(\mathbf{x}) = \operatorname{sign}(\mathbf{w}^\top\mathbf{x})\), a mistake means \(\mathbf{w}^\top\mathbf{x}\) and \(y\) have opposite signs, which is the same as their product being negative:</p>
+      <div class="eq">\[ \mathbb{1}\big(\operatorname{sign}(\mathbf{w}^\top\mathbf{x}) \neq y\big) \;=\; \mathbb{1}\big(y\,\mathbf{w}^\top\mathbf{x} < 0\big) \]</div>
+      <p>The four sign cases in the table below check this <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=647s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:47</a>. Nothing here needs \(h\) to be linear. Write \(h(\mathbf{x}) = \operatorname{sign}(g(\mathbf{x}))\) for a real-valued function \(g\): linear (\(g(\mathbf{x}) = \mathbf{w}^\top\mathbf{x}\)), quadratic, anything. The loss then depends on the point only through one number, which these notes call \(z\) (the standard name is the <dfn>margin</dfn> of the point):</p>
+      <div class="eq">\[ z = y\,g(\mathbf{x}), \qquad \ell_{0\text{-}1}(z) = \mathbb{1}(z < 0), \qquad \text{training problem: } \min_{g} \sum_{i=1}^{n} \mathbb{1}\big(y_i\,g(\mathbf{x}_i) < 0\big) \]</div>
+      <p>At \(z = 0\), on the boundary, the lecture decides to count no loss.</p>
+
+      <figure>
+        <div class="fig-split">
+          <svg class="dg" viewBox="0 0 280 222" role="img" aria-label="The 0-1 loss against z: value 1 for z below 0 and value 0 from z equal to 0 onwards. A dashed chord from the point at z = −1, loss 1, to the point at z = 1, loss 0, runs below the graph at z = −0.5, so the function is not convex.">
+            <line class="d-rule" x1="30" y1="180" x2="268" y2="180"/>
+            <line class="d-rule" x1="30" y1="40" x2="30" y2="186"/>
+            <line class="d-rule" x1="146" y1="40" x2="146" y2="186" style="stroke-dasharray: 3 3"/>
+            <text class="d-al" x="30" y="197" text-anchor="middle">−2</text>
+            <text class="d-al" x="88" y="197" text-anchor="middle">−1</text>
+            <text class="d-al" x="146" y="197" text-anchor="middle">0</text>
+            <text class="d-al" x="204" y="197" text-anchor="middle">1</text>
+            <text class="d-al" x="262" y="197" text-anchor="middle">2</text>
+            <text class="d-al" x="24" y="184" text-anchor="end">0</text>
+            <text class="d-al" x="24" y="74" text-anchor="end">1</text>
+            <text class="d-al" x="268" y="215" text-anchor="end">z = y·g(x)</text>
+            <text class="d-al" x="34" y="34">loss</text>
+            <line class="d-ln d-dash" x1="88" y1="70" x2="204" y2="180"/>
+            <path class="d-ln-acc" d="M30 70 H146" style="stroke-width:2.6"/>
+            <path class="d-ln-acc" d="M146 180 H262" style="stroke-width:2.6"/>
+            <circle class="pt-no" cx="146" cy="70" r="4.5" style="stroke: var(--accent)"/>
+            <circle class="pt-tree" cx="146" cy="180" r="4.5"/>
+            <circle class="pt-plain" cx="88" cy="70" r="3.5"/>
+            <circle class="pt-plain" cx="204" cy="180" r="3.5"/>
+            <line class="d-ln" x1="117" y1="70" x2="117" y2="97.5" style="stroke-width:2"/>
+            <path class="d-ln" d="M121 84 L146 89" style="stroke-width:1"/>
+            <text class="d-s" x="150" y="93">graph above chord:</text>
+            <text class="d-s" x="150" y="107">not convex</text>
+            <text class="d-s" x="36" y="60">mistake: loss 1</text>
+            <text class="d-s" x="266" y="152" text-anchor="end">correct: loss 0</text>
+          </svg>
+          <div class="tbl-wrap">
+            <table class="mini">
+              <thead><tr><th>\(g(\mathbf{x})\)</th><th>\(y\)</th><th>\(z = y\,g(\mathbf{x})\)</th><th>Correct?</th><th class="num">Loss</th></tr></thead>
+              <tbody>
+                <tr><td>&gt; 0</td><td>+1</td><td>&gt; 0</td><td>yes</td><td class="num">0</td></tr>
+                <tr><td>&lt; 0</td><td>−1</td><td>&gt; 0</td><td>yes</td><td class="num">0</td></tr>
+                <tr><td>&gt; 0</td><td>−1</td><td>&lt; 0</td><td>no, a mistake</td><td class="num">1</td></tr>
+                <tr><td>&lt; 0</td><td>+1</td><td>&lt; 0</td><td>no, a mistake</td><td class="num">1</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <figcaption><b>The 0-1 loss depends only on \(z = y\,g(\mathbf{x})\).</b> It is a step: discontinuous at \(z = 0\), and not convex, because between \(z = -1\) and \(z = 1\) the graph rises above its own chord (at \(z = -0.5\) the loss is 1, the chord only 0.75).</figcaption>
+      </figure>
+
+      <p>The training loss is a sum of these per-point losses, so the trouble is already visible in a single point's loss:</p>
+      <ul>
+        <li><b>It jumps.</b> The loss is discontinuous at \(z = 0\), dropping straight from 1 to 0.</li>
+        <li><b>It is not convex.</b> A sum of convex functions is convex, and convex functions can be minimized efficiently (convexity appeared in <a href="part-09.html">Part 9</a>). Had each point's loss been convex, the total would be too, and the best solution could be found in polynomial time. The step function is not convex, so there is no such guarantee, and the problem is NP-hard in general.</li>
+      </ul>
+      <p>Different algorithms deal with this NP-hardness differently. Seeing exactly how is the content of the rest of L69 to L71.</p>
+    </section>
+
+    <section id="squared-loss">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=954s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 15:54</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=1076s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 17:56 the identity</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=1293s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L69 · 21:33 why it is bad</a>
+        </div>
+        <h2>Algorithm 1: regression used for classification</h2>
+      </div>
+      <p>Start with a bad algorithm that still fits the framework: treat the labels \(\pm 1\) as real numbers and run linear regression (<a href="part-10.html">Part 10</a>). The per-point loss is \((g(\mathbf{x}) - y)^2\) with \(g(\mathbf{x}) = \mathbf{w}^\top\mathbf{x}\). This is solved efficiently, by matrix operations, and the final classifier is still \(h(\mathbf{x}) = \operatorname{sign}(\mathbf{w}^\top\mathbf{x})\).</p>
+      <p>To compare it with the 0-1 loss, rewrite it in terms of \(z = y\,g(\mathbf{x})\). Because \(y \in \{+1, -1\}\), \(y^2 = 1\), and both expressions below expand to the same thing:</p>
+      <div class="eq">\[ \begin{aligned} (g(\mathbf{x}) - y)^2 &= g(\mathbf{x})^2 - 2\,y\,g(\mathbf{x}) + y^2 = g(\mathbf{x})^2 - 2\,y\,g(\mathbf{x}) + 1 \\ (y\,g(\mathbf{x}) - 1)^2 &= y^2\,g(\mathbf{x})^2 - 2\,y\,g(\mathbf{x}) + 1 = g(\mathbf{x})^2 - 2\,y\,g(\mathbf{x}) + 1 \end{aligned} \]</div>
+      <div class="result">
+        <span class="lbl">Squared loss in terms of \(z\)</span>
+        \[ (g(\mathbf{x}) - y)^2 = (z - 1)^2 \qquad \text{when } y \in \{+1, -1\} \]
+        <p>This holds only because the labels are \(\pm 1\). For general real-valued \(y\) the two expressions differ.</p>
+      </div>
+      <p>Against \(z\), the regression loss is a parabola with its minimum, 0, at \(z = 1\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=1231s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:31</a>. Using regression for classification means minimizing this <dfn>surrogate loss</dfn> in place of the NP-hard 0-1 loss.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 600 290" role="img" aria-label="The 0-1 step and the squared loss (z minus 1) squared, a parabola with minimum 0 at z = 1. Two marked points: z = −1, a mistake, and z = 3, a confident correct prediction, both have squared loss 4.">
+            <line class="d-rule" x1="60" y1="250" x2="576" y2="250"/>
+            <line class="d-rule" x1="60" y1="44" x2="60" y2="256"/>
+            <line class="d-rule" x1="230" y1="44" x2="230" y2="256" style="stroke-dasharray: 3 3"/>
+            <text class="d-al" x="60" y="267" text-anchor="middle">−2</text>
+            <text class="d-al" x="145" y="267" text-anchor="middle">−1</text>
+            <text class="d-al" x="230" y="267" text-anchor="middle">0</text>
+            <text class="d-al" x="315" y="267" text-anchor="middle">1</text>
+            <text class="d-al" x="400" y="267" text-anchor="middle">2</text>
+            <text class="d-al" x="485" y="267" text-anchor="middle">3</text>
+            <text class="d-al" x="570" y="267" text-anchor="middle">4</text>
+            <text class="d-al" x="52" y="254" text-anchor="end">0</text>
+            <text class="d-al" x="52" y="214" text-anchor="end">1</text>
+            <text class="d-al" x="52" y="174" text-anchor="end">2</text>
+            <text class="d-al" x="52" y="134" text-anchor="end">3</text>
+            <text class="d-al" x="52" y="94" text-anchor="end">4</text>
+            <text class="d-al" x="52" y="54" text-anchor="end">5</text>
+            <text class="d-al" x="576" y="285" text-anchor="end">z = y·g(x)</text>
+            <text class="d-al" x="64" y="40">loss</text>
+            <path class="d-ln" d="M124.94 50 Q315 450 505.06 50" style="stroke-width:2"/>
+            <path class="d-ln-acc" d="M60 210 H230" style="stroke-width:2.6"/>
+            <path class="d-ln-acc" d="M230 250 H570" style="stroke-width:2.6"/>
+            <circle class="pt-no" cx="230" cy="210" r="4.5" style="stroke: var(--accent)"/>
+            <circle class="pt-tree" cx="230" cy="250" r="4.5"/>
+            <line class="d-ln d-dash" x1="145" y1="90" x2="485" y2="90"/>
+            <circle class="pt-new" cx="145" cy="90" r="5.5"/>
+            <circle class="pt-new" cx="485" cy="90" r="5.5"/>
+            <text class="d-s" x="315" y="80" text-anchor="middle">both pay squared loss 4</text>
+            <text class="d-s" x="172" y="108">z = −1: a mistake</text>
+            <text class="d-s" x="172" y="122">(0-1 loss 1)</text>
+            <text class="d-s" x="500" y="124">z = 3: correct</text>
+            <text class="d-s" x="500" y="139">(0-1 loss 0)</text>
+            <text class="d-s" x="440" y="178">squared loss (z − 1)²</text>
+            <text class="d-s" x="66" y="202" style="fill: var(--accent)">0-1 loss</text>
+          </svg>
+        </div>
+        <figcaption><b>Why the squared loss is a poor surrogate.</b> A point on the wrong side at \(z = -1\) and a point classified correctly with room to spare at \(z = 3\) both pay a squared loss of 4, while the 0-1 loss charges them 1 and 0. To the right of \(z = 1\), being "more right" costs more.</figcaption>
+      </figure>
+
+      <p>The trouble is on the right <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=1325s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:05</a>. A point with a large positive \(z\) is classified correctly, since \(\operatorname{sign}(g(\mathbf{x})) = y\), yet its loss grows like \((z - 1)^2\). Regression wants \(g(\mathbf{x})\) to equal \(y\) exactly, so a confident correct prediction is punished. An outlier far out on the correct side gets a large loss and pulls the fitted \(\mathbf{w}\) toward itself, even though \(h\) already classifies it correctly <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=1ok_K5EohoU&amp;t=1389s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:09</a>.</p>
+      <p class="rule-of-thumb">The squared loss approximates the 0-1 loss badly. A good surrogate should not penalize correct predictions for being confident.</p>
+    </section>
+
+    <!-- ============ LECTURE 70 ============ -->
+    <section id="hinge-loss">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=31s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L70 · 0:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=92s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L70 · 1:32 rewriting</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=560s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L70 · 9:20 hinge loss</a>
+        </div>
+        <h2>SVM: the hinge loss</h2>
+      </div>
+      <p>Start from the soft-margin SVM (<a href="part-16.html">Part 16</a>):</p>
+      <div class="eq">\[ \min_{\mathbf{w},\,\boldsymbol{\xi}} \;\; \frac12\lVert\mathbf{w}\rVert^2 + C\sum_{i=1}^{n} \xi_i \qquad \text{such that} \quad y_i\,\mathbf{w}^\top\mathbf{x}_i + \xi_i \ge 1, \quad \xi_i \ge 0 \quad \text{for all } i \]</div>
+      <p>The slack \(\xi_i\) is the "bribe" point \(i\) pays to get to the right side of the line. Its two constraints combine into one:</p>
+      <div class="eq">\[ \xi_i \ge 1 - y_i\,\mathbf{w}^\top\mathbf{x}_i \;\;\text{and}\;\; \xi_i \ge 0 \qquad\Longleftrightarrow\qquad \xi_i \ge \max\big(0,\; 1 - y_i\,\mathbf{w}^\top\mathbf{x}_i\big) \]</div>
+      <p>The objective grows with every \(\xi_i\), so at the optimum no point pays more than it must <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=184s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:04</a>: a point classified correctly with margin at least 1 pays 0, any other pays exactly \(1 - y_i\,\mathbf{w}^\top\mathbf{x}_i\). Substitute \(\xi_i = \max(0, 1 - y_i\,\mathbf{w}^\top\mathbf{x}_i)\) and the constraints disappear:</p>
+      <div class="eq">\[ \min_{\mathbf{w} \in \mathbb{R}^d} \;\; \underbrace{\frac12\lVert\mathbf{w}\rVert^2}_{\text{regularizer: depends on the model}} \; + \; C\sum_{i=1}^{n} \underbrace{\max\big(0,\; 1 - y_i\,\mathbf{w}^\top\mathbf{x}_i\big)}_{\text{loss: depends on the data}} \]</div>
+      <p>The data \(\mathbf{x}_i, y_i\) appear only in the second term; the first depends only on \(\mathbf{w}\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=248s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:08</a>. This is the shape of ridge regression (<a href="part-12.html">Part 12</a>): squared loss plus \(\tfrac{\lambda}{2}\lVert\mathbf{w}\rVert^2\). There \(\lambda\) weighs the regularizer; here \(C\) weighs the loss instead. The balancing just happens on the other side, and dividing through by \(C\) would move it back.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 262" role="img" aria-label="Left: three positive points A, B and C relative to the lines wᵀx = −1, 0 and +1. A is beyond the +1 line and has slack 0; B sits inside the margin with slack 0.6; C is on the wrong side with slack 1.5. Right: the hinge loss max(0, 1 − z) with the same three points at z = 1.6, 0.4 and −0.5 having losses 0, 0.6 and 1.5.">
+            <defs><marker id="p18-sl-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="12" y="20">Slack in the soft-margin SVM</text>
+            <text class="d-al" x="58" y="44" text-anchor="end">wᵀx =</text>
+            <text class="d-al" x="95" y="44" text-anchor="middle">−1</text>
+            <text class="d-al" x="150" y="44" text-anchor="middle">0</text>
+            <text class="d-al" x="205" y="44" text-anchor="middle">+1</text>
+            <line class="d-ln d-dash" x1="95" y1="52" x2="95" y2="230"/>
+            <line class="d-ln" x1="150" y1="52" x2="150" y2="230"/>
+            <line class="d-ln d-dash" x1="205" y1="52" x2="205" y2="230"/>
+            <circle class="pt-no" cx="62" cy="80" r="4.5"/>
+            <circle class="pt-no" cx="40" cy="150" r="4.5"/>
+            <circle class="pt-no" cx="74" cy="205" r="4.5"/>
+            <line class="d-ln-acc" x1="176" y1="138" x2="203" y2="138" marker-end="url(#p18-sl-ah)"/>
+            <line class="d-ln-acc" x1="127" y1="190" x2="203" y2="190" marker-end="url(#p18-sl-ah)"/>
+            <circle class="pt-tree" cx="238" cy="88" r="5"/>
+            <circle class="pt-tree" cx="172" cy="138" r="5"/>
+            <circle class="pt-tree" cx="122.5" cy="190" r="5"/>
+            <text class="d-s" x="246" y="92">A: ξ = 0</text>
+            <text class="d-s" x="211" y="142">B: ξ = 0.6</text>
+            <text class="d-s" x="211" y="194">C: ξ = 1.5</text>
+            <circle class="pt-tree" cx="18" cy="248" r="4"/><text class="d-s" x="26" y="252">y = +1</text>
+            <circle class="pt-no" cx="80" cy="248" r="4"/><text class="d-s" x="88" y="252">y = −1</text>
+            <line class="d-ln-acc" x1="140" y1="248" x2="162" y2="248" marker-end="url(#p18-sl-ah)"/><text class="d-s" x="168" y="252">slack ξ</text>
+
+            <line class="d-rule" x1="315" y1="10" x2="315" y2="254"/>
+
+            <text class="d-h" x="340" y="20">The same numbers on the hinge</text>
+            <line class="d-rule" x1="380" y1="220" x2="626" y2="220"/>
+            <line class="d-rule" x1="380" y1="56" x2="380" y2="226"/>
+            <line class="d-rule" x1="448" y1="56" x2="448" y2="226" style="stroke-dasharray: 3 3"/>
+            <text class="d-al" x="380" y="237" text-anchor="middle">−1</text>
+            <text class="d-al" x="448" y="237" text-anchor="middle">0</text>
+            <text class="d-al" x="516" y="237" text-anchor="middle">1</text>
+            <text class="d-al" x="584" y="237" text-anchor="middle">2</text>
+            <text class="d-al" x="372" y="224" text-anchor="end">0</text>
+            <text class="d-al" x="372" y="154" text-anchor="end">1</text>
+            <text class="d-al" x="372" y="84" text-anchor="end">2</text>
+            <text class="d-al" x="626" y="254" text-anchor="end">z = yᵢ wᵀxᵢ</text>
+            <text class="d-al" x="384" y="52">loss</text>
+            <path class="d-ln" d="M380 150 H448"/>
+            <circle class="pt-no" cx="448" cy="150" r="3.5"/>
+            <text class="d-al" x="386" y="142">0-1</text>
+            <path class="d-ln-acc" d="M380 80 L516 220 H620" style="stroke-width:2.6"/>
+            <circle class="pt-tree" cx="556.8" cy="220" r="5"/>
+            <circle class="pt-tree" cx="475.2" cy="178" r="5"/>
+            <circle class="pt-tree" cx="414" cy="115" r="5"/>
+            <text class="d-s" x="560" y="210">A: 0</text>
+            <text class="d-s" x="483" y="172">B: 0.6</text>
+            <text class="d-s" x="422" y="110">C: 1.5</text>
+            <text class="d-s" x="470" y="100" style="fill: var(--accent)">hinge: max(0, 1 − z)</text>
+          </svg>
+        </div>
+        <figcaption><b>The slack is the hinge loss.</b> Three positive points with illustrative values of \(z = y_i\,\mathbf{w}^\top\mathbf{x}_i\): A beyond the margin (\(z = 1.6\)) pays nothing, B inside the margin (\(z = 0.4\)) pays \(1 - z = 0.6\), C on the wrong side (\(z = -0.5\)) pays 1.5. At the optimum each \(\xi_i = \max(0, 1 - z_i)\), which is the hinge curve on the right.</figcaption>
+      </figure>
+
+      <p>As a function of \(z = y\,g(\mathbf{x})\), with \(g(\mathbf{x}) = \mathbf{w}^\top\mathbf{x}\) here <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=405s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:45</a>:</p>
+      <div class="eq">\[ \ell_{\text{hinge}}(z) = \max(0,\; 1 - z) = \begin{cases} 1 - z & \text{if } z < 1 \\ 0 & \text{if } z \ge 1 \end{cases} \]</div>
+      <ul>
+        <li>For \(z \ge 1\) the loss is 0, however large \(z\) gets. Confident correct predictions cost nothing, which fixes the squared loss's flaw: this loss is tuned for classification, the squared loss for regression <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=498s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:18</a>.</li>
+        <li>For \(z < 1\), a mistake or a correct prediction with margin below 1, the loss is positive and linear: 1 at \(z = 0\), falling to 0 at \(z = 1\).</li>
+        <li>It is convex, so the optimization is easy, and it follows the 0-1 loss far more closely than the squared loss. The lecture describes it, informally, as in some sense the best convex approximation of the 0-1 loss <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=530s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:50</a>. That is why SVMs do much better than regression for classification.</li>
+      </ul>
+      <div class="result">
+        <span class="lbl">SVM in the loss view</span>
+        <p>Soft-margin SVM = <b>hinge loss + L2 regularization</b>, just as ridge regression = squared loss + L2 regularization. Other regularizers are possible, but L2 keeps the problem easy to solve, and the hinge loss approximates the 0-1 loss while getting rid of the NP-hardness.</p>
+      </div>
+    </section>
+
+    <section id="logistic-loss">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=652s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L70 · 10:52</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=868s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L70 · 14:28 case y = +1</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=959s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L70 · 15:59 case y = −1</a>
+        </div>
+        <h2>Logistic regression: the logistic loss</h2>
+      </div>
+      <p>Logistic regression (<a href="part-15.html">Part 15</a>) models \(P(y = 1 \mid \mathbf{x}) = \sigma(\mathbf{w}^\top\mathbf{x})\) and maximizes the likelihood of the labels, assumed independent. It was set up with labels 0 and 1. The lecture writes these as \(z_i\); to keep \(z\) for the margin, these notes call them \(t_i\), with \(t_i = 1\) when \(y_i = +1\) and \(t_i = 0\) when \(y_i = -1\).</p>
+      <div class="eq">\[ \max_{\mathbf{w}} \; \prod_{i=1}^{n} \sigma(\mathbf{w}^\top\mathbf{x}_i)^{t_i} \big(1 - \sigma(\mathbf{w}^\top\mathbf{x}_i)\big)^{1 - t_i}, \qquad \sigma(a) = \frac{1}{1 + e^{-a}} \]</div>
+      <p>Take the logarithm, then flip the sign to turn it into a minimization, so it can be read as a loss <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=808s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:28</a>:</p>
+      <div class="eq">\[ \min_{\mathbf{w}} \; \sum_{i=1}^{n} \Big[ -t_i \log\sigma(\mathbf{w}^\top\mathbf{x}_i) \; - \; (1 - t_i)\log\big(1 - \sigma(\mathbf{w}^\top\mathbf{x}_i)\big) \Big] \]</div>
+      <p>Now find the contribution of one point in each of the two cases.</p>
+      <p><b>Case \(t_i = 1\), that is \(y_i = +1\).</b> Only the first term survives:</p>
+      <div class="eq">\[ -\log\sigma(\mathbf{w}^\top\mathbf{x}_i) = -\log\frac{1}{1 + e^{-\mathbf{w}^\top\mathbf{x}_i}} = \log\big(1 + e^{-\mathbf{w}^\top\mathbf{x}_i}\big) = \log\big(1 + e^{-y_i\,\mathbf{w}^\top\mathbf{x}_i}\big) \quad \text{since } y_i = +1 \]</div>
+      <p><b>Case \(t_i = 0\), that is \(y_i = -1\).</b> Only the second term survives. Divide the numerator and denominator by \(e^{-\mathbf{w}^\top\mathbf{x}_i}\), which is allowed because it is always positive:</p>
+      <div class="eq">\[ -\log\Big(1 - \frac{1}{1 + e^{-\mathbf{w}^\top\mathbf{x}_i}}\Big) = -\log\frac{e^{-\mathbf{w}^\top\mathbf{x}_i}}{1 + e^{-\mathbf{w}^\top\mathbf{x}_i}} = -\log\frac{1}{e^{\mathbf{w}^\top\mathbf{x}_i} + 1} = \log\big(1 + e^{\mathbf{w}^\top\mathbf{x}_i}\big) = \log\big(1 + e^{-y_i\,\mathbf{w}^\top\mathbf{x}_i}\big) \]</div>
+      <p>The last step uses \(y_i = -1\). Both cases give the same expression <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=1087s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:07</a>.</p>
+      <div class="result">
+        <span class="lbl">Logistic regression in the loss view</span>
+        \[ \min_{\mathbf{w}} \; \sum_{i=1}^{n} \log\big(1 + e^{-y_i\,\mathbf{w}^\top\mathbf{x}_i}\big), \qquad \ell_{\text{log}}(z) = \log\big(1 + e^{-z}\big) \]
+        <p>This is exactly the maximum-likelihood problem, with the labels written as \(\pm 1\) instead of 0 and 1. Written this way it depends on \(\mathbf{w}^\top\mathbf{x}_i\,y_i\), so it fits on the same plot as the other losses.</p>
+      </div>
+      <p>Its shape <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=1250s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:50</a>. It decreases as \(z\) grows and is never exactly 0, since it is the log of something greater than 1, but it gets ever closer to 0. It is convex, so it can be minimized efficiently. Its name is the <dfn>logistic loss</dfn> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=1311s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:51</a>. With the natural log used in the derivation it crosses \(z = 0\) at \(\log 2 \approx 0.69\); the lecture's sketch is not drawn to scale.</p>
+    </section>
+
+    <section id="surrogates">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=1341s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L70 · 22:21</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=1436s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L70 · 23:56 regularization</a>
+        </div>
+        <h2>Surrogates, in short</h2>
+      </div>
+      <p>The lecture's conclusions:</p>
+      <ol>
+        <li>The 0-1 loss is hard to minimize.</li>
+        <li>Different algorithms minimize different <b>surrogate losses</b> in its place.</li>
+        <li>The surrogates are convex, and hence easy to minimize.</li>
+      </ol>
+      <p>This is why classification has many algorithms and regression does not <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tXVelGBsIPI&amp;t=1404s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:24</a>. In regression the loss we care about, the squared loss, is already convex, so there was nothing to approximate, and only the regularization varied. In classification the loss we care about is not convex, and each surrogate is a different compromise. How well a surrogate represents the 0-1 loss shapes how well its algorithm performs.</p>
+      <p>Regularization can be added to any of them. The SVM has it built in: maximizing the margin is what produced the \(\tfrac12\lVert\mathbf{w}\rVert^2\) term. Logistic regression has none on its own, but in practice it is always run with a regularizer, which is easy since it is solved with gradient-based methods anyway.</p>
+      <p>The perceptron and boosting fit the same picture, less cleanly. That is the next lecture.</p>
+    </section>
+
+    <!-- ============ LECTURE 71 ============ -->
+    <section id="perceptron-loss">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=32s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L71 · 0:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=218s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L71 · 3:38 modified hinge</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=279s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L71 · 4:39 subgradients</a>
+        </div>
+        <h2>The perceptron as stochastic subgradient descent</h2>
+      </div>
+      <p>The perceptron (<a href="part-15.html">Part 15</a>) looks at one point \((\mathbf{x}_t, y_t)\) per iteration and, if it misclassifies it, updates \(\mathbf{w}_{t+1} = \mathbf{w}_t + \mathbf{x}_t\,y_t\). This looks very much like a gradient-descent step, \(\mathbf{w}_{t+1} = \mathbf{w}_t - \eta_t\,\nabla L(\mathbf{w}_t)\) (<a href="part-10.html">Part 10</a>). Which loss would produce it?</p>
+      <p>Try the hinge loss of one point, \(\max(0, 1 - y\,\mathbf{w}^\top\mathbf{x})\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=62s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:02</a>. It is piecewise linear in \(\mathbf{w}\): on the sloped piece its gradient is \(-y\,\mathbf{x}\), on the flat piece 0. The perceptron's rule matches once the kink is moved from 1 to 0, a <dfn>modified hinge loss</dfn>:</p>
+      <div class="eq">\[ \ell_{\text{perc}}(\mathbf{w}; \mathbf{x}, y) = \max\big(0,\; -y\,\mathbf{w}^\top\mathbf{x}\big), \qquad \nabla_{\mathbf{w}}\,\ell_{\text{perc}} = \begin{cases} -y\,\mathbf{x} & \text{if } y\,\mathbf{w}^\top\mathbf{x} < 0 \\ \mathbf{0} & \text{if } y\,\mathbf{w}^\top\mathbf{x} > 0 \end{cases} \]</div>
+      <p>At \(y\,\mathbf{w}^\top\mathbf{x} = 0\) two linear pieces meet and there is no derivative. Use <dfn>subgradients</dfn> instead (<a href="part-12.html">Part 12</a>): any line through the kink that stays below the function. In terms of \(z\) these have slopes between \(-1\) and 0, so in terms of \(\mathbf{w}\) the subgradients are \(\{-\alpha\,y\,\mathbf{x} : \alpha \in [0, 1]\}\).</p>
+
+      <figure>
+        <div class="fig-split">
+          <svg class="dg" viewBox="0 0 270 272" role="img" aria-label="The loss max(0, −z): a line falling to a kink at z = 0, then flat. Shaded wedges show every line through the kink with slope between −1 and 0; one dashed example has slope −1/2. The slope −1 line, highlighted, is the perceptron's choice.">
+            <polygon points="24,150 24,30 140,150" style="fill: var(--accent-soft)"/>
+            <polygon points="140,150 227,150 227,240" style="fill: var(--accent-soft)"/>
+            <line class="d-rule" x1="20" y1="150" x2="262" y2="150"/>
+            <line class="d-ln d-dash" x1="24" y1="90" x2="227" y2="195"/>
+            <line class="d-ln-acc d-dash" x1="140" y1="150" x2="227" y2="240" style="stroke-width:2"/>
+            <path class="d-ln-acc" d="M24 30 L140 150 H256" style="stroke-width:2.6"/>
+            <circle class="pt-new" cx="140" cy="150" r="4.5"/>
+            <text class="d-al" x="24" y="166" text-anchor="middle">−2</text>
+            <text class="d-al" x="82" y="166" text-anchor="middle">−1</text>
+            <text class="d-al" x="134" y="166" text-anchor="end">0</text>
+            <text class="d-al" x="18" y="94" text-anchor="end">1</text>
+            <text class="d-al" x="18" y="34" text-anchor="end">2</text>
+            <text class="d-al" x="262" y="142" text-anchor="end">z = y wᵀx</text>
+            <text class="d-s" x="70" y="56" style="fill: var(--accent)">loss max(0, −z)</text>
+            <text class="d-s" x="150" y="106">subgradients at 0:</text>
+            <text class="d-s" x="150" y="120">slopes in [−1, 0]</text>
+            <text class="d-s" x="226" y="262" text-anchor="end">slope −1: the perceptron's pick</text>
+          </svg>
+          <div class="tbl-wrap">
+            <table class="mini">
+              <thead><tr><th>Case</th><th>(Sub)gradient</th><th>Update, step 1</th></tr></thead>
+              <tbody>
+                <tr><td>\(y\,\mathbf{w}^\top\mathbf{x} > 0\), correct</td><td>\(\mathbf{0}\)</td><td>no change</td></tr>
+                <tr><td>\(y\,\mathbf{w}^\top\mathbf{x} < 0\), mistake</td><td>\(-y\,\mathbf{x}\)</td><td>\(\mathbf{w} + y\,\mathbf{x}\)</td></tr>
+                <tr><td>\(y\,\mathbf{w}^\top\mathbf{x} = 0\), on the boundary</td><td>any \(-\alpha\,y\,\mathbf{x}\), \(\alpha \in [0, 1]\); the perceptron takes \(\alpha = 1\)</td><td>\(\mathbf{w} + y\,\mathbf{x}\)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <figcaption><b>The perceptron's update is a subgradient step.</b> At the kink of \(\max(0, -z)\), every line through it with slope between \(-1\) and 0 stays below the curve (shaded; the dashed line is one example). Choosing slope \(-1\) counts a point on the boundary as a mistake, and a step of size 1 gives the familiar update.</figcaption>
+      </figure>
+
+      <p>The perceptron makes a particular choice at the kink <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=311s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:11</a>: \(\alpha = 1\), the subgradient \(-y\,\mathbf{x}\). So a point exactly on the boundary is treated as a mistake. With the step size fixed at \(\eta_t = 1\):</p>
+      <div class="eq">\[ \text{mistake } (y_t\,\mathbf{w}_t^\top\mathbf{x}_t \le 0): \;\; \mathbf{w}_{t+1} = \mathbf{w}_t - 1\cdot(-y_t\,\mathbf{x}_t) = \mathbf{w}_t + \mathbf{x}_t\,y_t, \qquad \text{otherwise: } \; \mathbf{w}_{t+1} = \mathbf{w}_t \]</div>
+      <div class="result">
+        <span class="lbl">Perceptron in the loss view</span>
+        <p>The perceptron is <b>stochastic (sub)gradient descent</b> on the modified hinge loss \(\max(0, -y\,\mathbf{w}^\top\mathbf{x})\). It uses the gradient at one data point at a time (which could be drawn at random) instead of the whole data set, with a constant step size of 1 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=465s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:45</a>.</p>
+      </div>
+      <p>The lecture stresses that this is back-fitting <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=527s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:47</a>. The perceptron was derived from a different motivation, and it does not solve an optimization over all the data points. Forcing it into the loss framework needs all these caveats. It is still worth knowing, because its update \(\mathbf{x}_t\,y_t\) is exactly the subgradient step of a hinge-type loss.</p>
+    </section>
+
+    <section id="exponential-loss">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=619s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L71 · 10:19</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=680s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L71 · 11:20 coordinate descent</a>
+        </div>
+        <h2>Boosting: the exponential loss</h2>
+      </div>
+      <p>Boosting (<a href="part-17.html">Part 17</a>) can also be read as optimizing a loss, the <dfn>exponential loss</dfn> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=649s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:49</a>:</p>
+      <div class="eq">\[ \ell_{\text{exp}}(h; \mathbf{x}, y) = e^{-y\,h(\mathbf{x})}, \qquad \text{that is} \qquad \ell_{\text{exp}}(z) = e^{-z} \]</div>
+      <p>It looks like the logistic loss, falling as \(z\) grows and never reaching 0, but it is a different function. Each round of boosting adds a new classifier chosen to reduce the exponential loss of the combined classifier. Algorithms of this kind are called <dfn>coordinate descent</dfn> algorithms.</p>
+      <p>The course did not prove that boosting works, so the lecture gives only this high-level motivation and does not derive the loss. As with the perceptron, putting boosting in this framework comes with caveats.</p>
+    </section>
+
+    <section id="convex-surrogates">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=710s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L71 · 11:50</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=771s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L71 · 12:51 beyond convex surrogates</a>
+        </div>
+        <h2>All the losses on one plot</h2>
+      </div>
+      <p>The clean conclusion is that logistic regression and SVMs are neatly explained as minimizing a convex surrogate in place of the 0-1 loss. Regression on \(\pm 1\) labels also fits, though it is never used for classification in practice. The perceptron and boosting fit with caveats.</p>
+      <p>Why convex? A convex function has only one minimum value, with no other local minima to get stuck in, and that minimum is easy to find. So convex functions are natural choices for surrogates <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=741s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:21</a>. A different convex surrogate gives a different algorithm.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Algorithm</th><th>Loss of one point, \(z = y\,g(\mathbf{x})\)</th><th>Name</th><th>How it is minimized</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Linear regression on \(\pm 1\) labels</td><td>\((z - 1)^2\)</td><td>squared</td><td>matrix operations</td><td><a href="part-10.html">Part 10</a></td></tr>
+            <tr><td>Soft-margin SVM</td><td>\(\max(0,\, 1 - z)\)</td><td>hinge</td><td>with \(\tfrac12\lVert\mathbf{w}\rVert^2\) regularizer</td><td><a href="part-16.html">Part 16</a></td></tr>
+            <tr><td>Logistic regression</td><td>\(\log(1 + e^{-z})\)</td><td>logistic</td><td>gradient methods, regularizer added in practice</td><td><a href="part-15.html">Part 15</a></td></tr>
+            <tr><td>Perceptron</td><td>\(\max(0,\, -z)\)</td><td>modified hinge</td><td>stochastic subgradient descent, step 1</td><td><a href="part-15.html">Part 15</a></td></tr>
+            <tr><td>Boosting</td><td>\(e^{-z}\)</td><td>exponential</td><td>coordinate descent, one classifier per round</td><td><a href="part-17.html">Part 17</a></td></tr>
+            <tr><td>Neural networks</td><td>not convex in the parameters</td><td>(any)</td><td>gradient descent with backpropagation</td><td><a href="#training">below</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure id="loss-fig">
+        <div class="controls">
+          <label for="loss-z">Margin \(z = y\,g(\mathbf{x})\)</label>
+          <input type="range" id="loss-z" min="-3" max="3" step="0.01" value="-0.5">
+          <output id="loss-z-out" for="loss-z">−0.50</output>
+          <button class="btn" id="loss-all" type="button">Show all curves</button>
+        </div>
+        <div class="controls">
+          <label class="check" for="lt-01"><input type="checkbox" id="lt-01" checked><svg width="24" height="10" viewBox="0 0 24 10" aria-hidden="true"><line x1="1" y1="5" x2="23" y2="5" style="stroke: var(--ink); stroke-width: 3"/></svg>0-1</label>
+          <label class="check" for="lt-sq"><input type="checkbox" id="lt-sq" checked><svg width="24" height="10" viewBox="0 0 24 10" aria-hidden="true"><line x1="1" y1="5" x2="23" y2="5" style="stroke: var(--muted); stroke-width: 2.2"/></svg>Squared</label>
+          <label class="check" for="lt-hi"><input type="checkbox" id="lt-hi" checked><svg width="24" height="10" viewBox="0 0 24 10" aria-hidden="true"><line x1="1" y1="5" x2="23" y2="5" style="stroke: var(--accent); stroke-width: 2.6"/></svg>Hinge</label>
+          <label class="check" for="lt-pe"><input type="checkbox" id="lt-pe" checked><svg width="24" height="10" viewBox="0 0 24 10" aria-hidden="true"><line x1="1" y1="5" x2="23" y2="5" style="stroke: var(--accent); stroke-width: 2.2; stroke-dasharray: 5 3"/></svg>Perceptron</label>
+          <label class="check" for="lt-lo"><input type="checkbox" id="lt-lo" checked><svg width="24" height="10" viewBox="0 0 24 10" aria-hidden="true"><line x1="1" y1="5" x2="23" y2="5" style="stroke: var(--ok); stroke-width: 2.6"/></svg>Logistic</label>
+          <label class="check" for="lt-ex"><input type="checkbox" id="lt-ex" checked><svg width="24" height="10" viewBox="0 0 24 10" aria-hidden="true"><line x1="1" y1="5" x2="23" y2="5" style="stroke: var(--ok); stroke-width: 2.2; stroke-dasharray: 5 3"/></svg>Exponential</label>
+        </div>
+        <div class="readouts">
+          <div><span class="k">0-1</span><span class="v" id="lr-01">–</span></div>
+          <div><span class="k">Squared</span><span class="v" id="lr-sq">–</span></div>
+          <div><span class="k">Hinge</span><span class="v mine" id="lr-hi">–</span></div>
+          <div><span class="k">Perceptron</span><span class="v" id="lr-pe">–</span></div>
+          <div><span class="k">Logistic</span><span class="v" id="lr-lo">–</span></div>
+          <div><span class="k">Exponential</span><span class="v" id="lr-ex">–</span></div>
+        </div>
+        <div class="status" id="loss-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="loss-svg" viewBox="0 0 640 400" role="img" aria-label="Six per-point losses plotted against the margin z from −3 to 3: the 0-1 step, squared loss (z − 1)², hinge max(0, 1 − z), perceptron max(0, −z), logistic log(1 + e^(−z)) and exponential e^(−z). A movable vertical marker shows each loss at one value of z."></svg></div>
+        <figcaption><b>Exact functions, not data.</b> The six per-point losses of L69 to L71, plotted against \(z = y\,g(\mathbf{x})\) exactly as the lectures define them (natural log for the logistic loss). Untick curves to compare pairs, and move the slider or drag on the plot to read every loss at one \(z\). Values above 4 run off the top. As \(z\) grows, every surrogate except the squared loss falls to 0 or towards it; the squared loss rises again.</figcaption>
+      </figure>
+
+      <p>These are not the only convex surrogates. Others, Huber's loss for example, lead to yet more algorithms <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=771s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:51</a>.</p>
+      <p>There is also a different class of algorithms that gives up convexity altogether. They accept ending up at a local minimum, and in practice still perform comparably to SVMs and logistic regression. These are <b>neural networks</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZAuZqOM-skQ&amp;t=801s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:21</a>. They have no convex surrogate, they too are inspired by the perceptron, and they led to major advances in deep learning. The course only gives a perspective on them; a deep learning course builds them from the bottom up.</p>
+    </section>
+
+    <!-- ============ LECTURE 72 ============ -->
+    <section id="beyond-convexity">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=0s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 0:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=155s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 2:35 leaving convexity</a>
+        </div>
+        <h2>Loss plus regularizer, and the step beyond convexity</h2>
+      </div>
+      <p>L72 opens with the lens of the last three lectures in one formula:</p>
+      <div class="eq">\[ \min_{\mathbf{w}} \;\; \sum_{i=1}^{n} \underbrace{L\big(\mathbf{w}^\top\mathbf{x}_i,\; y_i\big)}_{\text{loss: depends on the data}} \; + \; \underbrace{R(\mathbf{w})}_{\text{regularizer: depends on the model}} \]</div>
+      <p>The regularizer steers the model toward desirable properties; \(\tfrac12\lVert\mathbf{w}\rVert^2\), for instance, favours weights close to zero. The loss we want is the 0-1 loss, but that is NP-hard, so each algorithm uses a convex surrogate: hinge gives SVMs, logistic gives logistic regression, a modified hinge with step size 1 gives the perceptron, and the exponential loss gives boosting.</p>
+      <p>Convexity was the point of all this. With a carefully chosen convex loss and regularizer, the minimizing \(\mathbf{w}\) is unique, and optimization algorithms reach that optimum. Neural networks drop this requirement: their loss is not necessarily convex. They are the second family of algorithms inspired by the basic perceptron <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=217s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:37</a>. The course introduces them only to show how they differ from what came before; the detail belongs to a deep learning course, which starts from neural networks.</p>
+    </section>
+
+    <section id="nn-architecture">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=277s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 4:37 the perceptron as a picture</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=403s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 6:43 hidden layer</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=647s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 10:47 output layer</a>
+        </div>
+        <h2>From a perceptron to a network</h2>
+      </div>
+      <p>First draw the perceptron as a picture. Each feature \(x_1, \dots, x_d\) is an input node. Edges carry the weights \(w_1, \dots, w_d\) to one node that computes \(\mathbf{w}^\top\mathbf{x}\), and the prediction is \(\operatorname{sign}(\mathbf{w}^\top\mathbf{x})\).</p>
+      <p>A neural network extends this picture. Each circle is a <dfn>neuron</dfn>, loosely modelled on neurons in the brain, which fire when their incoming signal is strong enough. Edges always point from left to right. Instead of one \(\mathbf{w}\) there are many, arranged in layers:</p>
+      <ul class="kinds">
+        <li><b>Input layer.</b> The features \(x_1, \dots, x_d\).</li>
+        <li><b>Hidden layer.</b> \(k\) neurons. Every one receives the same input, but each has its own weights \(\mathbf{w}_j \in \mathbb{R}^d\). Neuron \(j\) computes \(\mathbf{w}_j^\top\mathbf{x}\), a linear function of the input, then applies a non-linear <dfn>activation function</dfn> \(a\) and outputs \(a(\mathbf{w}_j^\top\mathbf{x})\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=557s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>9:17</a>. Typically the activation takes a real number to a number between 0 and 1, or to another real number, depending on the choice of \(a\). Usually all hidden neurons use the same \(a\).</li>
+        <li><b>Output layer.</b> Combines the hidden outputs linearly, with its own weights \(\mathbf{w}_{\text{out}} \in \mathbb{R}^k\).</li>
+      </ul>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 300" role="img" aria-label="Left: the perceptron, inputs x1 to xd joined by weights w1 to wd to one node computing wᵀx, giving ŷ = sign(wᵀx). Right: a network with one hidden layer. Inputs x1 to xd connect to every hidden neuron 1 to k; the edges into neuron 1 carry its weights w1. Hidden neurons output a(wⱼᵀx), and these connect with weights w_out to the output ŷ.">
+            <defs><marker id="p18-nn-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="16" y="24">Perceptron</text>
+            <line class="d-ln" x1="50" y1="70" x2="150" y2="140"/>
+            <line class="d-ln" x1="50" y1="120" x2="150" y2="140"/>
+            <line class="d-ln" x1="50" y1="210" x2="150" y2="140"/>
+            <line class="d-ln" x1="174" y1="140" x2="200" y2="140" marker-end="url(#p18-nn-ah)"/>
+            <circle class="node" cx="50" cy="70" r="15"/><text class="d-t" x="50" y="75" text-anchor="middle">x₁</text>
+            <circle class="node" cx="50" cy="120" r="15"/><text class="d-t" x="50" y="125" text-anchor="middle">x₂</text>
+            <text class="d-t" x="50" y="170" text-anchor="middle">⋮</text>
+            <circle class="node" cx="50" cy="210" r="15"/><text class="d-t" x="50" y="214" text-anchor="middle">x<tspan dy="3" style="font-size:10px">d</tspan></text>
+            <circle class="node-acc" cx="150" cy="140" r="24"/><text class="d-t" x="150" y="145" text-anchor="middle">wᵀx</text>
+            <text class="d-s" x="100" y="95">w₁</text>
+            <text class="d-s" x="84" y="116">w₂</text>
+            <text class="d-s" x="100" y="190">w<tspan dy="3" style="font-size:9px">d</tspan></text>
+            <text class="d-t" x="206" y="145">ŷ</text>
+            <text class="d-s" x="162" y="206" text-anchor="middle">ŷ = sign(wᵀx)</text>
+
+            <line class="d-rule" x1="240" y1="12" x2="240" y2="290"/>
+
+            <text class="d-h" x="260" y="24">Neural network with one hidden layer</text>
+            <line class="d-ln" x1="300" y1="70" x2="450" y2="115" style="stroke-width:1"/>
+            <line class="d-ln" x1="300" y1="70" x2="450" y2="220" style="stroke-width:1"/>
+            <line class="d-ln" x1="300" y1="120" x2="450" y2="115" style="stroke-width:1"/>
+            <line class="d-ln" x1="300" y1="120" x2="450" y2="220" style="stroke-width:1"/>
+            <line class="d-ln" x1="300" y1="210" x2="450" y2="115" style="stroke-width:1"/>
+            <line class="d-ln" x1="300" y1="210" x2="450" y2="220" style="stroke-width:1"/>
+            <line class="d-ln-acc" x1="300" y1="70" x2="450" y2="60"/>
+            <line class="d-ln-acc" x1="300" y1="120" x2="450" y2="60"/>
+            <line class="d-ln-acc" x1="300" y1="210" x2="450" y2="60"/>
+            <line class="d-ln" x1="450" y1="60" x2="600" y2="140"/>
+            <line class="d-ln" x1="450" y1="115" x2="600" y2="140"/>
+            <line class="d-ln" x1="450" y1="220" x2="600" y2="140"/>
+            <circle class="node" cx="300" cy="70" r="15"/><text class="d-t" x="300" y="75" text-anchor="middle">x₁</text>
+            <circle class="node" cx="300" cy="120" r="15"/><text class="d-t" x="300" y="125" text-anchor="middle">x₂</text>
+            <text class="d-t" x="300" y="172" text-anchor="middle">⋮</text>
+            <circle class="node" cx="300" cy="210" r="15"/><text class="d-t" x="300" y="214" text-anchor="middle">x<tspan dy="3" style="font-size:10px">d</tspan></text>
+            <circle class="node-acc" cx="450" cy="60" r="18"/><text class="d-t" x="450" y="65" text-anchor="middle">1</text>
+            <circle class="node" cx="450" cy="115" r="18"/><text class="d-t" x="450" y="120" text-anchor="middle">2</text>
+            <text class="d-t" x="450" y="172" text-anchor="middle">⋮</text>
+            <circle class="node" cx="450" cy="220" r="18"/><text class="d-t" x="450" y="225" text-anchor="middle">k</text>
+            <circle class="node" cx="600" cy="140" r="22"/><text class="d-t" x="600" y="145" text-anchor="middle">ŷ</text>
+            <text class="d-s" x="352" y="50" style="fill: var(--accent)">w₁ ∈ ℝᵈ</text>
+            <text class="d-s" x="474" y="50">a(w₁ᵀx)</text>
+            <text class="d-s" x="474" y="248">a(w<tspan dy="3" style="font-size:9px">k</tspan><tspan dy="-3">ᵀx)</tspan></text>
+            <text class="d-s" x="540" y="200">w<tspan dy="3" style="font-size:9px">out</tspan><tspan dy="-3"> ∈ ℝᵏ</tspan></text>
+            <text class="d-row" x="300" y="270" text-anchor="middle">input layer</text>
+            <text class="d-row" x="450" y="270" text-anchor="middle">hidden layer</text>
+            <text class="d-row" x="600" y="270" text-anchor="middle">output layer</text>
+            <text class="d-t" x="450" y="292" text-anchor="middle">ŷ = Σ<tspan dy="3" style="font-size:10px">j</tspan><tspan dy="-3"> w</tspan><tspan dy="3" style="font-size:10px">out,j</tspan><tspan dy="-3"> · a(w</tspan><tspan dy="3" style="font-size:10px">j</tspan><tspan dy="-3">ᵀx)</tspan></text>
+          </svg>
+        </div>
+        <figcaption><b>The same picture, extended.</b> The perceptron has one weight vector. A network with one hidden layer has one weight vector \(\mathbf{w}_j\) per hidden neuron (the highlighted edges are \(\mathbf{w}_1\)), a non-linear activation \(a\) after each, and output weights \(\mathbf{w}_{\text{out}}\) that combine the hidden outputs.</figcaption>
+      </figure>
+
+      <div class="result">
+        <span class="lbl">One hidden layer, regression output</span>
+        \[ \hat y(\mathbf{x}) = \mathbf{w}_{\text{out}}^\top \begin{bmatrix} a(\mathbf{w}_1^\top\mathbf{x}) \\ \vdots \\ a(\mathbf{w}_k^\top\mathbf{x}) \end{bmatrix} = \sum_{j=1}^{k} w_{\text{out},j}\; a(\mathbf{w}_j^\top\mathbf{x}) \]
+      </div>
+      <p>For a regression problem this real number is the prediction <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=712s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:52</a>. Computing it is a single pass through the network from left to right: form each \(\mathbf{w}_j^\top\mathbf{x}\), apply \(a\), and combine the results with \(\mathbf{w}_{\text{out}}\).</p>
+      <p>The parameters are \(\mathbf{w}_1, \dots, \mathbf{w}_k \in \mathbb{R}^d\) and \(\mathbf{w}_{\text{out}} \in \mathbb{R}^k\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=807s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:27</a>, that is \(dk + k\) numbers. The activation function, the number of hidden layers and the number of nodes in each are fixed in advance, as part of the network's specification <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=901s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:01</a>. Once everything is fixed, the network is a map from \(\mathbb{R}^d\) to \(\mathbb{R}\) determined by the weights.</p>
+    </section>
+
+    <section id="hidden-votes">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=932s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 15:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=1052s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 17:32 voting</a>
+        </div>
+        <h2>Hidden neurons as voters</h2>
+      </div>
+      <p>Why build this? A linear model assumes \(y\) can be explained by a linear function of \(\mathbf{x}\), which may be too simple. SVMs and logistic regression handled non-linearity with kernels (<a href="part-05.html">Part 5</a>, <a href="part-16.html">Part 16</a>). A network introduces it through the activation functions.</p>
+      <p>Picture each hidden neuron as checking whether some property holds for the input. If the input is an image given as pixel values, one neuron might say whether the image contains a particular edge, another whether it contains a curve: anything a linear function of the pixels can pick out <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=1022s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>17:02</a>.</p>
+      <p>Take the simplest activation, a threshold: output 1 if \(\mathbf{w}_j^\top\mathbf{x} \ge 0\) and 0 otherwise. Then each hidden neuron is a linear classifier reporting which side of its hyperplane the point is on, and the output layer takes a <b>weighted vote</b> of those reports. Different neurons have different \(\mathbf{w}_j\), so together they pin down where in \(\mathbb{R}^d\) the point lies. The threshold makes the whole map non-linear.</p>
+      <p>Nobody hands us these weights. All of \(\mathbf{w}_1, \dots, \mathbf{w}_k\) and \(\mathbf{w}_{\text{out}}\) must be learned from data, as \(\mathbf{w}\) was for SVMs, logistic regression and the perceptron, only now there are many more of them <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=1144s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:04</a>.</p>
+    </section>
+
+    <section id="activations">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=1206s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 20:06</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=1366s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 22:46 ReLU</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=1428s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L72 · 23:48 why non-linear</a>
+        </div>
+        <h2>Activation functions</h2>
+      </div>
+      <p>The threshold activation is discontinuous, like the 0-1 loss, and it makes learning the weights very hard. In practice people use activations such as these <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=1243s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:43</a>:</p>
+      <ul>
+        <li><b>Sigmoid</b>, \(a(s) = \sigma(s) = \dfrac{1}{1 + e^{-s}}\), as in logistic regression (<a href="part-15.html">Part 15</a>). It is differentiable and easy to handle, a soft vote: 0.5 at \(s = 0\), approaching 1 as \(s\) grows and 0 as \(s\) becomes very negative.</li>
+        <li><b>ReLU</b>, the rectified linear unit, \(a(s) = \max(0, s)\): equal to \(s\) when \(s\) is positive and 0 otherwise. Why one might prefer it to the sigmoid is left to a deep learning course.</li>
+        <li>Others, such as tanh.</li>
+      </ul>
+      <p class="callout">Smoothing removes the discontinuity but not the non-convexity. With sigmoid hidden units, the output is no longer a convex function of the parameters, and neither is the loss built on it <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=1305s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:45</a>. This is the step away from convexity.</p>
+      <p>Why have a non-linearity at all <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Y6CNz0wRWpI&amp;t=1428s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:48</a>? If \(a\) were linear, every \(a(\mathbf{w}_j^\top\mathbf{x})\) would be a linear function of \(\mathbf{x}\), and a linear combination of linear functions is again linear. The network would be no richer than what a perceptron or an SVM already does. With \(a(s) = s\), for example:</p>
+      <div class="eq">\[ \hat y = \sum_{j=1}^{k} w_{\text{out},j}\,\mathbf{w}_j^\top\mathbf{x} = \Big(\sum_{j=1}^{k} w_{\text{out},j}\,\mathbf{w}_j\Big)^{\!\top}\mathbf{x} = \mathbf{v}^\top\mathbf{x} \]</div>
+      <p>The non-linear activation is what lets the network learn a richer class of maps from input to output. Try the four activations below.</p>
+
+      <figure id="nn-fig">
+        <div class="controls">
+          <label for="nn-x1">Input \(x_1\)</label>
+          <input type="range" id="nn-x1" min="-2" max="2" step="0.05" value="1.2">
+          <output id="nn-x1-out" for="nn-x1">1.20</output>
+        </div>
+        <div class="controls">
+          <label for="nn-x2">Input \(x_2\)</label>
+          <input type="range" id="nn-x2" min="-2" max="2" step="0.05" value="0.3">
+          <output id="nn-x2-out" for="nn-x2">0.30</output>
+        </div>
+        <div class="controls" role="radiogroup" aria-label="Activation function">
+          <label class="check" for="nn-act-sigmoid"><input type="radio" name="nn-act" id="nn-act-sigmoid" value="sigmoid" checked>Sigmoid</label>
+          <label class="check" for="nn-act-relu"><input type="radio" name="nn-act" id="nn-act-relu" value="relu">ReLU</label>
+          <label class="check" for="nn-act-step"><input type="radio" name="nn-act" id="nn-act-step" value="step">Threshold</label>
+          <label class="check" for="nn-act-linear"><input type="radio" name="nn-act" id="nn-act-linear" value="linear">Linear</label>
+          <button class="btn" id="nn-reset" type="button">Reset the input</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">w₁ᵀx</span><span class="v" id="nn-s1">–</span></div>
+          <div><span class="k">w₂ᵀx</span><span class="v" id="nn-s2">–</span></div>
+          <div><span class="k">Output ŷ</span><span class="v mine" id="nn-y">–</span></div>
+        </div>
+        <div class="status" id="nn-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="nn-svg" viewBox="0 0 680 356" role="img" aria-label="Left: a network with inputs x1 and x2, two hidden neurons and one output, showing the value at every node, and below it the chosen activation function with both hidden inputs marked. Right: the output ŷ shaded over the square of inputs from −2 to 2, with the two lines where each hidden neuron's input is zero and the current input marked."></svg></div>
+        <figcaption><b>A forward pass through a 2-2-1 network</b>, with weights chosen for these notes rather than taken from the lecture: \(\mathbf{w}_1 = [1, 1]\), \(\mathbf{w}_2 = [1, -1]\), \(\mathbf{w}_{\text{out}} = [1, 1]\), no bias. The shading is \(\hat y\) over the input plane (darker is larger); dashed lines mark \(\mathbf{w}_j^\top\mathbf{x} = 0\), and arrows point to the side where each hidden neuron's vote is high. Drag on the square to move the input. With the linear activation the network collapses to the single linear function \(\hat y = 2x_1\).</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============ LECTURE 73 ============ -->
+    <section id="training">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=31s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 0:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=125s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 2:05 gradient descent</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=192s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 3:12 more layers</a>
+        </div>
+        <h2>Training a network by gradient descent</h2>
+      </div>
+      <p>Collect every parameter into one vector \(\theta\); for the network above, \(\theta\) holds \(\mathbf{w}_1, \dots, \mathbf{w}_k\) and \(\mathbf{w}_{\text{out}}\). Write \(\text{NN}(\mathbf{x}; \theta)\) for what the network with parameters \(\theta\) predicts for input \(\mathbf{x}\). For regression the loss is the usual squared loss, summed over the data:</p>
+      <div class="eq">\[ \min_{\theta} \;\; \sum_{i=1}^{n} \big(\text{NN}(\mathbf{x}_i; \theta) - y_i\big)^2 \]</div>
+      <p>\(\text{NN}(\mathbf{x}_i; \theta)\) plays the role \(\mathbf{w}^\top\mathbf{x}_i\) played before <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=94s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:34</a>. With a single hidden neuron and the identity as activation, it is exactly \(\mathbf{w}^\top\mathbf{x}_i\), and this is ordinary least squares (<a href="part-10.html">Part 10</a>).</p>
+      <p>If the activation is differentiable, start from some initial \(\theta\) and run gradient descent: repeatedly take a step in the negative gradient direction. \(\theta\) is high-dimensional, and the gradient captures how the output changes as each individual weight changes.</p>
+      <div class="eq">\[ \theta_{t+1} = \theta_t - \eta_t\, \nabla_\theta \sum_{i=1}^{n} \big(\text{NN}(\mathbf{x}_i; \theta_t) - y_i\big)^2 \]</div>
+
+      <h3>Deeper networks <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=222s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 3:42</a></h3>
+      <p>Nothing limits a network to one hidden layer. A second hidden layer combines the votes of the first and votes on the combination, a third does the same with the second, and so on: each layer works one level above the previous one. With \(L\) hidden layers, an output layer then produces the prediction.</p>
+      <p>Every neuron has its own weight vector, whose size is set by the layer before it <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=283s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:43</a>. First-layer weights live in \(\mathbb{R}^d\); a neuron in layer \(\ell\) has one weight per node of layer \(\ell - 1\). The number of nodes per layer is a design choice. Layers 1 to \(L\) usually have the same number of nodes, though they need not. Either way the number of parameters grows quickly.</p>
+    </section>
+
+    <section id="backpropagation">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=313s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 5:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=407s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 6:47 local minima</a>
+        </div>
+        <h2>Backpropagation, and why local minima are acceptable</h2>
+      </div>
+      <p>Computing the gradient of such a complicated network looks hard, but there is an efficient way, based on the chain rule of differentiation. The algorithm is called <dfn>backpropagation</dfn> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=376s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:16</a>. Given the parameter values \(\theta\), it computes the gradient of the network's loss at \(\theta\); gradient descent then uses that gradient to update the weights as usual. Backpropagation computes the gradient, and gradient descent takes the step.</p>
+      <p>The chain rule fits because the gradient says how the output changes when one weight changes <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=751s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:31</a>. Changing a weight changes the output of its neuron, which changes the next layer, which changes the layer after that, all the way to the output. The network's layer-by-layer structure lets this computation be organized efficiently.</p>
+      <div class="result">
+        <span class="lbl">Not derived in the lecture: one hidden layer, one point</span>
+        <p>For the squared loss \(\ell = (\hat y - y)^2\) of one point, with \(\hat y = \sum_j w_{\text{out},j}\, a(\mathbf{w}_j^\top\mathbf{x})\), the chain rule gives</p>
+        \[ \frac{\partial \ell}{\partial w_{\text{out},j}} = 2(\hat y - y)\; a(\mathbf{w}_j^\top\mathbf{x}), \qquad \nabla_{\mathbf{w}_j}\, \ell = 2(\hat y - y)\; w_{\text{out},j}\; a'(\mathbf{w}_j^\top\mathbf{x})\; \mathbf{x} \]
+        <p>The factor \(2(\hat y - y)\) is computed once at the output and passed back to every weight. Reusing such shared factors layer by layer, from the output backwards, is what makes backpropagation efficient.</p>
+      </div>
+      <p>There is a catch <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=407s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:47</a>. The output is not a convex function of the parameters. The loss is very high-dimensional and highly non-convex, so gradient descent need not converge to the parameters that minimize the training loss. It converges to a <b>local minimum</b>.</p>
+      <p>At first glance that suggests poor solutions. In practice it works very well, provided the algorithm is initialized carefully and gradient descent is modified with some tricks, steps that do not follow the gradient direction exactly <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=499s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:19</a>. How and why those tricks work is part of a deep learning course.</p>
+      <p class="rule-of-thumb">Neural networks find local minima of non-convex losses, and in practice those minima are usually very good.</p>
+    </section>
+
+    <section id="nn-classification">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=561s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 9:21</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=658s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 10:58 cross-entropy</a>
+        </div>
+        <h2>Networks for classification</h2>
+      </div>
+      <p>Backpropagation is the same for regression and classification; only the loss changes. For binary classification keep the input and hidden layers, and let the output layer apply a sigmoid to its linear combination. If \(\mathbf{h}\) is the vector of outputs of the last hidden layer:</p>
+      <div class="eq">\[ \hat p = \sigma\big(\mathbf{w}_{\text{out}}^\top\mathbf{h}\big), \qquad \text{read as the predicted } P(y = 1 \mid \mathbf{x}) \]</div>
+      <p>Compare this probability with the actual label using the <dfn>cross-entropy loss</dfn>, which measures how close the two are <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=689s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:29</a>. The lecture's example: if the label is \(y = 0\), predicting 0.1 should cost little, and predicting 0.9 (saying \(y = 1\) is likely) should cost a lot. The lecture does not write the formula; the standard form is</p>
+      <div class="eq">\[ \ell_{\text{CE}}(\hat p, y) = -\big[\, y\log\hat p + (1 - y)\log(1 - \hat p) \,\big], \qquad y \in \{0, 1\} \]</div>
+      <p>which is the per-point negative log-likelihood that logistic regression minimizes (<a href="#logistic-loss">above</a>). For the example, with \(y = 0\): \(\hat p = 0.1\) costs \(-\log 0.9 \approx 0.105\), and \(\hat p = 0.9\) costs \(-\log 0.1 \approx 2.303\).</p>
+      <p>Everything else is unchanged <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=720s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:00</a>: the network is still a function of \(\theta\), backpropagation computes the gradient of this new loss, and gradient descent follows it.</p>
+    </section>
+
+    <section id="feature-learning">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=812s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 13:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=940s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 15:40 feature map</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=1031s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 17:11 compared with kernels</a>
+        </div>
+        <h2>Networks learn their own features</h2>
+      </div>
+      <p>Neural networks learn local minima of non-convex functions and typically work very well in practice, above all on <b>unstructured data</b> such as images, text, speech and time series <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=844s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>14:04</a>. There is no table of features; the features have to be learned from raw pieces of information, and the network architecture has to differ for each kind of data.</p>
+      <p>There are two ways to see what a network does. One: it maps the input straight to the output. Two: it does two things in sequence. Layers 1 to \(L\) apply a non-linear map from \(\mathbb{R}^d\) to \(\mathbb{R}^m\), where \(m\) is the number of nodes in layer \(L\), and then the output layer applies a <b>linear</b> function to the result.</p>
+      <p>The second view should recall kernel machines (<a href="part-05.html">Part 5</a>, <a href="part-11.html">Part 11</a>, <a href="part-16.html">Part 16</a>): map the data to a higher dimension, then learn a linear function there. The difference is who chooses the map. With a kernel you specify it; a polynomial kernel, for instance, turns height and weight into height², weight², height × weight and so on. A network learns the feature map and the weights on top of it together.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 250" role="img" aria-label="Two pipelines. Kernel machine: input x, then a feature map φ fixed before training, then a learned linear model, then ŷ. Neural network: input x, then hidden layers 1 to L that learn a non-linear map to ℝᵐ, then a linear output layer, then ŷ; both of these stages are learned together by gradient descent with backpropagation.">
+            <defs><marker id="p18-fm-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-row" x="16" y="22">Kernel machine</text>
+            <rect class="d-box" x="16" y="32" width="104" height="58" rx="6"/>
+            <text class="d-t" x="68" y="57" text-anchor="middle">input x</text>
+            <text class="d-s" x="68" y="76" text-anchor="middle">x ∈ ℝᵈ</text>
+            <line class="d-ln" x1="120" y1="61" x2="148" y2="61" marker-end="url(#p18-fm-ah)"/>
+            <rect class="d-box" x="150" y="32" width="244" height="58" rx="6"/>
+            <text class="d-t" x="272" y="57" text-anchor="middle">feature map φ(x)</text>
+            <text class="d-s" x="272" y="76" text-anchor="middle">chosen by you, through the kernel</text>
+            <line class="d-ln" x1="394" y1="61" x2="422" y2="61" marker-end="url(#p18-fm-ah)"/>
+            <rect class="d-box" x="424" y="32" width="150" height="58" rx="6"/>
+            <text class="d-t" x="499" y="57" text-anchor="middle">linear model</text>
+            <text class="d-s" x="499" y="76" text-anchor="middle">wᵀφ(x)</text>
+            <line class="d-ln" x1="574" y1="61" x2="602" y2="61" marker-end="url(#p18-fm-ah)"/>
+            <text class="d-t" x="612" y="66">ŷ</text>
+            <text class="d-s t-off" x="272" y="106" text-anchor="middle">fixed before training</text>
+            <text class="d-s" x="499" y="106" text-anchor="middle">learned from data</text>
+
+            <text class="d-row" x="16" y="140">Neural network</text>
+            <rect class="d-box" x="16" y="150" width="104" height="58" rx="6"/>
+            <text class="d-t" x="68" y="175" text-anchor="middle">input x</text>
+            <text class="d-s" x="68" y="194" text-anchor="middle">x ∈ ℝᵈ</text>
+            <line class="d-ln" x1="120" y1="179" x2="148" y2="179" marker-end="url(#p18-fm-ah)"/>
+            <rect class="d-box-acc" x="150" y="150" width="244" height="58" rx="6"/>
+            <text class="d-t" x="272" y="175" text-anchor="middle">hidden layers 1 … L</text>
+            <text class="d-s" x="272" y="194" text-anchor="middle">learned non-linear map ℝᵈ → ℝᵐ</text>
+            <line class="d-ln" x1="394" y1="179" x2="422" y2="179" marker-end="url(#p18-fm-ah)"/>
+            <rect class="d-box-acc" x="424" y="150" width="150" height="58" rx="6"/>
+            <text class="d-t" x="499" y="175" text-anchor="middle">output layer</text>
+            <text class="d-s" x="499" y="194" text-anchor="middle">linear (+ sigmoid)</text>
+            <line class="d-ln" x1="574" y1="179" x2="602" y2="179" marker-end="url(#p18-fm-ah)"/>
+            <text class="d-t" x="612" y="184">ŷ</text>
+            <path class="d-ln-acc" d="M150 216 V224 H574 V216"/>
+            <text class="d-s" x="362" y="242" text-anchor="middle" style="fill: var(--accent)">both learned together, by gradient descent with backpropagation</text>
+          </svg>
+        </div>
+        <figcaption><b>Where the features come from.</b> A kernel machine fixes the map to a high-dimensional space before training and learns only the linear part. A network learns the map (its hidden layers, ending in \(m\) nodes) and the linear output layer at the same time.</figcaption>
+      </figure>
+
+      <p>Seen this way, a network can be designed to suit the kind of data <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=1093s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:13</a>. For images, useful features look for edges, corners and simple shapes, and the network can be set up to look for such things. The last layer stays linear, with a sigmoid for classification; the real question is the architecture of the layers before it. A deep learning course covers the main designs <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=1154s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:14</a>:</p>
+      <ul>
+        <li><b>Convolutional neural networks</b> for images, since convolution is a natural image operation.</li>
+        <li><b>Recurrent neural networks</b> and <b>LSTMs</b> (long short-term memory networks) for time series.</li>
+        <li><b>Transformers</b> and attention models.</li>
+      </ul>
+      <p>Each is a well-designed way to map raw input to a feature space in which classification or regression becomes easier.</p>
+
+      <h3>Neural networks in summary <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=1216s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L73 · 20:16</a></h3>
+      <ul>
+        <li>A network is a non-linear map from input to output, specified by an architecture: one hidden layer, many layers, or other designs.</li>
+        <li>Its parameters are learned by gradient descent, with backpropagation computing the gradient. This usually ends at a local minimum of the loss, which is usually very good in practice.</li>
+        <li>On unstructured data, modern networks give state-of-the-art results, beating classical methods such as SVMs or logistic regression whose kernels are not tuned to the kind of data <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=1310s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:50</a>.</li>
+        <li>On structured, tabular data they are not necessarily the best. Boosting, SVMs and logistic regression remain very good choices there <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=LctgFHD_RN4&amp;t=1278s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:18</a>.</li>
+      </ul>
+    </section>
+
+    <!-- ============ LECTURE 74 ============ -->
+    <section id="course-summary">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=32s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L74 · 0:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=64s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L74 · 1:04 supervised learning</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=94s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L74 · 1:34 what next</a>
+        </div>
+        <h2>The course in one table</h2>
+      </div>
+      <p>The final lecture looks back over the whole course: unsupervised learning first, in three kinds, then supervised learning, regression and then classification. The table follows that order and links each topic to its notes. The spoken summary does not name generative models or kernel and probabilistic regression; they are included so the map is complete.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Area</th><th>What the course covered</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td colspan="3"><strong>Introduction</strong></td></tr>
+            <tr><td>Paradigms</td><td>What machine learning is; supervised, unsupervised and sequential learning</td><td><a href="part-01.html">Part 1</a></td></tr>
+            <tr><td colspan="3"><strong>Unsupervised learning</strong></td></tr>
+            <tr><td>Representation learning</td><td>PCA: compression, the best line, eigenvectors, its issues and fast computation</td><td><a href="part-02.html">Part 2</a>, <a href="part-03.html">3</a>, <a href="part-04.html">4</a></td></tr>
+            <tr><td></td><td>Feature maps, kernels and kernel PCA</td><td><a href="part-05.html">Part 5</a></td></tr>
+            <tr><td>Clustering</td><td>K-means (Lloyd's algorithm), convergence, initialization, choosing K. A kernel version of K-means is spectral clustering, mentioned only.</td><td><a href="part-06.html">Part 6</a>, <a href="part-07.html">7</a></td></tr>
+            <tr><td>Estimation</td><td>Maximum likelihood and Bayesian estimation</td><td><a href="part-08.html">Part 8</a></td></tr>
+            <tr><td></td><td>Mixture models and the EM algorithm</td><td><a href="part-09.html">Part 9</a></td></tr>
+            <tr><td colspan="3"><strong>Supervised learning</strong></td></tr>
+            <tr><td>Regression</td><td>Ordinary least squares and gradient descent</td><td><a href="part-10.html">Part 10</a></td></tr>
+            <tr><td></td><td>Kernel and probabilistic regression</td><td><a href="part-11.html">Part 11</a></td></tr>
+            <tr><td></td><td>Ridge regression and LASSO</td><td><a href="part-12.html">Part 12</a></td></tr>
+            <tr><td>Classification</td><td>k-nearest neighbours and decision trees</td><td><a href="part-13.html">Part 13</a></td></tr>
+            <tr><td></td><td>Generative models and Naive Bayes</td><td><a href="part-14.html">Part 14</a></td></tr>
+            <tr><td></td><td>Perceptron and logistic regression</td><td><a href="part-15.html">Part 15</a></td></tr>
+            <tr><td></td><td>Support vector machines</td><td><a href="part-16.html">Part 16</a></td></tr>
+            <tr><td></td><td>Bagging and boosting</td><td><a href="part-17.html">Part 17</a></td></tr>
+            <tr><td></td><td>The loss-function view; neural networks, at a high level</td><td><a href="#loss-view">Part 18</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The lecturer hopes this is a solid foundation. From here the natural next steps are implementing these algorithms in practice, as in the Machine Learning Practice course, and a deep learning course, which is easier to appreciate after this one.</p>
+    </section>
+
+    <section id="not-covered">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=124s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L74 · 2:04</a>
+        <h2>What the course left out</h2>
+      </div>
+      <p>With what this course covered, an interested learner should be able to pick these up if needed.</p>
+      <div class="ingredients">
+        <div class="ingredient">
+          <span class="from">Between the two</span>
+          <h4>Semi-supervised learning</h4>
+          <p>Some data points come with labels and the rest do not. It sits between supervised and unsupervised learning.</p>
+        </div>
+        <div class="ingredient">
+          <span class="from">Deep learning</span>
+          <h4>Self-supervised learning</h4>
+          <p>Especially as data scales, new training data is created from existing data through self-supervision.</p>
+        </div>
+        <div class="ingredient">
+          <span class="from">A paradigm</span>
+          <h4>Sequential decision making</h4>
+          <p>Data arrives one point at a time. You decide on the current point, get feedback on whether you were right, and learn good strategies over time. It could fill a separate course (see the paradigms in <a href="part-01.html">Part 1</a>).</p>
+        </div>
+      </div>
+      <p>Everything in this course started instead from a whole data set \(\mathbf{x}_1, y_1, \dots, \mathbf{x}_n, y_n\) given in advance <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=185s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:05</a>.</p>
+    </section>
+
+    <section id="deployable-ml">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=245s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L74 · 4:05</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=307s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L74 · 5:07 fairness</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=489s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L74 · 8:09 explainability</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=676s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L74 · 11:16 privacy</a>
+        </div>
+        <h2>Deployable machine learning: open problems</h2>
+      </div>
+      <p>The course taught the most important piece of a practical system, the algorithm. But it is only one piece of a pipeline, and deploying it in the field raises further issues. The lecture names them, without solutions, to make you curious. Much current machine learning research is about them.</p>
+      <ul class="kinds">
+        <li><b>Fairness.</b> A system used in the US predicted a risk score for whether a person convicted of a crime would reoffend and return to prison, using features such as their previous records. Its scores came out favourable to one ethnicity and unfavourable to another, though risk should depend on past offences, not ethnicity. Nothing in an algorithm like logistic regression or an SVM prefers one group to another. The bias was in the data: if past judges gave higher risk scores or longer sentences to one ethnicity, any algorithm learning from those decisions reproduces the bias. So unfairness may come from the data rather than the algorithm. Making algorithms fair is still a research question, with some solutions so far.</li>
+        <li><b>Explainability.</b> Can a highly accurate but complicated model, such as a large neural network, be used in mission-critical settings? A doctor who gets a suggestion to prescribe a medicine needs to know why. A decision tree can explain itself: trace the path to the leaf, a series of if-then-else conditions on feature thresholds (<a href="part-13.html">Part 13</a>). A network with 100 hidden layers has no simple explanation. Or suppose a self-driving car fails to brake and a pedestrian dies: why did it decide not to brake, and who is accountable, the person who wrote the algorithm or the training method used? Without a human-understandable explanation this is unclear. The area is called explainable AI or explainable machine learning.</li>
+        <li><b>Privacy.</b> A model trained on confidential data, such as salaries or health records, might leak information about the people in it. A patient may refuse to share data with an algorithm that could reveal their health status. How should privacy be defined, and can learning algorithms be made private?</li>
+        <li><b>AI for the edge</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=738s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:18</a>. Networks keep growing, to billions of parameters, while a phone has limited memory. Can precision be truncated, parameters subsampled, or small networks built that mimic large ones?</li>
+        <li><b>Data that changes after deployment</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=799s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:19</a>. A model predicting IPL match winners from past scores and player statistics goes stale as skills and teams change, so the test data drifts away from the training data. Retraining from scratch for every new data point is not feasible. How can a deployed model keep learning?</li>
+      </ul>
+      <p>The full list the lecture gives of post-deployment questions <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=861s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>14:21</a>: fairness, explainability, privacy, distributed learning, AI for the edge, transfer learning (carrying knowledge from one domain to another) and continual learning (learning after deployment).</p>
+      <p>The course was introductory by design <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=06PP-3xUCs0&amp;t=925s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:25</a>. Its goal was a solid foundation for more advanced courses, such as deep learning for unstructured data, and for following the research in these areas.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>0-1 loss</dt><dd>\(\mathbb{1}(y\,g(\mathbf{x}) < 0)\): 1 for a mistake, 0 otherwise. Discontinuous and not convex, so minimizing it over linear classifiers is NP-hard in general.</dd></div>
+        <div><dt>Margin \(z = y\,g(\mathbf{x})\)</dt><dd>The one number every loss here depends on. Positive exactly when \(\operatorname{sign}(g(\mathbf{x})) = y\).</dd></div>
+        <div><dt>Surrogate loss</dt><dd>A loss minimized in place of the 0-1 loss. Convex surrogates are easy to minimize; each gives a different algorithm.</dd></div>
+        <div><dt>Squared loss</dt><dd>\((z - 1)^2\) for \(\pm 1\) labels. Regression's loss; it penalizes confident correct predictions.</dd></div>
+        <div><dt>Hinge loss</dt><dd>\(\max(0, 1 - z)\). Soft-margin SVM = hinge loss + L2 regularization.</dd></div>
+        <div><dt>Logistic loss</dt><dd>\(\log(1 + e^{-z})\). Logistic regression's negative log-likelihood, written with \(\pm 1\) labels.</dd></div>
+        <div><dt>Modified hinge loss</dt><dd>\(\max(0, -z)\). The perceptron is stochastic subgradient descent on it with step size 1.</dd></div>
+        <div><dt>Exponential loss</dt><dd>\(e^{-z}\). Boosting reduces it one classifier per round, a coordinate descent method.</dd></div>
+        <div><dt>Subgradient</dt><dd>The slope of a line through a point that stays below a convex function; at a kink there are many.</dd></div>
+        <div><dt>Hidden layer</dt><dd>Neurons between input and output, each computing \(a(\mathbf{w}_j^\top\mathbf{x})\) with its own weights.</dd></div>
+        <div><dt>Activation function</dt><dd>The non-linearity a neuron applies to \(\mathbf{w}^\top\mathbf{x}\): threshold, sigmoid, ReLU \(\max(0, s)\), tanh. Without it the network is linear.</dd></div>
+        <div><dt>Backpropagation</dt><dd>Computing the gradient of a network's loss efficiently with the chain rule, layer by layer from the output back.</dd></div>
+        <div><dt>Cross-entropy loss</dt><dd>Classification loss comparing a predicted probability with the actual 0/1 label.</dd></div>
+        <div><dt>Feature learning</dt><dd>Hidden layers learn the map to a new feature space and the output layer is linear on it; kernels fix that map in advance.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Why does classification have many algorithms while regression essentially has one?</span><span class="tog"></span></summary>
+          <p>Regression's loss, the squared loss, is already convex, so it can be minimized directly. Classification's real loss, the 0-1 loss, is discontinuous and non-convex, and minimizing it is NP-hard for non-separable data. Each algorithm minimizes a different convex surrogate instead.</p></details>
+        <details><summary><span class="q">Q2</span><span>Show that \((g(\mathbf{x}) - y)^2 = (y\,g(\mathbf{x}) - 1)^2\) for \(y \in \{\pm 1\}\). Why does this make regression a poor classifier?</span><span class="tog"></span></summary>
+          <p>Both expand to \(g(\mathbf{x})^2 - 2y\,g(\mathbf{x}) + 1\), using \(y^2 = 1\). As a function of \(z\) it is \((z - 1)^2\), which grows for \(z > 1\): points classified correctly with a large margin get a large loss, so outliers on the correct side distort \(\mathbf{w}\).</p></details>
+        <details><summary><span class="q">Q3</span><span>A point has \(y = +1\) and \(g(\mathbf{x}) = 0.4\). Compute its 0-1, squared, hinge, perceptron, logistic and exponential losses.</span><span class="tog"></span></summary>
+          <p>\(z = 0.4\). 0-1: 0. Squared: \((0.4 - 1)^2 = 0.36\). Hinge: \(1 - 0.4 = 0.6\). Perceptron: \(\max(0, -0.4) = 0\). Logistic: \(\log(1 + e^{-0.4}) = \log 1.670 \approx 0.513\). Exponential: \(e^{-0.4} \approx 0.670\). The point is correct, but inside the margin, so the hinge loss still charges it.</p></details>
+        <details><summary><span class="q">Q4</span><span>In a soft-margin SVM, three points have \(y_i\,\mathbf{w}^\top\mathbf{x}_i = 1.4,\ 0.3,\ -0.2\). What are their slacks at the optimum, and why?</span><span class="tog"></span></summary>
+          <p>\(\xi_i = \max(0, 1 - y_i\,\mathbf{w}^\top\mathbf{x}_i)\): 0, 0.7 and 1.2. The constraints require \(\xi_i \ge 0\) and \(\xi_i \ge 1 - y_i\,\mathbf{w}^\top\mathbf{x}_i\), and the objective grows with \(\xi_i\), so each slack sits at the smaller of the allowed values. That is the hinge loss.</p></details>
+        <details><summary><span class="q">Q5</span><span>A point has \(y = -1\) and \(\mathbf{w}^\top\mathbf{x} = 2\). Compute its logistic-regression loss both ways: from the 0/1-label likelihood and from \(\log(1 + e^{-z})\).</span><span class="tog"></span></summary>
+          <p>Label 0 form: \(-\log(1 - \sigma(2)) = -\log(1 - 0.881) = -\log 0.119 \approx 2.127\). Margin form: \(z = -2\), \(\log(1 + e^{2}) = \log 8.389 \approx 2.127\). The same, as the derivation in L70 promises.</p></details>
+        <details><summary><span class="q">Q6</span><span>In what sense is the perceptron a loss-minimization algorithm, and what does it do when \(y\,\mathbf{w}^\top\mathbf{x} = 0\)?</span><span class="tog"></span></summary>
+          <p>It is stochastic subgradient descent on \(\max(0, -y\,\mathbf{w}^\top\mathbf{x})\): one point at a time, step size 1. At \(y\,\mathbf{w}^\top\mathbf{x} = 0\) any \(-\alpha\,y\,\mathbf{x}\) with \(\alpha \in [0,1]\) is a subgradient; the perceptron takes \(\alpha = 1\), so it treats the point as a mistake and updates \(\mathbf{w} \leftarrow \mathbf{w} + y\,\mathbf{x}\).</p></details>
+        <details><summary><span class="q">Q7</span><span>A network has \(d = 10\) inputs, one hidden layer of \(k = 5\) neurons and one output. How many weights does it have, and what does it reduce to with a linear activation?</span><span class="tog"></span></summary>
+          <p>\(dk + k = 50 + 5 = 55\) weights. With \(a(s) = s\), \(\hat y = \sum_j w_{\text{out},j}\,\mathbf{w}_j^\top\mathbf{x} = \mathbf{v}^\top\mathbf{x}\) with \(\mathbf{v} = \sum_j w_{\text{out},j}\,\mathbf{w}_j\): just a linear model, so all 55 weights buy nothing beyond 10.</p></details>
+        <details><summary><span class="q">Q8</span><span>Gradient descent on a neural network converges to a local minimum. Why, and how does the lecture say this plays out in practice?</span><span class="tog"></span></summary>
+          <p>Because the loss is not a convex function of the parameters (non-linear activations make it highly non-convex), gradient descent is not guaranteed to reach the global minimum. In practice, with careful initialization and modified gradient steps, the local minima reached are usually very good.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-17.html"><span class="dir">← Part 17</span><span class="nm">Ensembles: bagging and boosting</span></a><a class="next" href="index.html"><span class="dir">Finished →</span><span class="nm">Back to all parts</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (YouTube auto-generated English captions for these lectures) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const fmt = (v, d = 2) => { const zero = (0).toFixed(d), s = Math.abs(v).toFixed(d); return (v < 0 && s !== zero ? '−' : '') + s; };
+  const svgPoint = (svg, e) => { const m = svg.getScreenCTM(); if (!m) return null; const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(m.inverse()); };
+
+  /* ---------- Six per-point losses against the margin z = y·g(x) ---------- */
+  (() => {
+    const svg = document.getElementById('loss-svg'); if (!svg) return;
+    const W = 640, H = 400, L = 50, R = 16, T = 16, PW = W - L - R, PH = 334;
+    const Z0 = -3, Z1 = 3, VMAX = 4;
+    const sx = z => L + (z - Z0) / (Z1 - Z0) * PW;
+    const sy = v => T + (VMAX - v) / VMAX * PH;
+    // Drawing order: squared and exponential underneath, the 0-1 step on top.
+    const curves = [
+      { key: 'sq', f: z => (z - 1) * (z - 1), tok: 'muted', w: 2.2 },
+      { key: 'ex', f: z => Math.exp(-z), tok: 'ok', w: 2.2, dash: '7 5' },
+      { key: 'lo', f: z => Math.log(1 + Math.exp(-z)), tok: 'ok', w: 2.6 },
+      { key: 'pe', f: z => Math.max(0, -z), tok: 'accent', w: 2.2, dash: '7 5' },
+      { key: 'hi', f: z => Math.max(0, 1 - z), tok: 'accent', w: 2.6 },
+      { key: '01', f: z => (z < 0 ? 1 : 0), tok: 'ink', w: 3 }
+    ];
+
+    const grid = mk('g', { class: 'c-grid' }, svg);
+    for (let z = Z0; z <= Z1; z++) mk('line', { x1: sx(z), x2: sx(z), y1: sy(0), y2: sy(VMAX) }, grid);
+    for (let v = 0; v <= VMAX; v++) mk('line', { x1: sx(Z0), x2: sx(Z1), y1: sy(v), y2: sy(v) }, grid);
+    for (let z = Z0; z <= Z1; z++) mk('text', { x: sx(z), y: sy(0) + 18, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = fmt(z, 0);
+    for (let v = 0; v <= VMAX; v++) mk('text', { x: L - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+    mk('line', { x1: sx(Z0), x2: sx(Z1), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(0), y2: sy(VMAX), class: 'c-axis' }, svg);
+    mk('text', { x: sx(-1.5), y: H - 8, 'text-anchor': 'middle', class: 'c-note' }, svg).textContent = '← mistakes (z < 0)';
+    mk('text', { x: sx(0), y: H - 8, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'z = y·g(x)';
+    mk('text', { x: sx(1.5), y: H - 8, 'text-anchor': 'middle', class: 'c-note' }, svg).textContent = 'correct (z > 0) →';
+    mk('text', { x: 14, y: T + PH / 2, 'text-anchor': 'middle', class: 'c-title', transform: `rotate(-90 14 ${T + PH / 2})` }, svg).textContent = 'loss of one point';
+
+    const defs = mk('defs', {}, svg);
+    const cp = mk('clipPath', { id: 'loss-clip' }, defs);
+    mk('rect', { x: L, y: T - 2, width: PW, height: PH + 4 }, cp);
+    const layer = mk('g', { 'clip-path': 'url(#loss-clip)' }, svg);
+    const n = 480;
+    curves.forEach(c => {
+      c.g = mk('g', { style: `stroke: var(--${c.tok}); stroke-width: ${c.w}; fill: none; stroke-linejoin: round;${c.dash ? ` stroke-dasharray: ${c.dash};` : ''}` }, layer);
+      if (c.key === '01') {
+        mk('path', { d: `M${sx(Z0)} ${sy(1)} H${sx(0)} M${sx(0)} ${sy(0)} H${sx(Z1)}` }, c.g);
+        mk('circle', { cx: sx(0), cy: sy(1), r: 4.5, style: 'fill: var(--surface); stroke-width: 2' }, c.g);
+        mk('circle', { cx: sx(0), cy: sy(0), r: 4.5, style: 'fill: var(--ink); stroke: none' }, c.g);
+      } else {
+        let d = '';
+        for (let i = 0; i <= n; i++) { const z = Z0 + (Z1 - Z0) * i / n, v = Math.min(c.f(z), VMAX + 2); d += (i ? 'L' : 'M') + sx(z).toFixed(1) + ' ' + sy(v).toFixed(1); }
+        mk('path', { d }, c.g);
+      }
+    });
+
+    const guide = mk('line', { y1: sy(0), y2: sy(VMAX), style: 'stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 3 4' }, svg);
+    const dots = curves.map(c => mk('circle', { r: 5, style: `fill: var(--surface); stroke: var(--${c.tok}); stroke-width: 2.2` }, svg));
+    const slider = document.getElementById('loss-z'), out = document.getElementById('loss-z-out'), status = document.getElementById('loss-status');
+    const boxes = curves.map(c => document.getElementById('lt-' + c.key));
+    const reads = curves.map(c => document.getElementById('lr-' + c.key));
+    let z = parseFloat(slider.value);
+
+    const draw = () => {
+      out.textContent = fmt(z);
+      guide.setAttribute('x1', sx(z)); guide.setAttribute('x2', sx(z));
+      curves.forEach((c, i) => {
+        const on = boxes[i].checked, v = c.f(z), show = on && v <= VMAX;
+        c.g.style.display = on ? '' : 'none';
+        reads[i].parentElement.hidden = !on;
+        reads[i].textContent = c.key === '01' ? String(v) : fmt(v);
+        dots[i].style.display = show ? '' : 'none';
+        if (show) { dots[i].setAttribute('cx', sx(z)); dots[i].setAttribute('cy', sy(v)); }
+      });
+      status.textContent = Math.abs(z) < 0.005
+        ? 'z = 0: on the boundary. The 0-1 loss as defined in L69 counts no mistake here; the perceptron treats it as a mistake.'
+        : z < 0 ? 'z < 0: the point is on the wrong side, a mistake. The 0-1 loss is 1, and every surrogate is positive.'
+        : z < 1 ? 'Correct side, but the margin is below 1: the 0-1 and perceptron losses are 0, while the hinge loss still charges 1 − z.'
+        : 'Correct with margin at least 1: the 0-1, hinge and perceptron losses are 0. The squared loss rises again as (z − 1)², and the logistic and exponential losses shrink without reaching 0.';
+    };
+    const setFrom = e => { const p = svgPoint(svg, e); if (!p) return; const zz = Z0 + (p.x - L) / PW * (Z1 - Z0); z = Math.round(Math.max(Z0, Math.min(Z1, zz)) * 100) / 100; slider.value = z; draw(); };
+    svg.addEventListener('pointerdown', e => { setFrom(e); if (svg.setPointerCapture) svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener('pointermove', e => { if (e.buttons) setFrom(e); });
+    slider.addEventListener('input', () => { z = parseFloat(slider.value); draw(); });
+    boxes.forEach(b => b.addEventListener('change', draw));
+    document.getElementById('loss-all').addEventListener('click', () => { boxes.forEach(b => { b.checked = true; }); draw(); });
+    draw();
+  })();
+
+  /* ---------- Forward pass through a 2-2-1 network ---------- */
+  (() => {
+    const svg = document.getElementById('nn-svg'); if (!svg) return;
+    const WH = [[1, 1], [1, -1]], WO = [1, 1];
+    const ACT = {
+      sigmoid: { f: s => 1 / (1 + Math.exp(-s)), lo: 0, hi: 1, label: 'sigmoid σ(s)', msg: 'Sigmoid: each hidden neuron casts a soft vote between 0 and 1 for its side of its line, and ŷ adds the two votes. The output is smooth but not linear in x.' },
+      relu: { f: s => Math.max(0, s), lo: 0, hi: 4, label: 'ReLU max(0, s)', msg: 'ReLU: a(s) = max(0, s). The output is piecewise linear in x, with creases along the two dashed lines.' },
+      step: { f: s => (s >= 0 ? 1 : 0), lo: 0, hi: 1, label: 'threshold, 1 if s ≥ 0', msg: 'Threshold: each hidden neuron is a linear classifier voting 0 or 1, and ŷ counts the votes: 2 in the right-hand wedge, 0 in the left-hand one, 1 above and below.' },
+      linear: { f: s => s, lo: -4, hi: 4, label: 'linear a(s) = s', msg: 'Linear: ŷ = (w₁ + w₂)ᵀx = 2x₁, a single linear function of the input. The shading changes only from left to right: without a non-linear activation the hidden layer adds nothing.' }
+    };
+    const P0 = [1.2, 0.3];
+    const sl1 = document.getElementById('nn-x1'), sl2 = document.getElementById('nn-x2');
+    const o1 = document.getElementById('nn-x1-out'), o2 = document.getElementById('nn-x2-out');
+    const rs1 = document.getElementById('nn-s1'), rs2 = document.getElementById('nn-s2'), ry = document.getElementById('nn-y'), status = document.getElementById('nn-status');
+    const radios = [...document.querySelectorAll('input[name="nn-act"]')];
+    let act = (radios.find(r => r.checked) || { value: 'sigmoid' }).value;
+    let p = [parseFloat(sl1.value), parseFloat(sl2.value)];
+    const fwd = q => { const s = WH.map(w => w[0] * q[0] + w[1] * q[1]); const h = s.map(ACT[act].f); return { s, h, y: WO[0] * h[0] + WO[1] * h[1] }; };
+
+    const defs = mk('defs', {}, svg);
+    const mkr = mk('marker', { id: 'nn-ah', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs);
+    mk('path', { d: 'M0,0 L10,5 L0,10 z', class: 'c-arrowhead' }, mkr);
+    const halo = 'paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round';
+
+    /* network diagram */
+    const NODE = { x1: [70, 84], x2: [70, 194], h1: [200, 84], h2: [200, 194], o: [320, 139] };
+    mk('text', { x: 16, y: 22, class: 'c-tick' }, svg).textContent = 'w₁ = [1, 1]   w₂ = [1, −1]   w_out = [1, 1]   no bias';
+    [['x1', 'h1', '1', 135, 77], ['x2', 'h1', '1', 178, 120], ['x1', 'h2', '1', 178, 165], ['x2', 'h2', '−1', 135, 210], ['h1', 'o', '1', 264, 107], ['h2', 'o', '1', 264, 179]].forEach(([a, b, wt, lx, ly]) => {
+      mk('line', { x1: NODE[a][0], y1: NODE[a][1], x2: NODE[b][0], y2: NODE[b][1], style: `stroke: var(--ink-2); stroke-width: 1.4;${wt === '−1' ? ' stroke-dasharray: 5 4;' : ''}` }, svg);
+      mk('text', { x: lx, y: ly, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = wt;
+    });
+    const val = {};
+    Object.keys(NODE).forEach(k => {
+      const [cx, cy] = NODE[k], hid = k[0] === 'h';
+      mk('circle', { cx, cy, r: 22, style: hid ? 'fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2' : 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.5' }, svg);
+      val[k] = mk('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', class: 'c-note' }, svg);
+    });
+    mk('text', { x: 70, y: 54, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'x₁';
+    mk('text', { x: 70, y: 234, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'x₂';
+    const pre1 = mk('text', { x: 200, y: 54, 'text-anchor': 'middle', class: 'c-title' }, svg);
+    const pre2 = mk('text', { x: 200, y: 234, 'text-anchor': 'middle', class: 'c-title' }, svg);
+    mk('text', { x: 320, y: 109, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'ŷ';
+
+    /* activation inset */
+    const AX0 = 56, AX1 = 326, AY0 = 274, AY1 = 330;
+    const ax = s => AX0 + (s + 4) / 8 * (AX1 - AX0);
+    const actTitle = mk('text', { x: AX0, y: 258, class: 'c-title' }, svg);
+    const aFrame = mk('g', {}, svg);
+    const aPath = mk('path', { style: 'fill: none; stroke: var(--accent); stroke-width: 2.4' }, svg);
+    const aDots = [0, 1].map(() => mk('circle', { r: 4.5, class: 'c-pt-hi' }, svg));
+    const aLbl = [0, 1].map(() => mk('text', { 'text-anchor': 'middle', class: 'c-note' }, svg));
+    const hiT = mk('text', { x: AX0 - 6, y: AY0 + 4, 'text-anchor': 'end', class: 'c-tick' }, svg);
+    const loT = mk('text', { x: AX0 - 6, y: AY1 + 4, 'text-anchor': 'end', class: 'c-tick' }, svg);
+    [-4, 0, 4].forEach(s => { mk('text', { x: ax(s), y: AY1 + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = fmt(s, 0); });
+    let ay = v => v;
+    const drawAct = () => {
+      const A = ACT[act];
+      ay = v => AY1 - (v - A.lo) / (A.hi - A.lo) * (AY1 - AY0);
+      aFrame.textContent = '';
+      mk('rect', { x: AX0, y: AY0, width: AX1 - AX0, height: AY1 - AY0, style: 'fill: none; stroke: var(--rule)' }, aFrame);
+      mk('line', { x1: AX0, x2: AX1, y1: ay(0), y2: ay(0), class: 'c-axis' }, aFrame);
+      mk('line', { x1: ax(0), x2: ax(0), y1: AY0, y2: AY1, class: 'c-faint' }, aFrame);
+      let d = '';
+      if (act === 'step') d = `M${ax(-4)} ${ay(0)} H${ax(0)} M${ax(0)} ${ay(1)} H${ax(4)}`;
+      else for (let i = 0; i <= 160; i++) { const s = -4 + 8 * i / 160; d += (i ? 'L' : 'M') + ax(s).toFixed(1) + ' ' + ay(A.f(s)).toFixed(1); }
+      aPath.setAttribute('d', d);
+      hiT.textContent = fmt(A.hi, 0); loT.textContent = fmt(A.lo, 0);
+      actTitle.textContent = 'activation a(s): ' + A.label;
+    };
+
+    /* output over the input square */
+    const HX = 388, HY = 30, HS = 272, NC = 34, CS = HS / NC;
+    const hx = v => HX + (v + 2) / 4 * HS, hy = v => HY + (2 - v) / 4 * HS;
+    const gCells = mk('g', { style: 'shape-rendering: crispEdges' }, svg), cells = [];
+    for (let i = 0; i < NC; i++) for (let j = 0; j < NC; j++) {
+      const q = [-2 + (i + 0.5) * 4 / NC, 2 - (j + 0.5) * 4 / NC];
+      cells.push({ q, r: mk('rect', { x: HX + i * CS, y: HY + j * CS, width: CS, height: CS, style: 'fill: var(--accent); stroke: none' }, gCells) });
+    }
+    mk('rect', { x: HX, y: HY, width: HS, height: HS, style: 'fill: none; stroke: var(--ink-2); stroke-width: 1' }, svg);
+    const lineStyle = 'stroke: var(--ink); stroke-width: 1.4; stroke-dasharray: 5 4';
+    mk('line', { x1: hx(-2), y1: hy(2), x2: hx(2), y2: hy(-2), style: lineStyle }, svg);
+    mk('line', { x1: hx(-2), y1: hy(-2), x2: hx(2), y2: hy(2), style: lineStyle }, svg);
+    mk('text', { x: HX, y: HY - 8, class: 'c-note' }, svg).textContent = 'w₁ᵀx = 0';
+    mk('text', { x: HX + HS, y: HY - 8, 'text-anchor': 'end', class: 'c-note' }, svg).textContent = 'w₂ᵀx = 0';
+    const u = 0.75 / Math.SQRT2;
+    mk('line', { x1: hx(0), y1: hy(0), x2: hx(u), y2: hy(u), class: 'c-arrow', 'marker-end': 'url(#nn-ah)' }, svg);
+    mk('line', { x1: hx(0), y1: hy(0), x2: hx(u), y2: hy(-u), class: 'c-arrow', 'marker-end': 'url(#nn-ah)' }, svg);
+    mk('text', { x: hx(u) + 6, y: hy(u) - 2, class: 'c-note', style: halo }, svg).textContent = 'w₁';
+    mk('text', { x: hx(u) + 6, y: hy(-u) + 12, class: 'c-note', style: halo }, svg).textContent = 'w₂';
+    [-2, 0, 2].forEach(v => {
+      mk('text', { x: hx(v), y: HY + HS + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = fmt(v, 0);
+      mk('text', { x: HX - 6, y: hy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = fmt(v, 0);
+    });
+    mk('text', { x: hx(1), y: HY + HS + 14, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'x₁';
+    mk('text', { x: HX - 6, y: hy(1) + 4, 'text-anchor': 'end', class: 'c-title' }, svg).textContent = 'x₂';
+    const dot = mk('circle', { r: 6, class: 'c-pt-hi' }, svg);
+    const legLo = mk('text', { x: HX, y: 348, class: 'c-tick' }, svg);
+    for (let k = 0; k < 10; k++) mk('rect', { x: 452 + k * 14, y: 339, width: 14, height: 10, style: `fill: var(--accent); fill-opacity: ${(0.04 + 0.56 * k / 9).toFixed(3)}` }, svg);
+    const legHi = mk('text', { x: 598, y: 348, class: 'c-tick' }, svg);
+
+    const shade = () => {
+      const ys = cells.map(c => fwd(c.q).y);
+      const lo = Math.min(...ys), hi = Math.max(...ys), span = (hi - lo) || 1;
+      cells.forEach((c, k) => c.r.setAttribute('fill-opacity', (0.04 + 0.56 * (ys[k] - lo) / span).toFixed(3)));
+      legLo.textContent = 'ŷ ' + fmt(lo); legHi.textContent = fmt(hi);
+    };
+    const draw = () => {
+      const r = fwd(p);
+      val.x1.textContent = fmt(p[0]); val.x2.textContent = fmt(p[1]);
+      val.h1.textContent = fmt(r.h[0]); val.h2.textContent = fmt(r.h[1]); val.o.textContent = fmt(r.y);
+      pre1.textContent = 'w₁ᵀx = ' + fmt(r.s[0]); pre2.textContent = 'w₂ᵀx = ' + fmt(r.s[1]);
+      rs1.textContent = fmt(r.s[0]); rs2.textContent = fmt(r.s[1]); ry.textContent = fmt(r.y);
+      o1.textContent = fmt(p[0]); o2.textContent = fmt(p[1]);
+      dot.setAttribute('cx', hx(p[0])); dot.setAttribute('cy', hy(p[1]));
+      r.s.forEach((s, i) => {
+        const yv = ay(ACT[act].f(s));
+        aDots[i].setAttribute('cx', ax(s)); aDots[i].setAttribute('cy', yv);
+        const right = s > r.s[1 - i] || (s === r.s[1 - i] && i === 1); aLbl[i].setAttribute('x', ax(s) + (right ? 8 : -8)); aLbl[i].setAttribute('y', yv - 8); aLbl[i].textContent = String(i + 1);
+      });
+      status.textContent = ACT[act].msg;
+    };
+    const setFrom = e => {
+      const q = svgPoint(svg, e); if (!q || q.x < HX || q.x > HX + HS || q.y < HY || q.y > HY + HS) return false;
+      const snap = v => Math.round(Math.max(-2, Math.min(2, v)) * 20) / 20;
+      p = [snap((q.x - HX) / HS * 4 - 2), snap(2 - (q.y - HY) / HS * 4)];
+      sl1.value = p[0]; sl2.value = p[1]; draw(); return true;
+    };
+    svg.addEventListener('pointerdown', e => { if (setFrom(e) && svg.setPointerCapture) svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener('pointermove', e => { if (e.buttons) setFrom(e); });
+    [sl1, sl2].forEach(s => s.addEventListener('input', () => { p = [parseFloat(sl1.value), parseFloat(sl2.value)]; draw(); }));
+    radios.forEach(rb => rb.addEventListener('change', () => { if (rb.checked) { act = rb.value; drawAct(); shade(); draw(); } }));
+    document.getElementById('nn-reset').addEventListener('click', () => {
+      const a = p.slice();
+      tween(0, 1, k => { p = [a[0] + (P0[0] - a[0]) * k, a[1] + (P0[1] - a[1]) * k]; sl1.value = p[0]; sl2.value = p[1]; draw(); });
+    });
+    drawAct(); shade(); draw();
+  })();
+})();
+</script>
+</body>
+</html>
