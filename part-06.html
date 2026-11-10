@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 6 · K-means and its convergence · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 6: lectures 13–15 on clustering, the K-means objective, Lloyd's algorithm and the proof that it converges.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 6 of 18</span><span class="sep">·</span><a href="part-05.html">← Part 5</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Clustering: the K-means objective, Lloyd's algorithm and why it stops</h1>
+    <p class="lede">Notes for lectures 13 to 15. Clustering splits the data into K groups and scores a split by how far each point sits from the mean of its own group; Lloyd's algorithm searches for a good split by alternately computing the group means and moving every point to the nearest mean. Every round that moves a point strictly lowers the score, and there are only finitely many splits, so the algorithm always stops, though not necessarily at the best split.</p>
+    <div class="meta">
+      <span><b>Part 6</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>63 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L13 · 17:00</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L14 · 12:20</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L15 · 33:15</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 13</h4>
+      <ul>
+        <li><a href="#beyond-pca">Structure PCA misses</a></li>
+        <li><a href="#partitions">Partitions into K boxes</a></li>
+        <li><a href="#objective">Scoring a partition</a></li>
+        <li><a href="#hardness">Too many partitions</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 14</h4>
+      <ul>
+        <li><a href="#lloyd">Lloyd's algorithm</a></li>
+        <li><a href="#stopping">When does it stop?</a></li>
+        <li><a href="#four-questions">Four questions</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 15</h4>
+      <ul>
+        <li><a href="#fact-one">Fact 1: the mean</a></li>
+        <li><a href="#proof-setup">Setting up the proof</a></li>
+        <li><a href="#reassign-step">Reassigning lowers the sum</a></li>
+        <li><a href="#mean-step">New means lower it again</a></li>
+        <li><a href="#finite">Why it must stop</a></li>
+        <li><a href="#caveats">What the proof does not say</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li><dfn>Clustering</dfn> is a second kind of unsupervised learning: split \(\mathbf{x}_1, \dots, \mathbf{x}_n \in \mathbb{R}^d\) into \(K\) groups. A split is written as cluster indicators \(z_1, \dots, z_n \in \{1, \dots, K\}\).</li>
+        <li>A partition is scored by \(F(z_1, \dots, z_n) = \sum_i \lVert \mathbf{x}_i - \boldsymbol{\mu}_{z_i} \rVert^2\), where \(\boldsymbol{\mu}_k\) is the mean of cluster \(k\). Minimizing \(F\) over all \(K^n\) assignments is the <b>K-means problem</b>, and it is NP-hard.</li>
+        <li><b>Lloyd's algorithm</b> (often called the K-means algorithm) starts from any partition and repeats two steps: compute each cluster's mean, then move each point to the nearest mean, staying put on a tie. It stops when no point moves.</li>
+        <li><b>Fact 1</b>: of all vectors \(\mathbf{v}\), the mean of a set of points minimizes the sum of squared distances to them.</li>
+        <li>The proof: reassignment makes the sum strictly smaller (measured with the old means), and recomputing the means cannot make it larger (Fact 1). So \(F\) strictly falls every round, no partition repeats, and with finitely many partitions the algorithm must converge.</li>
+        <li>The proof says nothing about how many rounds it takes, or about quality: Lloyd's algorithm can stop at a partition that is not the best one.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 13 ============ -->
+    <section id="beyond-pca">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=48s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 0:48</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=80s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 1:20 the PCA picture</a>
+        </div>
+        <h2>Structure that PCA does not report</h2>
+      </div>
+      <p>So far the unsupervised part of the course has been about <dfn>representation learning</dfn>: PCA in <a href="part-03.html">Part 3</a> and its kernel version in <a href="part-05.html">Part 5</a>. The second paradigm of unsupervised learning is <dfn>clustering</dfn>, and it is the topic of this part and the next.</p>
+      <p>The motivating picture has a few bunches of points in the plane. PCA would find the eigen direction of largest variance, which runs through the bunches, and replace every point by its proxy on that line (proxies were introduced in <a href="part-02.html">Part 2</a>). The line does hold most of the information. But the proxies are not spread evenly along it. They sit in clumps, so even inside the subspace PCA found there is more structure to uncover.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 300" role="img" aria-label="Left: eighteen points in three groups spread along a tilted line, the PCA direction w through them, and each point dropped onto the line as a proxy. Right: the coefficients of the proxies on one number line still fall into three separate groups.">
+            <text class="d-h" x="20" y="22">PCA keeps one line</text>
+            <line class="d-ln-acc" x1="24.8" y1="230.2" x2="375.8" y2="73.9" style="stroke-width:2"/>
+            <text class="d-s" x="377.8" y="91.9" text-anchor="end" style="fill: var(--accent)">w</text>
+            <line class="d-ln-mut" x1="52.4" y1="191.9" x2="62.1" y2="213.6"/><line class="d-ln-mut" x1="96.3" y1="231.9" x2="83.9" y2="203.9"/><line class="d-ln-mut" x1="90.8" y1="186" x2="96.3" y2="198.4"/><line class="d-ln-mut" x1="72.5" y1="220.2" x2="68.3" y2="210.8"/><line class="d-ln-mut" x1="74.9" y1="167" x2="90.1" y2="201.2"/><line class="d-ln-mut" x1="67" y1="241.2" x2="55.9" y2="216.4"/><line class="d-ln-mut" x1="188.4" y1="179.7" x2="180.2" y2="161.1"/><line class="d-ln-mut" x1="189.4" y1="123.4" x2="201.9" y2="151.4"/><line class="d-ln-mut" x1="228.1" y1="176.9" x2="214.3" y2="145.9"/><line class="d-ln-mut" x1="188.4" y1="146.2" x2="192.6" y2="155.5"/><line class="d-ln-mut" x1="213.6" y1="127.6" x2="220.5" y2="143.1"/><line class="d-ln-mut" x1="203" y1="195.6" x2="186.4" y2="158.3"/><line class="d-ln-mut" x1="296.4" y1="79.5" x2="307.5" y2="104.4"/><line class="d-ln-mut" x1="338.9" y1="116.4" x2="329.2" y2="94.7"/><line class="d-ln-mut" x1="335.8" y1="84.3" x2="338.6" y2="90.5"/><line class="d-ln-mut" x1="304.1" y1="113.3" x2="301.3" y2="107.1"/><line class="d-ln-mut" x1="306.4" y1="60.2" x2="323" y2="97.4"/><line class="d-ln-mut" x1="350.7" y1="126.1" x2="335.5" y2="91.9"/>
+            <circle class="c-proxy" cx="62.1" cy="213.6" r="3"/><circle class="c-proxy" cx="83.9" cy="203.9" r="3"/><circle class="c-proxy" cx="96.3" cy="198.4" r="3"/><circle class="c-proxy" cx="68.3" cy="210.8" r="3"/><circle class="c-proxy" cx="90.1" cy="201.2" r="3"/><circle class="c-proxy" cx="55.9" cy="216.4" r="3"/><circle class="c-proxy" cx="180.2" cy="161.1" r="3"/><circle class="c-proxy" cx="201.9" cy="151.4" r="3"/><circle class="c-proxy" cx="214.3" cy="145.9" r="3"/><circle class="c-proxy" cx="192.6" cy="155.5" r="3"/><circle class="c-proxy" cx="220.5" cy="143.1" r="3"/><circle class="c-proxy" cx="186.4" cy="158.3" r="3"/><circle class="c-proxy" cx="307.5" cy="104.4" r="3"/><circle class="c-proxy" cx="329.2" cy="94.7" r="3"/><circle class="c-proxy" cx="338.6" cy="90.5" r="3"/><circle class="c-proxy" cx="301.3" cy="107.1" r="3"/><circle class="c-proxy" cx="323" cy="97.4" r="3"/><circle class="c-proxy" cx="335.5" cy="91.9" r="3"/>
+            <circle class="pt-plain" cx="52.4" cy="191.9" r="4"/><circle class="pt-plain" cx="96.3" cy="231.9" r="4"/><circle class="pt-plain" cx="90.8" cy="186" r="4"/><circle class="pt-plain" cx="72.5" cy="220.2" r="4"/><circle class="pt-plain" cx="74.9" cy="167" r="4"/><circle class="pt-plain" cx="67" cy="241.2" r="4"/><circle class="pt-plain" cx="188.4" cy="179.7" r="4"/><circle class="pt-plain" cx="189.4" cy="123.4" r="4"/><circle class="pt-plain" cx="228.1" cy="176.9" r="4"/><circle class="pt-plain" cx="188.4" cy="146.2" r="4"/><circle class="pt-plain" cx="213.6" cy="127.6" r="4"/><circle class="pt-plain" cx="203" cy="195.6" r="4"/><circle class="pt-plain" cx="296.4" cy="79.5" r="4"/><circle class="pt-plain" cx="338.9" cy="116.4" r="4"/><circle class="pt-plain" cx="335.8" cy="84.3" r="4"/><circle class="pt-plain" cx="304.1" cy="113.3" r="4"/><circle class="pt-plain" cx="306.4" cy="60.2" r="4"/><circle class="pt-plain" cx="350.7" cy="126.1" r="4"/>
+            <text class="d-s" x="20" y="290">dots: data · rings: proxies on the line w · grey: projection</text>
+            <line class="d-rule" x1="420" y1="10" x2="420" y2="296"/>
+            <text class="d-h" x="440" y="22">Coefficients xᵢᵀw</text>
+            <line class="d-ln" x1="440" y1="160" x2="648" y2="160"/>
+            <line class="d-ln-acc" x1="454" y1="151" x2="454" y2="169"/><line class="d-ln-acc" x1="468" y1="151" x2="468" y2="169"/><line class="d-ln-acc" x1="476" y1="151" x2="476" y2="169"/><line class="d-ln-acc" x1="458" y1="151" x2="458" y2="169"/><line class="d-ln-acc" x1="472" y1="151" x2="472" y2="169"/><line class="d-ln-acc" x1="450" y1="151" x2="450" y2="169"/><line class="d-ln-acc" x1="530" y1="151" x2="530" y2="169"/><line class="d-ln-acc" x1="544" y1="151" x2="544" y2="169"/><line class="d-ln-acc" x1="552" y1="151" x2="552" y2="169"/><line class="d-ln-acc" x1="538" y1="151" x2="538" y2="169"/><line class="d-ln-acc" x1="556" y1="151" x2="556" y2="169"/><line class="d-ln-acc" x1="534" y1="151" x2="534" y2="169"/><line class="d-ln-acc" x1="612" y1="151" x2="612" y2="169"/><line class="d-ln-acc" x1="626" y1="151" x2="626" y2="169"/><line class="d-ln-acc" x1="632" y1="151" x2="632" y2="169"/><line class="d-ln-acc" x1="608" y1="151" x2="608" y2="169"/><line class="d-ln-acc" x1="622" y1="151" x2="622" y2="169"/><line class="d-ln-acc" x1="630" y1="151" x2="630" y2="169"/>
+            <path class="d-ln" d="M447 142 L447 136 L479 136 L479 142"/>
+            <text class="d-s" x="463" y="129" text-anchor="middle">group 1</text>
+            <path class="d-ln" d="M527 142 L527 136 L559 136 L559 142"/>
+            <text class="d-s" x="543" y="129" text-anchor="middle">group 2</text>
+            <path class="d-ln" d="M605 142 L605 136 L635 136 L635 142"/>
+            <text class="d-s" x="620" y="129" text-anchor="middle">group 3</text>
+            <text class="d-al" x="546" y="190" text-anchor="middle">one number per point</text>
+            <text class="d-s" x="440" y="246">The 1-D representation still</text>
+            <text class="d-s" x="440" y="262">falls into three groups.</text>
+          </svg>
+        </div>
+        <figcaption><b>Structure inside the PCA line.</b> Illustrative points in three bunches. Projecting onto the top PCA direction keeps the spread, and the single number left for each point still falls into three groups. Finding such groups directly is the clustering problem.</figcaption>
+      </figure>
+      <p class="rule-of-thumb">Question for this part: given data points, how do we uncover the groups they fall into?</p>
+    </section>
+
+    <section id="partitions">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=182s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 3:02</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=215s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 3:35 five points, three boxes</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=282s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 4:42 counting</a>
+        </div>
+        <h2>Partitions into K boxes</h2>
+      </div>
+      <p>The input is as usual \(\mathbf{x}_1, \dots, \mathbf{x}_n\), each in \(\mathbb{R}^d\). The goal is to partition them into \(K\) clusters. The lecture also calls them partitions, groups or simply boxes: every point must go into exactly one of \(K\) boxes.</p>
+      <p>There are many ways to do this. With five points and three boxes, one option is \(\{\mathbf{x}_1, \mathbf{x}_2, \mathbf{x}_5\}, \{\mathbf{x}_3\}, \{\mathbf{x}_4\}\). Another is \(\{\mathbf{x}_1, \mathbf{x}_4\}, \{\mathbf{x}_2\}, \{\mathbf{x}_3, \mathbf{x}_5\}\).</p>
+      <p>To count the options naively, let every point choose its box independently. Each of the five points has three choices, so there are</p>
+      <div class="eq">\[ 3 \times 3 \times 3 \times 3 \times 3 = 3^5 = 243 \]</div>
+      <p>possibilities. This count includes splits that leave some box empty. Even if those are excluded, the number grows exponentially in the number of points.</p>
+      <p class="note">Not needed for the course: of the 243, exactly 150 use all three boxes, and 25 remain if you also ignore which box carries which number.</p>
+      <p>With so many candidates we need a way to say how good each one is. That means a <b>performance measure</b>: a number attached to every partition of the given points.</p>
+    </section>
+
+    <section id="objective">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=377s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 6:17 notation</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=589s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 9:49 the measure</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=746s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 12:26 example</a>
+        </div>
+        <h2>Scoring a partition</h2>
+      </div>
+      <h3>Cluster indicators</h3>
+      <p>Attach to every point a <dfn>cluster indicator</dfn> \(z_i \in \{1, \dots, K\}\) that says which box \(\mathbf{x}_i\) goes into. If the tenth point is put in the fourth box, then \(z_{10} = 4\). Once \(z_1, \dots, z_n\) are given, the partition is fully determined.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>The two splits above</th><th>As indicators \((z_1, \dots, z_5)\)</th></tr></thead>
+          <tbody>
+            <tr><td>\(\{\mathbf{x}_1, \mathbf{x}_2, \mathbf{x}_5\}, \{\mathbf{x}_3\}, \{\mathbf{x}_4\}\)</td><td>\((1, 1, 2, 3, 1)\)</td></tr>
+            <tr><td>\(\{\mathbf{x}_1, \mathbf{x}_4\}, \{\mathbf{x}_2\}, \{\mathbf{x}_3, \mathbf{x}_5\}\)</td><td>\((1, 2, 3, 1, 3)\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Which box gets which number is a choice; the table numbers boxes in the order they were listed.</p>
+
+      <h3>How good is a partition? <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=484s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 8:04</a></h3>
+      <p>We want a function \(F(z_1, \dots, z_n)\) that returns one number for each partition. It depends on the data too, but the data is fixed, so only the \(z\)'s are written. There are many possible choices. A natural one asks each cluster to be <b>homogeneous</b>: its points should look alike.</p>
+      <p>One way to measure how alike a cluster's points are is to see how spread out they are around the cluster's mean. Add up the squared distance of each point to that mean. If all points in a cluster are identical, each one is at distance zero; if they are far apart, the total is large. Doing this for every cluster gives the measure the lecture adopts:</p>
+      <div class="eq">\[ F(z_1, \dots, z_n) = \sum_{i=1}^{n} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}_{z_i} \big\rVert^2, \qquad \boldsymbol{\mu}_k = \frac{\sum_{i=1}^{n} \mathbf{x}_i \, \mathbb{I}(z_i = k)}{\sum_{i=1}^{n} \mathbb{I}(z_i = k)} \]</div>
+      <p>Here \(\mathbb{I}(u)\) is the <dfn>indicator</dfn>: 1 if the statement \(u\) is true and 0 otherwise. The numerator of \(\boldsymbol{\mu}_k\) adds up exactly the points assigned to box \(k\), and the denominator counts them, so \(\boldsymbol{\mu}_k\) is the average of box \(k\). The distance is the squared Euclidean (\(\ell_2\)) distance, and \(\boldsymbol{\mu}_{z_i}\) is the mean of the box that \(\mathbf{x}_i\) is in. So \(F\) is the total squared distance from every point to the mean of its own box.</p>
+      <p class="note">Standard names: \(F\) is often called the K-means objective or the within-cluster sum of squares.</p>
+
+      <h3>The lecture's example</h3>
+      <p>Take five points and \(K = 2\) with \(z = (1, 2, 1, 1, 2)\). Box 1 holds \(\mathbf{x}_1, \mathbf{x}_3, \mathbf{x}_4\) and box 2 holds \(\mathbf{x}_2, \mathbf{x}_5\). Then</p>
+      <div class="eq">\[ \boldsymbol{\mu}_1 = \frac{\mathbf{x}_1 + \mathbf{x}_3 + \mathbf{x}_4}{3}, \qquad \boldsymbol{\mu}_2 = \frac{\mathbf{x}_2 + \mathbf{x}_5}{2} \]</div>
+      <div class="eq">\[ F = \lVert\mathbf{x}_1 - \boldsymbol{\mu}_1\rVert^2 + \lVert\mathbf{x}_2 - \boldsymbol{\mu}_2\rVert^2 + \lVert\mathbf{x}_3 - \boldsymbol{\mu}_1\rVert^2 + \lVert\mathbf{x}_4 - \boldsymbol{\mu}_1\rVert^2 + \lVert\mathbf{x}_5 - \boldsymbol{\mu}_2\rVert^2 \]</div>
+      <p>The lecture keeps the points abstract. To see actual numbers, give them illustrative coordinates \(\mathbf{x}_1 = (1, 1)\), \(\mathbf{x}_2 = (5, 4)\), \(\mathbf{x}_3 = (2, 1)\), \(\mathbf{x}_4 = (1, 2)\), \(\mathbf{x}_5 = (6, 5)\). Then \(\boldsymbol{\mu}_1 = (4/3, 4/3)\) and \(\boldsymbol{\mu}_2 = (5.5, 4.5)\), and the five terms are \(2/9,\ 1/2,\ 5/9,\ 5/9,\ 1/2\), so \(F = 7/3 \approx 2.33\).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 320" role="img" aria-label="The same five points split into two clusters in two ways. Left: x1, x3, x4 in cluster 1 and x2, x5 in cluster 2; every point is close to its cluster mean and the objective is 2.33. Right: x1, x2, x4 in cluster 1 and x3, x5 in cluster 2; the distances to the means are long and the objective is 31.33.">
+            <text class="d-h" x="20" y="22">z = (1, 2, 1, 1, 2)</text>
+            <text class="d-h" x="350" y="22">z = (1, 1, 2, 1, 2)</text>
+            <rect class="d-plot" x="20" y="26.400000000000006" width="294" height="231.0" rx="6"/>
+            <line class="d-ln-acc d-dash" x1="62" y1="228" x2="76" y2="214"/>
+            <line class="d-ln d-dash" x1="230" y1="102" x2="251" y2="81"/>
+            <line class="d-ln-acc d-dash" x1="104" y1="228" x2="76" y2="214"/>
+            <line class="d-ln-acc d-dash" x1="62" y1="186" x2="76" y2="214"/>
+            <line class="d-ln d-dash" x1="272" y1="60" x2="251" y2="81"/>
+            <circle class="pt-tree" cx="62" cy="228" r="5.5"/>
+            <text class="d-s" x="52" y="244" text-anchor="end">x₁</text>
+            <circle class="pt-no" cx="230" cy="102" r="5.5"/>
+            <text class="d-s" x="220" y="94" text-anchor="end">x₂</text>
+            <circle class="pt-tree" cx="104" cy="228" r="5.5"/>
+            <text class="d-s" x="114" y="244" text-anchor="start">x₃</text>
+            <circle class="pt-tree" cx="62" cy="186" r="5.5"/>
+            <text class="d-s" x="52" y="180" text-anchor="end">x₄</text>
+            <circle class="pt-no" cx="272" cy="60" r="5.5"/>
+            <text class="d-s" x="282" y="52" text-anchor="start">x₅</text>
+            <path class="pt-new" d="M76 208 L82 214 L76 220 L70 214 Z"/>
+            <path class="pt-new" d="M251 75 L257 81 L251 87 L245 81 Z"/>
+            <rect class="d-plot" x="350" y="26.400000000000006" width="294" height="231.0" rx="6"/>
+            <line class="d-ln-acc d-dash" x1="392" y1="228" x2="448" y2="172"/>
+            <line class="d-ln-acc d-dash" x1="560" y1="102" x2="448" y2="172"/>
+            <line class="d-ln d-dash" x1="434" y1="228" x2="518" y2="144"/>
+            <line class="d-ln-acc d-dash" x1="392" y1="186" x2="448" y2="172"/>
+            <line class="d-ln d-dash" x1="602" y1="60" x2="518" y2="144"/>
+            <circle class="pt-tree" cx="392" cy="228" r="5.5"/>
+            <text class="d-s" x="382" y="244" text-anchor="end">x₁</text>
+            <circle class="pt-tree" cx="560" cy="102" r="5.5"/>
+            <text class="d-s" x="550" y="94" text-anchor="end">x₂</text>
+            <circle class="pt-no" cx="434" cy="228" r="5.5"/>
+            <text class="d-s" x="444" y="244" text-anchor="start">x₃</text>
+            <circle class="pt-tree" cx="392" cy="186" r="5.5"/>
+            <text class="d-s" x="382" y="180" text-anchor="end">x₄</text>
+            <circle class="pt-no" cx="602" cy="60" r="5.5"/>
+            <text class="d-s" x="612" y="52" text-anchor="start">x₅</text>
+            <path class="pt-new" d="M448 166 L454 172 L448 178 L442 172 Z"/>
+            <path class="pt-new" d="M518 138 L524 144 L518 150 L512 144 Z"/>
+            <text class="d-s" x="88" y="208" style="fill: var(--accent)">μ₁</text>
+            <text class="d-s" x="261" y="95">μ₂</text>
+            <text class="d-s" x="440" y="162" text-anchor="end" style="fill: var(--accent)">μ₁</text>
+            <text class="d-s" x="528" y="158">μ₂</text>
+            <text class="d-t" x="20" y="302">F = 2/9 + 1/2 + 5/9 + 5/9 + 1/2 = 7/3 ≈ 2.33</text>
+            <text class="d-t" x="350" y="302">F = 46/3 + 16 = 94/3 ≈ 31.33</text>
+          </svg>
+        </div>
+        <figcaption><b>Same points, two partitions, two scores.</b> Illustrative coordinates chosen for these notes. Filled points are in box 1, hollow points in box 2, diamonds are the box means and dashes are the distances that \(F\) squares and adds. The left partition keeps every point near its own mean (\(F \approx 2.33\)); the right one does not (\(F \approx 31.33\)), so \(F\) prefers the left.</figcaption>
+      </figure>
+    </section>
+
+    <section id="hardness">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=843s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 14:03</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=A3UNtCuMm7Y&amp;t=938s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L13 · 15:38 NP-hard</a>
+        </div>
+        <h2>Too many partitions to check</h2>
+      </div>
+      <p>With a measure in place, the goal is precise: among all partitions, find the one with the smallest \(F\).</p>
+      <div class="result">
+        <span class="lbl">The K-means problem</span>
+        \[ \min_{z_1, \dots, z_n \,\in\, \{1, \dots, K\}} \;\; \sum_{i=1}^{n} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}_{z_i} \big\rVert^2 \]
+      </div>
+      <p>There are only finitely many partitions, so one could imagine a brute-force algorithm: compute \(F\) for every partition and keep the smallest. The trouble is how many there are. Each point has \(K\) choices, so there are \(K^n\) ways to put \(n\) points into \(K\) boxes. That is an upper bound, since it counts splits with empty boxes, but the true count also grows exponentially.</p>
+      <p>Computer scientists call this problem <dfn>NP-hard</dfn>. It is not expected that any algorithm solves it in time polynomial in the quantities of interest, here \(n\) and \(K\). A running time like \(n^2K^3\) would be acceptable; \(K^n\) is not. Even with \(K = 2\) and \(n = 1000\) points, brute force would examine \(2^{1000} \approx 10^{301}\) partitions.</p>
+      <p>So the plan changes. Instead of solving the problem exactly, the next lecture gives a very popular <b>heuristic</b> algorithm for it.</p>
+    </section>
+
+    <!-- ============ LECTURE 14 ============ -->
+    <section id="lloyd">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;t=12s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L14 · 0:12</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;t=139s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L14 · 2:19 compute means</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;t=216s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L14 · 3:36 reassign</a>
+        </div>
+        <h2>Lloyd's algorithm</h2>
+      </div>
+      <p>The algorithm is called <dfn>Lloyd's algorithm</dfn>, and it is often also called the K-means algorithm. The lecture points out that this second name is a slight misnomer. K-means is the name of the problem, finding \(K\) means that represent a partition, and Lloyd's algorithm is one heuristic way to attack it that need not solve it exactly.</p>
+      <p>It needs a starting partition \(z_1^0, \dots, z_n^0 \in \{1, \dots, K\}\), where the superscript is the iteration number. For now any starting partition will do; good ways to choose one are the topic of L17 in <a href="part-07.html">Part 7</a>.</p>
+      <ol class="algo">
+        <li class="algo-title">Lloyd's algorithm</li>
+        <li><b>Initialize.</b> Pick any partition \(z_1^0, \dots, z_n^0\). Set \(t = 0\).</li>
+        <li><b>Compute the means.</b> For every \(k\), \(\displaystyle \boldsymbol{\mu}_k^t = \frac{\sum_{i=1}^n \mathbf{x}_i\,\mathbb{I}(z_i^t = k)}{\sum_{i=1}^n \mathbb{I}(z_i^t = k)}\).</li>
+        <li><b>Reassign.</b> For every \(i\), \(\displaystyle z_i^{t+1} = \arg\min_{k} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}_k^t \big\rVert^2\). If the current cluster's mean is among the closest, keep \(z_i^{t+1} = z_i^t\).</li>
+        <li><b>Check.</b> If no point changed cluster, stop: the algorithm has converged. Otherwise set \(t \leftarrow t + 1\) and go back to computing the means.</li>
+      </ol>
+      <p>The crux is the reassignment step. Every point compares its squared distance to the mean of its own box with its squared distances to the means of all the other boxes. If some other mean is <b>strictly</b> closer, the point jumps to that box in the next round. If the closest other mean is exactly as close as its own, it does not jump. <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;t=328s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:28</a></p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 236" role="img" aria-label="Three cases of the reassignment rule for a point x in cluster 1. (a) Its own mean mu 1 is closer: it stays. (b) The mean mu 2 of another cluster is strictly closer: it moves to cluster 2. (c) The two means are equally far: it stays in cluster 1.">
+            <text class="d-t" x="14" y="24">(a) own mean closer</text>
+            <line class="d-ln-acc" x1="80" y1="66" x2="50" y2="140"/>
+            <line class="d-ln d-dash" x1="80" y1="66" x2="170" y2="140"/>
+            <path class="pt-new" d="M50 134 L56 140 L50 146 L44 140 Z"/><path class="pt-new" d="M170 134 L176 140 L170 146 L164 140 Z"/>
+            <text class="d-s" x="50" y="162" text-anchor="middle" style="fill: var(--accent)">μ₁</text>
+            <text class="d-s" x="170" y="162" text-anchor="middle">μ₂</text>
+            <circle class="pt-tree" cx="80" cy="66" r="6"/>
+            <text class="d-s" x="80" y="54" text-anchor="middle">x</text>
+            <text class="d-al" x="110" y="186" text-anchor="middle">d₁ &lt; d₂</text>
+            <text class="d-s" x="110" y="210" text-anchor="middle">z stays 1</text>
+            <line class="d-rule" x1="220" y1="14" x2="220" y2="200"/>
+            <text class="d-t" x="234" y="24">(b) another mean strictly closer</text>
+            <line class="d-ln d-dash" x1="360" y1="66" x2="270" y2="140"/>
+            <line class="d-ln-acc" x1="360" y1="66" x2="390" y2="140"/>
+            <path class="pt-new" d="M270 134 L276 140 L270 146 L264 140 Z"/><path class="pt-new" d="M390 134 L396 140 L390 146 L384 140 Z"/>
+            <text class="d-s" x="270" y="162" text-anchor="middle" style="fill: var(--accent)">μ₁</text>
+            <text class="d-s" x="390" y="162" text-anchor="middle">μ₂</text>
+            <circle class="pt-no" cx="360" cy="66" r="6"/>
+            <text class="d-s" x="360" y="54" text-anchor="middle">x</text>
+            <text class="d-al" x="330" y="186" text-anchor="middle">d₂ &lt; d₁</text>
+            <text class="d-s" x="330" y="210" text-anchor="middle">z changes from 1 to 2</text>
+            <line class="d-rule" x1="440" y1="14" x2="440" y2="200"/>
+            <text class="d-t" x="454" y="24">(c) a tie</text>
+            <line class="d-ln-acc" x1="550" y1="66" x2="490" y2="140"/>
+            <line class="d-ln d-dash" x1="550" y1="66" x2="610" y2="140"/>
+            <path class="pt-new" d="M490 134 L496 140 L490 146 L484 140 Z"/><path class="pt-new" d="M610 134 L616 140 L610 146 L604 140 Z"/>
+            <text class="d-s" x="490" y="162" text-anchor="middle" style="fill: var(--accent)">μ₁</text>
+            <text class="d-s" x="610" y="162" text-anchor="middle">μ₂</text>
+            <circle class="pt-tree" cx="550" cy="66" r="6"/>
+            <text class="d-s" x="550" y="54" text-anchor="middle">x</text>
+            <text class="d-al" x="550" y="186" text-anchor="middle">d₁ = d₂</text>
+            <text class="d-s" x="550" y="210" text-anchor="middle">z stays 1: no move on a tie</text>
+            <text class="d-al" x="14" y="230">dₖ = ‖x − μₖ‖² · filled: cluster 1 · hollow: cluster 2 · solid line: the box x goes to</text>
+          </svg>
+        </div>
+        <figcaption><b>The reassignment rule for one point.</b> A point \(\mathbf{x}\) in cluster 1 moves only when another cluster's mean is strictly closer, case (b). In a tie, case (c), it stays. The proof in Lecture 15 relies on this strictness.</figcaption>
+      </figure>
+
+      <figure id="lloyd-fig">
+        <div class="controls">
+          <label for="km-k">Number of clusters K</label>
+          <input type="range" id="km-k" min="2" max="5" step="1" value="4">
+          <output id="km-k-out" for="km-k">4</output>
+          <button class="btn" id="km-assign" type="button">Assign</button>
+          <button class="btn" id="km-update" type="button">Update centroids</button>
+          <button class="btn" id="km-run" type="button">Run to the end</button>
+          <button class="btn" id="km-reset" type="button">Reset</button>
+          <button class="btn" id="km-new" type="button">New start</button>
+          <label class="check" for="km-dist"><input type="checkbox" id="km-dist" checked> Show distances</label>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Round t</span><span class="v" id="km-t">0</span></div>
+          <div><span class="k">Sum of squared distances</span><span class="v mine" id="km-obj">–</span></div>
+          <div><span class="k">Moved in last Assign</span><span class="v" id="km-moved">–</span></div>
+        </div>
+        <div class="status" id="km-status" aria-live="polite"></div>
+        <div class="chart-wrap" id="km-wrap"><svg id="km-svg" viewBox="0 0 700 400" role="img" aria-label="Left: sixty-eight synthetic points in four groups, coloured and shaped by their current cluster, with each cluster's centroid and thin lines from points to their centroid. Right: the sum of squared distances after every step, which never increases."></svg></div>
+        <figcaption><b>Synthetic data: 68 points in four groups</b>, generated for this page with a seeded random generator. Each start is a random partition \(z^0\), made for this page by dropping K random sites in the square and putting every point in the box of the nearest site; its box means are the first centroids. Press Assign and Update centroids in turn. On the right, a dot is \(F\) after an update; a ring is the value just after Assign, with the new boxes but the old centroids, which is the intermediate quantity of the proof below. Neither step ever raises the value. With K = 4, press New start a few times: some starts stop at a partition with a much larger \(F\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="stopping">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;t=394s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L14 · 6:34</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;t=426s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L14 · 7:06 could it loop?</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;t=530s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L14 · 8:50 the claims</a>
+        </div>
+        <h2>When does it stop?</h2>
+      </div>
+      <p>Each round moves the algorithm from one partition to another. It has <dfn>converged</dfn> when it reaches a partition in which no point wants to jump: no point has another box whose mean is strictly closer than the mean of its own box. From then on nothing changes.</p>
+      <p>"Repeat until convergence" quietly assumes that this moment comes. It might not. The algorithm could go from one partition to a second, then a third, and then back to the first. It would then cycle forever, always changing partitions and never converging. The hope behind the algorithm is that each jump leads to a better partition, but a hope needs an argument.</p>
+      <p>The lecture states the facts now and proves the first one in Lecture 15:</p>
+      <ul>
+        <li><b>Lloyd's algorithm always converges.</b></li>
+        <li><b>The converged partition need not be optimal.</b> It may not solve the K-means problem. That is expected, since the problem is NP-hard, and it is something we have to live with.</li>
+        <li><b>In practice it works well.</b> It is a very popular algorithm and it produces reasonable clusters. <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;t=606s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:06</a></li>
+      </ul>
+    </section>
+
+    <section id="four-questions">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=QrXQ5cMzphA&amp;t=636s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L14 · 10:36</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=76s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 1:16</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=109s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 1:49 choosing K</a>
+        </div>
+        <h2>Four questions about Lloyd's algorithm</h2>
+      </div>
+      <p>Having the algorithm raises questions about where it works well and why. The lecture lists the four key ones, to be answered one by one:</p>
+      <ol>
+        <li><b>Convergence.</b> Does the algorithm converge? Answered in this part, below.</li>
+        <li><b>Nature of the clusters.</b> If it converges, what kind of clusters does it produce? (L16, <a href="part-07.html">Part 7</a>.)</li>
+        <li><b>Initialization.</b> The algorithm does not say how to choose \(z^0\). How should we? (L17, Part 7.)</li>
+        <li><b>Choice of K.</b> So far \(K\) is given. In a genuinely unsupervised setting nobody tells us how many natural groups the data has. (L18, Part 7.)</li>
+      </ol>
+      <p>On the last question, Lecture 15 gives an example where \(K\) is natural. A teacher who wants to turn exam marks into grades already knows the buckets, say S, A, B, C and D, so the number of grades fixes \(K\). In other problems we are only handed the points, and finding a good \(K\) is part of the job.</p>
+    </section>
+
+    <!-- ============ LECTURE 15 ============ -->
+    <section id="fact-one">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=172s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 2:52</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=208s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 3:28 Fact 1</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=343s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 5:43 the exercise</a>
+        </div>
+        <h2>Fact 1: the mean minimizes squared distance</h2>
+      </div>
+      <p>Lecture 15 answers the first question: yes, Lloyd's algorithm converges. The lecture adds that understanding the argument also hints at what the final partitions look like, which <a href="part-07.html">Part 7</a> takes up. The proof rests on one simple fact about points and distances.</p>
+      <p>Take any points \(\mathbf{x}_1, \dots, \mathbf{x}_l \in \mathbb{R}^d\) and look for the single vector \(\mathbf{v}\) that is closest to all of them in the sense of total squared distance.</p>
+      <div class="result">
+        <span class="lbl">Fact 1</span>
+        \[ \mathbf{v}^* = \arg\min_{\mathbf{v} \in \mathbb{R}^d} \sum_{i=1}^{l} \lVert \mathbf{x}_i - \mathbf{v} \rVert^2 = \frac{1}{l}\sum_{i=1}^{l} \mathbf{x}_i \]
+        <p>The minimizer is the mean of the points. In other words, \(\sum_i \lVert\mathbf{x}_i - \text{mean}\rVert^2 \le \sum_i \lVert\mathbf{x}_i - \mathbf{v}\rVert^2\) for every \(\mathbf{v}\).</p>
+      </div>
+      <p>Using the average \(\frac1l\sum_i\) instead of the sum would not change the answer, since the average is the sum scaled by a constant. The lecture works with the sum because \(F\) was defined as a sum.</p>
+      <p>The lecture leaves the derivation as an exercise, recommended especially if you are not used to differentiating with respect to a vector. Treat the objective as a function of \(\mathbf{v}\), take its gradient (one partial derivative per component) and set it to zero:</p>
+      <div class="eq">\[ g(\mathbf{v}) = \sum_{i=1}^{l} (\mathbf{x}_i - \mathbf{v})^\top(\mathbf{x}_i - \mathbf{v}), \qquad \nabla_{\mathbf{v}}\, g = \sum_{i=1}^{l} -2(\mathbf{x}_i - \mathbf{v}) = -2\Big(\sum_{i=1}^{l}\mathbf{x}_i - l\,\mathbf{v}\Big) = \mathbf{0} \;\;\Longrightarrow\;\; \mathbf{v} = \frac1l\sum_{i=1}^{l}\mathbf{x}_i \]</div>
+      <p>A quick check that this point is a minimum, which the lecture does not do: write \(\bar{\mathbf{x}}\) for the mean and split \(\mathbf{x}_i - \mathbf{v} = (\mathbf{x}_i - \bar{\mathbf{x}}) + (\bar{\mathbf{x}} - \mathbf{v})\). Expanding the square, the cross terms add up to \(2(\bar{\mathbf{x}} - \mathbf{v})^\top \sum_i (\mathbf{x}_i - \bar{\mathbf{x}})\), which is zero because the deviations from the mean sum to zero. So</p>
+      <div class="eq">\[ \sum_{i=1}^{l} \lVert \mathbf{x}_i - \mathbf{v} \rVert^2 = \sum_{i=1}^{l} \lVert \mathbf{x}_i - \bar{\mathbf{x}} \rVert^2 + l\,\lVert \bar{\mathbf{x}} - \mathbf{v} \rVert^2 \]</div>
+      <p>Any \(\mathbf{v}\) other than the mean pays exactly \(l\,\lVert\bar{\mathbf{x}} - \mathbf{v}\rVert^2\) extra.</p>
+    </section>
+
+    <section id="proof-setup">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=413s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 6:53</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=514s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 8:34 assume a reassignment</a>
+        </div>
+        <h2>Setting up the proof</h2>
+      </div>
+      <p>Look at some iteration \(t\). The current assignment is \(z_1^t, \dots, z_n^t\) (superscript: iteration, subscript: point), each a value in \(\{1, \dots, K\}\), and \(\boldsymbol{\mu}_k^t\) is the mean of cluster \(k\) under this assignment.</p>
+      <p>If no point is reassigned at step \(t\), the algorithm has converged and there is nothing to prove. So assume it has not converged. Then at least one point is unhappy with its own mean: it has found another box whose mean is strictly closer. The reassignment step produces \(z_1^{t+1}, \dots, z_n^{t+1}\), and some points have moved. The question is whether this is a better partition, measured by \(F\).</p>
+      <p>The argument compares three sums of squared distances. They differ only in which box and which mean each point is measured against.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Quantity</th><th>Each \(\mathbf{x}_i\) is measured to</th><th>Formula</th></tr></thead>
+          <tbody>
+            <tr><td>\(F(z^t)\), current objective</td><td>round-\(t\) mean of its current box</td><td>\(\sum_i \lVert\mathbf{x}_i - \boldsymbol{\mu}^t_{z_i^t}\rVert^2\)</td></tr>
+            <tr><td>Intermediate quantity</td><td>round-\(t\) mean of the box it wants to go to</td><td>\(\sum_i \lVert\mathbf{x}_i - \boldsymbol{\mu}^t_{z_i^{t+1}}\rVert^2\)</td></tr>
+            <tr><td>\(F(z^{t+1})\), next objective</td><td>round-\((t{+}1)\) mean of its new box</td><td>\(\sum_i \lVert\mathbf{x}_i - \boldsymbol{\mu}^{t+1}_{z_i^{t+1}}\rVert^2\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The proof shows \(F(z^{t+1}) \le \text{intermediate} &lt; F(z^t)\), one inequality at a time.</p>
+    </section>
+
+    <section id="reassign-step">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=661s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 11:01</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=835s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 13:55 why strict</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=899s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 14:59 not yet F</a>
+        </div>
+        <h2>Step 1: reassigning lowers the sum</h2>
+      </div>
+      <p>The claim is</p>
+      <div class="eq">\[ \sum_{i=1}^{n} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}^t_{z_i^{t+1}} \big\rVert^2 \;&lt;\; \sum_{i=1}^{n} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}^t_{z_i^{t}} \big\rVert^2 = F(z_1^t, \dots, z_n^t) \]</div>
+      <p>The right side is the current objective: since \(z_i^t\) is by definition the box of \(\mathbf{x}_i\) at round \(t\), it adds up each point's squared distance to its own mean. The left side measures each point against the mean of the box it <i>wants to go to</i>, still using the round-\(t\) means \(\boldsymbol{\mu}_1^t, \dots, \boldsymbol{\mu}_K^t\). Compare the two sums term by term.</p>
+      <ol>
+        <li><b>A point that stays</b> has \(z_i^{t+1} = z_i^t\). Both sides measure it against the same mean, so its two terms are equal.</li>
+        <li><b>A point that moves</b> jumped only because the mean of its new box is strictly closer than its own mean. Its term on the left is strictly smaller than its term on the right.</li>
+        <li>No term on the left is larger than its partner on the right, since \(z_i^{t+1}\) picks the closest round-\(t\) mean.</li>
+        <li>Because the algorithm has not converged, at least one point moves. So the left sum is strictly smaller than the right sum.</li>
+      </ol>
+      <p>This inequality holds simply by the algorithm's choice: it jumps only on a strict improvement.</p>
+      <p class="callout">The left side is <b>not</b> the objective of the next partition. The points have only announced where they want to go. Once they all move, each box has new members and therefore a new mean, and \(F(z^{t+1})\) measures every point against that new mean. The left side is an intermediate quantity that sits between the two objectives.</p>
+    </section>
+
+    <section id="mean-step">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=969s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 16:09</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=1098s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 18:18 one cluster</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=1271s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 21:11 use Fact 1</a>
+        </div>
+        <h2>Step 2: new means lower it again</h2>
+      </div>
+      <p>The second claim compares the next objective with the intermediate quantity:</p>
+      <div class="eq">\[ F(z_1^{t+1}, \dots, z_n^{t+1}) = \sum_{i=1}^{n} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}^{t+1}_{z_i^{t+1}} \big\rVert^2 \;\le\; \sum_{i=1}^{n} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}^{t}_{z_i^{t+1}} \big\rVert^2 \]</div>
+      <p>Focus on a single cluster \(k\). At round \(t\) it had some members and the mean \(\boldsymbol{\mu}_k^t\). During reassignment, some members are happy and stay. Some find a closer mean elsewhere and leave. Some points from other clusters find \(\boldsymbol{\mu}_k^t\) closer than their own mean and arrive. Call the resulting set of members \(C_k = \{\, i : z_i^{t+1} = k \,\}\).</p>
+      <ul>
+        <li>In the <b>intermediate quantity</b>, every \(i \in C_k\) contributes \(\lVert\mathbf{x}_i - \boldsymbol{\mu}_k^t\rVert^2\), because \(z_i^{t+1} = k\) means \(\boldsymbol{\mu}^t_{z_i^{t+1}} = \boldsymbol{\mu}^t_k\). Each such point either stayed after comparing itself with \(\boldsymbol{\mu}_k^t\), or compared itself with \(\boldsymbol{\mu}_k^t\) and jumped in.</li>
+        <li>In \(F(z^{t+1})\), every \(i \in C_k\) contributes \(\lVert\mathbf{x}_i - \boldsymbol{\mu}_k^{t+1}\rVert^2\), where \(\boldsymbol{\mu}_k^{t+1}\) is the mean of exactly these points.</li>
+      </ul>
+      <p>So both sides measure the same set of points, once against an arbitrary vector \(\boldsymbol{\mu}_k^t\) and once against their own mean. Fact 1 says their own mean always wins. Written out, step by step:</p>
+      <div class="eq">\[ \begin{aligned} F(z^{t+1}) &amp;= \sum_{i=1}^{n} \sum_{k=1}^{K} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}_k^{t+1} \big\rVert^2\, \mathbb{I}(z_i^{t+1} = k) &amp;&amp; \text{split the sum by cluster} \\ &amp;= \sum_{k=1}^{K} \sum_{i \in C_k} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}_k^{t+1} \big\rVert^2 &amp;&amp; \text{definition of } C_k \\ &amp;\le \sum_{k=1}^{K} \sum_{i \in C_k} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}_k^{t} \big\rVert^2 &amp;&amp; \text{Fact 1 on } C_k \text{ with } \mathbf{v} = \boldsymbol{\mu}_k^t \\ &amp;= \sum_{i=1}^{n} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}^{t}_{z_i^{t+1}} \big\rVert^2 &amp;&amp; i \in C_k \iff z_i^{t+1} = k \end{aligned} \]</div>
+      <p class="note">A box that ends up with no members contributes nothing to either side. The lecture does not discuss that case.</p>
+      <p>The lecture's picture of this step is that after each round of moves, the points of every cluster are, on the whole, drawn closer together around their centre.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 318" role="img" aria-label="One cluster k across a reassignment. Left: two old members leave, two points join, and the five members of the new cluster are measured to the old mean, total 14.46. Right: the same five members measured to their own new mean, total 5.35, smaller as Fact 1 says.">
+            <defs><marker id="p06-ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="p06-ah5a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-t" x="20" y="22">Intermediate: new members vs old mean μₖᵗ</text>
+            <rect class="d-plot" x="20" y="36" width="270" height="228" rx="6"/>
+            <line class="d-ln-acc d-dash" x1="155" y1="125" x2="123" y2="150"/>
+            <line class="d-ln-acc d-dash" x1="185" y1="140" x2="123" y2="150"/>
+            <line class="d-ln-acc d-dash" x1="150" y1="190" x2="123" y2="150"/>
+            <line class="d-ln-acc d-dash" x1="240" y1="120" x2="123" y2="150"/>
+            <line class="d-ln-acc d-dash" x1="220" y1="215" x2="123" y2="150"/>
+            <circle class="d-off" cx="55" cy="75" r="5"/>
+            <line class="d-ln" x1="48.4" y1="70.4" x2="30.4" y2="57.8" marker-end="url(#p06-ah5)"/>
+            <circle class="d-off" cx="70" cy="220" r="5"/>
+            <line class="d-ln" x1="63.5" y1="224.7" x2="45.7" y2="237.6" marker-end="url(#p06-ah5)"/>
+            <text class="d-s" x="65" y="79">leaves</text>
+            <text class="d-s" x="80" y="236">leaves</text>
+            <line class="d-ln-acc" x1="274" y1="106" x2="248" y2="117" marker-end="url(#p06-ah5a)"/>
+            <line class="d-ln-acc" x1="254" y1="201" x2="228" y2="212" marker-end="url(#p06-ah5a)"/>
+            <text class="d-s" x="252" y="98" text-anchor="middle">joins</text>
+            <text class="d-s" x="232" y="193" text-anchor="middle">joins</text>
+            <circle class="pt-tree" cx="155" cy="125" r="5"/>
+            <circle class="pt-tree" cx="185" cy="140" r="5"/>
+            <circle class="pt-tree" cx="150" cy="190" r="5"/>
+            <circle class="pt-tree" cx="240" cy="120" r="5"/>
+            <circle class="pt-tree" cx="220" cy="215" r="5"/>
+            <path class="pt-new" d="M123 144 L129 150 L123 156 L117 150 Z"/>
+            <text class="d-s" x="123" y="172" text-anchor="middle">μₖᵗ</text>
+            <text class="d-t" x="20" y="300">sum of squared distances = 14.46</text>
+            <text class="d-t" x="350" y="22">F(zᵗ⁺¹): same members vs new mean μₖᵗ⁺¹</text>
+            <rect class="d-plot" x="350" y="36" width="270" height="228" rx="6"/>
+            <line class="d-ln-acc d-dash" x1="485" y1="125" x2="520" y2="158"/>
+            <line class="d-ln-acc d-dash" x1="515" y1="140" x2="520" y2="158"/>
+            <line class="d-ln-acc d-dash" x1="480" y1="190" x2="520" y2="158"/>
+            <line class="d-ln-acc d-dash" x1="570" y1="120" x2="520" y2="158"/>
+            <line class="d-ln-acc d-dash" x1="550" y1="215" x2="520" y2="158"/>
+            <path class="pt-no" d="M453 144 L459 150 L453 156 L447 150 Z"/>
+            <line class="d-ln" x1="462" y1="149" x2="510" y2="159" marker-end="url(#p06-ah5)"/>
+            <text class="d-s" x="453" y="172" text-anchor="middle">old mean</text>
+            <circle class="pt-tree" cx="485" cy="125" r="5"/>
+            <circle class="pt-tree" cx="515" cy="140" r="5"/>
+            <circle class="pt-tree" cx="480" cy="190" r="5"/>
+            <circle class="pt-tree" cx="570" cy="120" r="5"/>
+            <circle class="pt-tree" cx="550" cy="215" r="5"/>
+            <path class="pt-new" d="M520 152 L526 158 L520 164 L514 158 Z"/>
+            <text class="d-s" x="534" y="172">μₖᵗ⁺¹</text>
+            <text class="d-t" x="350" y="300">sum of squared distances = 5.35</text>
+          </svg>
+        </div>
+        <figcaption><b>One cluster across a round, with illustrative coordinates.</b> Left: two old members leave, two points join, and the five new members are measured to the old mean \(\boldsymbol{\mu}_k^t\), as in the intermediate quantity (total 14.46). Right: the same five points measured to their own mean \(\boldsymbol{\mu}_k^{t+1}\) (total 5.35). Two of the stayers end up slightly farther from the centre, yet the total falls, because Fact 1 is about the sum. The gap, 9.11, equals \(5\,\lVert\boldsymbol{\mu}_k^{t+1} - \boldsymbol{\mu}_k^t\rVert^2\), as the identity in Fact 1 predicts.</figcaption>
+      </figure>
+    </section>
+
+    <section id="finite">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=1534s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 25:34</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=1640s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 27:20 why this means stopping</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=1741s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 29:01 finitely many</a>
+        </div>
+        <h2>Strict decrease, and why it forces a stop</h2>
+      </div>
+      <p>Put the two steps side by side. The first sum below is \(F(z^t)\) and the last is \(F(z^{t+1})\); the intermediate quantity sits between them:</p>
+      <div class="eq">\[ F(z_1^{t+1}, \dots, z_n^{t+1}) \;\le\; \sum_{i=1}^{n} \big\lVert \mathbf{x}_i - \boldsymbol{\mu}^{t}_{z_i^{t+1}} \big\rVert^2 \;&lt;\; F(z_1^{t}, \dots, z_n^{t}) \]</div>
+      <div class="result">
+        <span class="lbl">Result</span>
+        <p>Whenever a reassignment happens, the objective strictly decreases:</p>
+        \[ F(z_1^{t+1}, \dots, z_n^{t+1}) \;&lt;\; F(z_1^{t}, \dots, z_n^{t}) \]
+      </div>
+      <p>Strict decrease alone does not prove convergence, since in general a quantity can keep decreasing forever. Here each value belongs to a partition, and three observations finish the proof.</p>
+      <ol>
+        <li><b>No partition can repeat.</b> Every round with a reassignment gives a partition with strictly smaller \(F\) than all the partitions visited before it. A repeated partition would need the same value of \(F\), which is impossible.</li>
+        <li><b>There are finitely many partitions.</b> At most \(K^n\). The number is huge but finite.</li>
+        <li><b>So the reassignments must stop.</b> Think of crossing a partition off the list each time it is visited. A finite list runs out, so eventually a round comes with no reassignment, which is exactly convergence.</li>
+      </ol>
+      <p>The finiteness of the set of partitions is what turns "the objective keeps going down" into "the algorithm stops".</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 296" role="img" aria-label="Left: one round of the proof. The objective of the current partition drops strictly to the intermediate quantity when points are reassigned, then does not rise when the means are recomputed. Right: across rounds the objective strictly falls, so no partition repeats; with at most K to the n partitions the rounds must stop.">
+            <defs><marker id="p06-ah6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="20" y="22">One round</text>
+            <line class="d-ln" x1="175" y1="64" x2="245" y2="64" style="stroke-width:3"/>
+            <text class="d-t" x="165" y="62" text-anchor="end">F(zᵗ)</text>
+            <text class="d-al" x="165" y="77" text-anchor="end">old boxes, old means</text>
+            <line class="d-ln" x1="175" y1="150" x2="245" y2="150" style="stroke-width:3"/>
+            <text class="d-t" x="165" y="148" text-anchor="end">intermediate</text>
+            <text class="d-al" x="165" y="163" text-anchor="end">new boxes, old means</text>
+            <line class="d-ln" x1="175" y1="226" x2="245" y2="226" style="stroke-width:3"/>
+            <text class="d-t" x="165" y="224" text-anchor="end">F(zᵗ⁺¹)</text>
+            <text class="d-al" x="165" y="239" text-anchor="end">new boxes, new means</text>
+            <line class="d-ln-acc" x1="210" y1="70" x2="210" y2="143" marker-end="url(#p06-ah6)"/>
+            <line class="d-ln-acc" x1="210" y1="156" x2="210" y2="219" marker-end="url(#p06-ah6)"/>
+            <text class="d-t" x="223" y="100">reassign: &lt;</text><text class="d-s" x="223" y="116">a point moved to a</text><text class="d-s" x="223" y="130">strictly closer mean</text>
+            <text class="d-t" x="223" y="180">recompute means: ≤</text><text class="d-s" x="223" y="196">Fact 1, cluster by cluster</text>
+            <text class="d-al" x="33" y="276">lower line = smaller objective</text>
+            <line class="d-rule" x1="362" y1="10" x2="362" y2="286"/>
+            <text class="d-h" x="380" y="22">Round after round</text>
+            <rect class="d-box" x="392" y="56" width="28" height="150" rx="3"/>
+            <text class="d-s" x="406" y="222" text-anchor="middle">F(z⁰)</text>
+            <rect class="d-box" x="436" y="102" width="28" height="104" rx="3"/>
+            <text class="d-s" x="450" y="222" text-anchor="middle">F(z¹)</text>
+            <rect class="d-box" x="480" y="128" width="28" height="78" rx="3"/>
+            <text class="d-s" x="494" y="222" text-anchor="middle">F(z²)</text>
+            <rect class="d-box" x="524" y="144" width="28" height="62" rx="3"/>
+            <text class="d-s" x="538" y="222" text-anchor="middle">F(z³)</text>
+            <rect class="d-box" x="568" y="150" width="28" height="56" rx="3"/>
+            <text class="d-s" x="582" y="222" text-anchor="middle">F(z⁴)</text>
+            <text class="d-s" x="626" y="166" text-anchor="middle">no move:</text>
+            <text class="d-s" x="626" y="182" text-anchor="middle">stop</text>
+            <line class="d-rule" x1="384" y1="206" x2="650" y2="206"/>
+            <text class="d-s" x="380" y="248">Every bar is lower than all bars before it,</text>
+            <text class="d-s" x="380" y="264">so no partition can come back. At most Kⁿ</text>
+            <text class="d-s" x="380" y="280">partitions exist, so the rounds must end.</text>
+          </svg>
+        </div>
+        <figcaption><b>The convergence argument in one picture.</b> Left: inside one round, reassignment gives a strict drop and recomputing the means gives a drop or no change. Right: across rounds, the objective of the visited partitions strictly falls (schematic heights), so none can be revisited. With at most \(K^n\) partitions, the run must end at a round where no point moves.</figcaption>
+      </figure>
+    </section>
+
+    <section id="caveats">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=1820s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 30:20</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=1854s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 30:54 no bound on rounds</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5geXmawaImk&amp;t=1922s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L15 · 32:02 local minima</a>
+        </div>
+        <h2>What the proof does not say</h2>
+      </div>
+      <p>To summarize: every reassignment strictly lowers the sum of squared distances from points to the means of their clusters, so at some point every point is happy with its own cluster and nothing changes any more. The lecture is careful about two things this does <b>not</b> claim.</p>
+      <ul>
+        <li><b>It does not say how many rounds.</b> The finiteness argument would allow on the order of \(K^n\) rounds in the worst case, but it does not say the algorithm needs that many. In practice Lloyd's algorithm converges very fast on most data sets. The argument only guarantees that it stops.</li>
+        <li><b>It does not say the result is good.</b> Converging does not mean reaching the smallest objective over all partitions. The algorithm can stop at a partition where everybody is happy and nothing changes, yet some other partition has a smaller \(F\). In this sense it can converge to a <dfn>local minimum</dfn>.</li>
+      </ul>
+      <p>What the argument does give is important: the algorithm can never get stuck in a loop of partitions, so "repeat until convergence" is a valid stopping rule. Without it we would not know whether the algorithm ever stops.</p>
+      <p>The next lecture studies the nature of the clusters that Lloyd's algorithm produces. That, initialization and the choice of \(K\) are in <a href="part-07.html">Part 7</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Clustering</dt><dd>Unsupervised task of partitioning data points into \(K\) groups of similar points.</dd></div>
+        <div><dt>Partition (cluster, box)</dt><dd>A split of the points in which every point belongs to exactly one of \(K\) groups.</dd></div>
+        <div><dt>Cluster indicator \(z_i\)</dt><dd>The number in \(\{1, \dots, K\}\) of the box that \(\mathbf{x}_i\) is assigned to; \(z_1, \dots, z_n\) determine the partition.</dd></div>
+        <div><dt>Cluster mean \(\boldsymbol{\mu}_k\)</dt><dd>Average of the points with \(z_i = k\). Also called the centroid of cluster \(k\).</dd></div>
+        <div><dt>K-means objective \(F\)</dt><dd>\(\sum_i \lVert\mathbf{x}_i - \boldsymbol{\mu}_{z_i}\rVert^2\): total squared distance from each point to its own cluster mean.</dd></div>
+        <div><dt>K-means problem</dt><dd>Minimizing \(F\) over all \(K^n\) assignments; NP-hard.</dd></div>
+        <div><dt>NP-hard</dt><dd>No algorithm is expected to solve the problem in time polynomial in \(n\) and \(K\).</dd></div>
+        <div><dt>Lloyd's algorithm</dt><dd>Heuristic for the K-means problem: alternate between computing cluster means and reassigning points to the nearest mean.</dd></div>
+        <div><dt>Reassignment step</dt><dd>\(z_i^{t+1} = \arg\min_k \lVert\mathbf{x}_i - \boldsymbol{\mu}_k^t\rVert^2\); a point moves only if another mean is strictly closer.</dd></div>
+        <div><dt>Convergence</dt><dd>Reaching a partition where no point wants to change cluster, after which nothing changes.</dd></div>
+        <div><dt>Fact 1</dt><dd>The mean of a set of points minimizes the sum of squared distances to them.</dd></div>
+        <div><dt>Intermediate quantity</dt><dd>\(\sum_i \lVert\mathbf{x}_i - \boldsymbol{\mu}^t_{z_i^{t+1}}\rVert^2\): new boxes, old means. It lies between \(F(z^{t+1})\) and \(F(z^t)\).</dd></div>
+        <div><dt>Local minimum</dt><dd>A converged partition that no single round can improve, but whose \(F\) is not the smallest possible.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>With the naive count, in how many ways can 10 points be put into 3 boxes? Why is this only an upper bound on the number of genuine 3-cluster partitions?</span><span class="tog"></span></summary>
+          <p>Each point has 3 choices, so \(3^{10} = 59{,}049\). The count includes assignments that leave a box empty (and treats relabellings of the boxes as different), so the number of genuine 3-cluster partitions is smaller, though still exponential in \(n\).</p></details>
+        <details><summary><span class="q">Q2</span><span>One-dimensional points 1, 2, 6, 7. Compute \(F\) for \(z = (1, 1, 2, 2)\) and for \(z = (1, 2, 2, 2)\).</span><span class="tog"></span></summary>
+          <p>First: \(\mu_1 = 1.5\), \(\mu_2 = 6.5\), every point is 0.5 away, so \(F = 4 \times 0.25 = 1\). Second: \(\mu_1 = 1\), \(\mu_2 = 5\), so \(F = 0 + 9 + 1 + 4 = 14\). The first partition is much better.</p></details>
+        <details><summary><span class="q">Q3</span><span>Which \(v\) minimizes \((1 - v)^2 + (2 - v)^2 + (6 - v)^2\)? Check the Fact 1 identity at \(v = 2\).</span><span class="tog"></span></summary>
+          <p>By Fact 1, the mean \(v = 3\), with value \(4 + 1 + 9 = 14\). At \(v = 2\) the value is \(1 + 0 + 16 = 17 = 14 + 3\,(3 - 2)^2\), as the identity \(\sum(x_i - v)^2 = \sum(x_i - \bar x)^2 + l(\bar x - v)^2\) predicts.</p></details>
+        <details><summary><span class="q">Q4</span><span>Points 0, 2, 3, 9, 10 with \(K = 2\) and \(z^0 = (1, 1, 2, 2, 2)\). Run one round of Lloyd's algorithm and compute \(F(z^0)\), the intermediate quantity and \(F(z^1)\). Does it then stop?</span><span class="tog"></span></summary>
+          <p>Means: \(\mu_1^0 = 1\), \(\mu_2^0 = 22/3 \approx 7.33\). \(F(z^0) = 1 + 1 + 18.78 + 2.78 + 7.11 \approx 30.67\). Point 3 is at squared distance 4 from \(\mu_1^0\) and 18.78 from \(\mu_2^0\), so it moves; nothing else does: \(z^1 = (1, 1, 1, 2, 2)\). Intermediate: \(1 + 1 + 4 + 2.78 + 7.11 \approx 15.89\). New means \(5/3\) and \(9.5\) give \(F(z^1) = 25/9 + 1/9 + 16/9 + 0.25 + 0.25 \approx 5.17\). So \(5.17 \le 15.89 &lt; 30.67\). In the next reassignment every point is already nearest its own mean, so the algorithm has converged.</p></details>
+        <details><summary><span class="q">Q5</span><span>Why is the intermediate quantity not the objective of the new partition?</span><span class="tog"></span></summary>
+          <p>It measures each point against the round-\(t\) mean of the box it is moving to. After the moves each box has different members, hence a different mean, and \(F(z^{t+1})\) uses those new means.</p></details>
+        <details><summary><span class="q">Q6</span><span>Why does the proof need the rule "move only if another mean is strictly closer"?</span><span class="tog"></span></summary>
+          <p>It makes Step 1 a strict inequality whenever the partition changes. If points could also switch on ties, the partition could change while \(F\) stayed the same, and then nothing would stop the algorithm from returning to an earlier partition and cycling.</p></details>
+        <details><summary><span class="q">Q7</span><span>One-dimensional points 0, 1, 10, 11, 20, 21 with \(K = 3\) and the partition \(\{0, 1, 10, 11\}, \{20\}, \{21\}\). Has Lloyd's algorithm converged here? Is this the best partition?</span><span class="tog"></span></summary>
+          <p>The means are 5.5, 20 and 21. Point 11 is at squared distance 30.25 from 5.5 and 81 from 20, point 10 at 20.25 versus 100, and the rest are even more settled, so no point moves: it has converged, with \(F = 30.25 + 20.25 + 20.25 + 30.25 = 101\). The partition \(\{0, 1\}, \{10, 11\}, \{20, 21\}\) has \(F = 6 \times 0.25 = 1.5\). Converged does not mean optimal.</p></details>
+        <details><summary><span class="q">Q8</span><span>The proof uses the bound "at most \(K^n\) partitions". Does that mean Lloyd's algorithm takes about \(K^n\) rounds?</span><span class="tog"></span></summary>
+          <p>No. The bound only shows that the number of rounds is finite. It is a worst-case argument and says nothing about the actual count; in practice the algorithm converges in few rounds.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-05.html"><span class="dir">← Part 5</span><span class="nm">Feature maps, kernels and kernel PCA</span></a><a class="next" href="index.html"><span class="dir">Part 7 · coming</span><span class="nm">K-means: geometry, initialization, choosing K</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+
+  /* ---------- Lloyd's algorithm, one step at a time ---------- */
+  (() => {
+    const svg = document.getElementById('km-svg'); if (!svg) return;
+    let seed = 606;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const blobs = [[-3.6, 2.8, 0.95, 18], [2.9, 3.6, 1.0, 16], [-1.4, -3.2, 1.1, 20], [3.8, -1.8, 0.85, 14]];
+    const pts = [];
+    blobs.forEach(([cx, cy, s, m]) => { for (let i = 0; i < m; i++) pts.push([cx + s * normal(), cy + s * normal()]); });
+    const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
+    const lo = -6, hi = 6, P = 20, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    axes(svg, sx, sy, lo, hi, 2);
+    mk('line', { x1: 410, x2: 410, y1: 14, y2: 386, class: 'c-faint' }, svg);
+
+    /* one colour and one shape per cluster, so clusters stay distinguishable without colour */
+    const STY = ['fill: var(--accent); stroke: var(--surface); stroke-width: 1',
+      'fill: var(--ok); stroke: var(--surface); stroke-width: 1',
+      'fill: var(--ink-2); stroke: var(--surface); stroke-width: 1',
+      'fill: var(--surface); stroke: var(--accent); stroke-width: 1.8',
+      'fill: var(--surface); stroke: var(--ok); stroke-width: 1.8'];
+    const SUB = '₁₂₃₄₅';
+    const r1 = v => Math.round(v * 10) / 10;
+    const shape = (k, x, y, r) => {
+      x = r1(x); y = r1(y);
+      if (k === 0) return `M${r1(x - r)} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
+      if (k === 1) { const h = r1(r * 0.88); return `M${r1(x - h)} ${r1(y - h)}h${2 * h}v${2 * h}h${-2 * h}Z`; }
+      if (k === 2) return `M${x} ${r1(y - 1.2 * r)}L${r1(x + 1.1 * r)} ${r1(y + 0.8 * r)}L${r1(x - 1.1 * r)} ${r1(y + 0.8 * r)}Z`;
+      if (k === 3) return `M${x} ${r1(y - 1.25 * r)}L${r1(x + 1.25 * r)} ${y}L${x} ${r1(y + 1.25 * r)}L${r1(x - 1.25 * r)} ${y}Z`;
+      return `M${x} ${r1(y + 1.2 * r)}L${r1(x + 1.1 * r)} ${r1(y - 0.8 * r)}L${r1(x - 1.1 * r)} ${r1(y - 0.8 * r)}Z`;
+    };
+    const clear = g => { while (g.firstChild) g.removeChild(g.firstChild); };
+    const gRes = mk('g', { class: 'c-resid' }, svg);
+    const res = pts.map(() => mk('line', {}, gRes));
+    const gHl = mk('g', {}, svg);
+    const gPts = mk('g', {}, svg);
+    const dots = pts.map(() => mk('path', {}, gPts));
+    const gCen = mk('g', {}, svg);
+    const gHist = mk('g', {}, svg);
+
+    const kIn = document.getElementById('km-k'), kOut = document.getElementById('km-k-out');
+    const bA = document.getElementById('km-assign'), bU = document.getElementById('km-update'), bR = document.getElementById('km-run');
+    const tOut = document.getElementById('km-t'), oOut = document.getElementById('km-obj'), mOut = document.getElementById('km-moved');
+    const status = document.getElementById('km-status'), wrap = document.getElementById('km-wrap'), dist = document.getElementById('km-dist');
+    let K = parseInt(kIn.value, 10), start = 13, z = [], mu = [], cen = [], phase = 'assign', t = 0, hist = [], moved = [], anim = 0, runTok = 0, running = false;
+
+    const cost = (zz, mm) => pts.reduce((s, p, i) => s + d2(p, mm[zz[i]]), 0);
+    const means = (zz, prev) => {
+      const acc = Array.from({ length: K }, () => [0, 0, 0]);
+      pts.forEach((p, i) => { const a = acc[zz[i]]; a[0] += p[0]; a[1] += p[1]; a[2]++; });
+      return acc.map((a, k) => a[2] ? [a[0] / a[2], a[1] / a[2]] : prev[k].slice());
+    };
+    const drawPts = () => pts.forEach((p, i) => { dots[i].setAttribute('d', shape(z[i], sx(p[0]), sy(p[1]), 4.2)); dots[i].setAttribute('style', STY[z[i]]); });
+    const drawHl = () => { clear(gHl); moved.forEach(i => mk('circle', { cx: r1(sx(pts[i][0])), cy: r1(sy(pts[i][1])), r: 8, class: 'c-hl' }, gHl)); };
+    const drawCen = m => {
+      cen.forEach((c, k) => {
+        c.p.setAttribute('d', shape(k, sx(m[k][0]), sy(m[k][1]), 8));
+        c.l.setAttribute('x', r1(sx(m[k][0]) + 11)); c.l.setAttribute('y', r1(sy(m[k][1]) - 9));
+      });
+      pts.forEach((p, i) => { const c = m[z[i]]; res[i].setAttribute('x1', r1(sx(p[0]))); res[i].setAttribute('y1', r1(sy(p[1]))); res[i].setAttribute('x2', r1(sx(c[0]))); res[i].setAttribute('y2', r1(sy(c[1]))); });
+    };
+
+    /* objective after every half-step: index 2t is F(z^t), odd indices are the values just after Assign */
+    const HX0 = 470, HX1 = 680, HY0 = 50, HY1 = 316;
+    const nice = v => { const e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; };
+    const drawHist = () => {
+      clear(gHist);
+      mk('text', { x: 428, y: 30, class: 'c-title' }, gHist).textContent = 'Objective after each step';
+      const step = nice(hist[0].v / 4), top = step * Math.ceil(hist[0].v / step - 1e-9);
+      const N = Math.max(12, 2 * Math.ceil((hist.length - 1) / 2));
+      const hx = i => HX0 + (HX1 - HX0) * i / N, hy = v => HY1 - (HY1 - HY0) * v / top;
+      for (let j = 0; j * step <= top + 1e-9; j++) {
+        const v = j * step;
+        if (j) mk('line', { x1: HX0, x2: HX1, y1: r1(hy(v)), y2: r1(hy(v)), class: 'c-faint' }, gHist);
+        mk('text', { x: HX0 - 6, y: r1(hy(v) + 4), 'text-anchor': 'end', class: 'c-tick' }, gHist).textContent = step < 1 ? v.toFixed(1) : Math.round(v);
+      }
+      mk('line', { x1: HX0, x2: HX1, y1: HY1, y2: HY1, class: 'c-axis' }, gHist);
+      mk('line', { x1: HX0, x2: HX0, y1: HY0, y2: HY1, class: 'c-axis' }, gHist);
+      const every = N > 24 ? 4 : N > 12 ? 2 : 1;
+      for (let r = 0; 2 * r <= N; r += every) mk('text', { x: r1(hx(2 * r)), y: HY1 + 15, 'text-anchor': 'middle', class: 'c-tick' }, gHist).textContent = r;
+      mk('text', { x: HX1, y: HY1 + 30, 'text-anchor': 'end', class: 'c-tick' }, gHist).textContent = 'round t';
+      mk('path', { d: hist.map((h, i) => (i ? 'L' : 'M') + r1(hx(i)) + ' ' + r1(hy(h.v))).join(''), class: 'c-line', style: 'fill: none' }, gHist);
+      hist.forEach((h, i) => {
+        const at = { cx: r1(hx(i)), cy: r1(hy(h.v)) };
+        if (h.kind === 'F') mk('circle', Object.assign(at, { r: 4.2, style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.5' }), gHist);
+        else mk('circle', Object.assign(at, { r: 4, class: 'c-proxy' }), gHist);
+      });
+      mk('circle', { cx: 434, cy: 362, r: 4.2, style: 'fill: var(--accent)' }, gHist);
+      mk('text', { x: 444, y: 366, class: 'c-note' }, gHist).textContent = 'after Update: F(z), own box, own centroid';
+      mk('circle', { cx: 434, cy: 382, r: 4, class: 'c-proxy' }, gHist);
+      mk('text', { x: 444, y: 386, class: 'c-note' }, gHist).textContent = 'after Assign: new box, old centroid';
+    };
+    const readouts = () => { tOut.textContent = t; oOut.textContent = hist[hist.length - 1].v.toFixed(1); };
+    const buttons = () => {
+      const set = (b, on) => { b.disabled = !on; b.style.opacity = on ? '' : '0.45'; b.style.cursor = on ? '' : 'default'; };
+      set(bA, !running && phase === 'assign'); set(bU, !running && phase === 'update'); set(bR, !running && phase !== 'done');
+    };
+
+    const init = () => {
+      anim++; runTok++; running = false;
+      seed = 1000 + start * 7919;
+      let sites;
+      do {
+        sites = Array.from({ length: K }, () => [-6 + 12 * rand(), -6 + 12 * rand()]);
+        z = pts.map(p => { let b = 0; for (let k = 1; k < K; k++) if (d2(p, sites[k]) < d2(p, sites[b])) b = k; return b; });
+      } while (new Set(z).size < K);
+      mu = means(z, null); phase = 'assign'; t = 0; moved = [];
+      hist = [{ v: cost(z, mu), kind: 'F' }];
+      clear(gCen);
+      cen = mu.map((c, k) => ({ p: mk('path', { class: 'c-centroid' }, gCen), l: mk('text', { class: 'c-note' }, gCen) }));
+      cen.forEach((c, k) => { c.l.textContent = 'μ' + SUB[k]; });
+      drawPts(); drawHl(); drawCen(mu); drawHist(); readouts(); buttons();
+      mOut.textContent = '–';
+      status.textContent = `Start: a random partition z⁰ into ${K} boxes, each with its mean as centroid. F(z⁰) = ${hist[0].v.toFixed(1)}. Press Assign.`;
+    };
+
+    const assign = () => {
+      if (phase !== 'assign') return;
+      anim++; drawCen(mu);
+      const z2 = z.map((k, i) => { let b = k; for (let j = 0; j < K; j++) if (d2(pts[i], mu[j]) < d2(pts[i], mu[b]) - 1e-12) b = j; return b; });
+      moved = []; z2.forEach((k, i) => { if (k !== z[i]) moved.push(i); });
+      mOut.textContent = moved.length;
+      if (!moved.length) {
+        phase = 'done'; running = false; drawHl(); buttons();
+        status.textContent = t ? `Converged after ${t} round${t > 1 ? 's' : ''}: no point has a strictly closer centroid. Final F = ${hist[hist.length - 1].v.toFixed(1)}.` : 'No point has a strictly closer centroid, so this start has already converged.';
+        return;
+      }
+      const before = hist[hist.length - 1].v;
+      z = z2;
+      const after = cost(z, mu);
+      hist.push({ v: after, kind: 'B' }); phase = 'update';
+      drawPts(); drawHl(); drawCen(mu); drawHist(); readouts(); buttons();
+      status.textContent = `Assign: ${moved.length} point${moved.length > 1 ? 's' : ''} moved to a strictly closer centroid (ringed). With the old centroids the sum fell from ${before.toFixed(1)} to ${after.toFixed(1)}.`;
+    };
+
+    const update = () => {
+      if (phase !== 'update') return;
+      const old = mu.map(c => c.slice());
+      const counts = Array(K).fill(0); z.forEach(k => { counts[k]++; });
+      mu = means(z, old); t++;
+      const before = hist[hist.length - 1].v, after = cost(z, mu);
+      hist.push({ v: after, kind: 'F' }); phase = 'assign'; moved = [];
+      drawHl(); drawHist(); readouts(); buttons();
+      const empty = []; counts.forEach((c, k) => { if (!c) empty.push(k + 1); });
+      status.textContent = (before - after < 0.05 ? `Update: each centroid moved to the mean of its box; F stays at ${after.toFixed(1)}.` : `Update: each centroid moved to the mean of its box, and F fell from ${before.toFixed(1)} to ${after.toFixed(1)}.`) +
+        (empty.length ? ` Box ${empty.join(', ')} has no points, so its centroid stays put (the lectures do not cover this case).` : '');
+      const my = ++anim;
+      tween(0, 1, s => { if (my !== anim) return; drawCen(old.map((c, k) => [c[0] + (mu[k][0] - c[0]) * s, c[1] + (mu[k][1] - c[1]) * s])); });
+    };
+
+    const run = () => {
+      if (phase === 'done' || running) return;
+      const tok = ++runTok; running = true; buttons();
+      let steps = 0;
+      const next = () => {
+        if (tok !== runTok) return;
+        if (phase === 'assign') assign(); else if (phase === 'update') update();
+        if (phase === 'done' || ++steps > 400) { running = false; buttons(); return; }
+        setTimeout(next, reduce ? 0 : 520);
+      };
+      next();
+    };
+
+    kIn.addEventListener('input', () => { K = parseInt(kIn.value, 10); kOut.textContent = K; init(); });
+    bA.addEventListener('click', assign);
+    bU.addEventListener('click', update);
+    bR.addEventListener('click', run);
+    document.getElementById('km-reset').addEventListener('click', init);
+    document.getElementById('km-new').addEventListener('click', () => { start++; init(); });
+    dist.addEventListener('change', () => wrap.classList.toggle('resid-off', !dist.checked));
+    init();
+  })();
+})();
+</script>
+</body>
+</html>
