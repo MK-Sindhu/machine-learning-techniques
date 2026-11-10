@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 7 · K-means: geometry, initialization, choosing K · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 7: lectures 16–18 on the Voronoi geometry of K-means clusters, K-means++ initialization and how to choose K.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 7 of 18</span><span class="sep">·</span><a href="part-06.html">← Part 6</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>K-means: what its clusters look like, where to start, how many</h1>
+    <p class="lede">Notes for lectures 16 to 18. At convergence every K-means cluster lies in a Voronoi region cut out by perpendicular bisectors between the means, so the boundaries between clusters are straight. The lectures then cover how to start Lloyd's algorithm, from random data points or with K-means++, and how to choose K by adding a penalty on K to the objective.</p>
+    <div class="meta">
+      <span><b>Part 7</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>60 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L16 · 23:42</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L17 · 18:55</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L18 · 17:00</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 16</h4>
+      <ul>
+        <li><a href="#two-means">K = 2: a linear condition</a></li>
+        <li><a href="#bisector">The perpendicular bisector</a></li>
+        <li><a href="#three-means">K = 3: half-spaces</a></li>
+        <li><a href="#voronoi">Voronoi regions</a></li>
+        <li><a href="#circles">Where K-means fails</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 17</h4>
+      <ul>
+        <li><a href="#random-init">Random starts, restarts</a></li>
+        <li><a href="#kmeans-pp">K-means++</a></li>
+        <li><a href="#why-random">Why sample?</a></li>
+        <li><a href="#guarantee">Guarantee and cost</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 18</h4>
+      <ul>
+        <li><a href="#choose-k">The objective can't pick K</a></li>
+        <li><a href="#penalty">Objective + penalty</a></li>
+        <li><a href="#aic-bic">AIC, BIC and the elbow</a></li>
+        <li><a href="#summary">Four questions, answered</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>At convergence every point is at least as close to its own mean as to any other. For two means this is the linear condition \(\mathbf{x}^\top(\boldsymbol\mu_2-\boldsymbol\mu_1) \le \tfrac12(\lVert\boldsymbol\mu_2\rVert^2-\lVert\boldsymbol\mu_1\rVert^2)\): the clusters are split by the <b>perpendicular bisector</b> of the two means.</li>
+        <li>With K means, each cluster's region is an intersection of \(K-1\) half-spaces, a <dfn>Voronoi region</dfn>. So K-means cannot recover clusters such as two concentric circles; kernel K-means is the fix, outside this course.</li>
+        <li>Lloyd's algorithm converges from any start, but where it ends depends on the start. Common practice: take K random data points as the initial means, run several times, keep the lowest objective.</li>
+        <li><b>K-means++</b> picks the initial means one at a time, each data point with probability proportional to its squared distance to the nearest mean already picked. Its expected objective is within a constant factor of the optimum, at the cost of K passes over the data.</li>
+        <li>The objective alone cannot choose K: it is 0 when \(K = n\). Choose K to minimize <b>objective + penalty(K)</b>. AIC (\(2K - 2\ln\mathcal{L}\)) and BIC (\(K\ln n - 2\ln\mathcal{L}\)) are standard criteria of this form; the elbow method is another heuristic.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 16 ============ -->
+    <section id="two-means">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=14s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 0:14</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=143s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 2:23 the converged state</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=208s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 3:28 expanding</a>
+        </div>
+        <h2>K = 2: a linear condition</h2>
+      </div>
+      <p><a href="part-06.html">Part 6</a> showed that Lloyd's algorithm always converges. The next question is what the clusters it converges to look like. Start with the simplest case, \(K = 2\): the algorithm stops with two clusters whose means are \(\boldsymbol\mu_1\) and \(\boldsymbol\mu_2\).</p>
+      <p>Convergence means every point is happy with its own mean. A point in cluster 1 must be at least as close to \(\boldsymbol\mu_1\) as to \(\boldsymbol\mu_2\), in squared distance. If it were closer to \(\boldsymbol\mu_2\), the next reassignment would move it and the algorithm would not have stopped. So for every \(\mathbf{x}\) in cluster 1:</p>
+      <div class="eq">\[ \lVert \mathbf{x} - \boldsymbol\mu_1 \rVert^2 \;\le\; \lVert \mathbf{x} - \boldsymbol\mu_2 \rVert^2 \]</div>
+      <p>Expand each side with \(\lVert\mathbf{a}-\mathbf{b}\rVert^2 = \lVert\mathbf{a}\rVert^2 + \lVert\mathbf{b}\rVert^2 - 2\mathbf{a}^\top\mathbf{b}\):</p>
+      <div class="eq">\[ \lVert\mathbf{x}\rVert^2 + \lVert\boldsymbol\mu_1\rVert^2 - 2\,\mathbf{x}^\top\boldsymbol\mu_1 \;\le\; \lVert\mathbf{x}\rVert^2 + \lVert\boldsymbol\mu_2\rVert^2 - 2\,\mathbf{x}^\top\boldsymbol\mu_2 \]</div>
+      <p>The \(\lVert\mathbf{x}\rVert^2\) terms cancel. Move \(-2\,\mathbf{x}^\top\boldsymbol\mu_2\) to the left, \(\lVert\boldsymbol\mu_1\rVert^2\) to the right, and divide by 2:</p>
+      <div class="result">
+        <span class="lbl">Condition for a point of cluster 1 (K = 2)</span>
+        \[ \mathbf{x}^\top(\boldsymbol\mu_2 - \boldsymbol\mu_1) \;\le\; \frac{\lVert\boldsymbol\mu_2\rVert^2 - \lVert\boldsymbol\mu_1\rVert^2}{2} \]
+        <p>This has the form \(\mathbf{x}^\top\mathbf{w} \le b\) with \(\mathbf{w} = \boldsymbol\mu_2 - \boldsymbol\mu_1\) and \(b = \tfrac12(\lVert\boldsymbol\mu_2\rVert^2 - \lVert\boldsymbol\mu_1\rVert^2)\). It is linear in \(\mathbf{x}\), so we should expect the two clusters to be divided by a line. Points of cluster 2 satisfy the reverse inequality, by the same argument with 1 and 2 swapped.</p>
+      </div>
+    </section>
+
+    <section id="bisector">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=316s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 5:16 the picture</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=553s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 9:13 the midpoint</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=624s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 10:24 perpendicular bisector</a>
+        </div>
+        <h2>The boundary is the perpendicular bisector</h2>
+      </div>
+      <p>To see which points satisfy the condition, start from the vector \(\mathbf{w} = \boldsymbol\mu_2 - \boldsymbol\mu_1\), the step you add to \(\boldsymbol\mu_1\) to reach \(\boldsymbol\mu_2\), drawn from the origin.</p>
+      <ol>
+        <li>The points with \(\mathbf{x}^\top(\boldsymbol\mu_2 - \boldsymbol\mu_1) = 0\) have zero dot product with \(\mathbf{w}\). They form the line through the origin at right angles to \(\mathbf{w}\) (line ① below).</li>
+        <li>Asking instead for \(\mathbf{x}^\top(\boldsymbol\mu_2 - \boldsymbol\mu_1) = b\) moves that line parallel to itself, along \(\mathbf{w}\). In the lecture's picture \(\lVert\boldsymbol\mu_2\rVert\) is larger than \(\lVert\boldsymbol\mu_1\rVert\), so \(b > 0\) and the line moves toward \(\boldsymbol\mu_2\) (line ②). Whether \(b\) is positive or negative depends on which mean is longer.</li>
+        <li>Cluster 1 is the side of line ② where \(\mathbf{x}^\top\mathbf{w} \le b\), the side that contains \(\boldsymbol\mu_1\). Cluster 2 is the other side.</li>
+      </ol>
+      <p>How far did the line move? Find one point on it. The average of the two means works:</p>
+      <div class="eq">\[ \Big(\frac{\boldsymbol\mu_1 + \boldsymbol\mu_2}{2}\Big)^{\!\top}(\boldsymbol\mu_2 - \boldsymbol\mu_1) = \frac{\boldsymbol\mu_1^\top\boldsymbol\mu_2 - \lVert\boldsymbol\mu_1\rVert^2 + \lVert\boldsymbol\mu_2\rVert^2 - \boldsymbol\mu_2^\top\boldsymbol\mu_1}{2} = \frac{\lVert\boldsymbol\mu_2\rVert^2 - \lVert\boldsymbol\mu_1\rVert^2}{2} \]</div>
+      <p>The cross terms cancel because \(\boldsymbol\mu_1^\top\boldsymbol\mu_2 = \boldsymbol\mu_2^\top\boldsymbol\mu_1\). So line ② passes through the midpoint of the two means and is at right angles to the segment joining them: it is the <dfn>perpendicular bisector</dfn> of that segment. This is also the direct way to see it. Join the two means, draw the perpendicular bisector, and every point on one side is closer to the mean on that side.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 336" role="img" aria-label="Two means mu1 at (2, 3) and mu2 at (6, 5). The vector mu2 minus mu1 is drawn from the origin. The dashed line through the origin perpendicular to it is shifted parallel until it passes through the midpoint (4, 4) of the two means; that shifted line is the boundary, the perpendicular bisector of the segment joining the means. Points on the mu1 side form cluster 1.">
+          <defs><marker id="p07-ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="p07-ah1-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+          <polygon points="14,320 334,320 182,16 14,16" style="fill: var(--accent-soft)"/>
+          <rect class="d-plot" x="14" y="16" width="368" height="304"/>
+          <line class="d-rule" x1="14" y1="256" x2="382" y2="256"/><line class="d-rule" x1="110" y1="320" x2="110" y2="16"/>
+          <text class="d-s" x="104" y="271" text-anchor="end">origin</text>
+          <line class="d-ln d-dash" x1="142" y1="320" x2="14" y2="64"/>
+          <line class="d-ln-acc" style="stroke-width:2.4" x1="334" y1="320" x2="182" y2="16"/>
+          <line class="d-ln" x1="46" y1="128" x2="195.6" y2="53.2" marker-end="url(#p07-ah1)"/>
+          <text class="d-s" x="112.4" y="75.2" text-anchor="end">shift</text>
+          <line class="d-ln" style="stroke-dasharray: 2 3" x1="174" y1="160" x2="302" y2="96"/>
+          <path class="d-ln" d="M246 124 L242 116 L234 120"/>
+          <line class="d-ln-acc" style="stroke-width:2.2" x1="110" y1="256" x2="238" y2="192" marker-end="url(#p07-ah1-acc)"/>
+          <text class="d-t" x="174" y="249.6" style="fill: var(--accent)">μ₂ − μ₁</text>
+          <circle class="pt-new" cx="174" cy="160" r="6"/><text class="d-t" x="164" y="164" text-anchor="end">μ₁</text>
+          <circle class="pt-new" cx="302" cy="96" r="6"/><text class="d-t" x="312" y="100">μ₂</text>
+          <circle class="pt-plain" cx="238" cy="128" r="3.5"/><text class="d-s" x="256" y="147">midpoint (4, 4)</text>
+          <text class="d-t" x="22" y="36">①</text>
+          <text class="d-t" x="190" y="32" style="fill: var(--accent)">②</text>
+          <text class="d-s" x="22" y="312">cluster 1 side</text>
+          <text class="d-s" x="374" y="34" text-anchor="end">cluster 2 side</text>
+          <text class="d-h" x="404" y="34">Closer to μ₁ than to μ₂</text>
+          <text class="d-t" x="404" y="58">‖x − μ₁‖² ≤ ‖x − μ₂‖²</text>
+          <text class="d-t" x="404" y="80">⇔  xᵀ(μ₂ − μ₁) ≤ b</text>
+          <text class="d-s" x="404" y="100">with b = (‖μ₂‖² − ‖μ₁‖²) / 2</text>
+          <text class="d-row" x="404" y="134">In this picture</text>
+          <text class="d-s" x="404" y="154">μ₁ = (2, 3), μ₂ = (6, 5)</text>
+          <text class="d-s" x="404" y="172">μ₂ − μ₁ = (4, 2), b = (61 − 13)/2 = 24</text>
+          <text class="d-s" x="404" y="204">① 4x + 2y = 0: through the origin,</text>
+          <text class="d-s" x="404" y="222">    at right angles to μ₂ − μ₁</text>
+          <text class="d-s" x="404" y="248">② 4x + 2y = 24: line ① moved</text>
+          <text class="d-s" x="404" y="266">    parallel, along μ₂ − μ₁</text>
+          <text class="d-s" x="404" y="292">The midpoint is on ②: 4·4 + 2·4 = 24.</text>
+          <text class="d-s" x="404" y="310">So ② is the perpendicular bisector</text>
+          <text class="d-s" x="404" y="328">of the segment from μ₁ to μ₂.</text>
+          </svg>
+        </div>
+        <figcaption><b>Two means, one straight boundary.</b> Line ① is \(\mathbf{x}^\top(\boldsymbol\mu_2 - \boldsymbol\mu_1) = 0\). Moving it along \(\boldsymbol\mu_2 - \boldsymbol\mu_1\) until the right-hand side is \(b\) gives line ②, which passes through the midpoint at a right angle to the segment. Every point on the shaded side is closer to \(\boldsymbol\mu_1\). The means are illustrative numbers.</figcaption>
+      </figure>
+      <p class="rule-of-thumb">With K = 2, the converged K-means clusters are always separated by a straight line (a hyperplane in \(\mathbb{R}^d\)). This follows from the convergence condition alone.</p>
+    </section>
+
+    <section id="three-means">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=690s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 11:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=788s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 13:08 two bisectors</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=895s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 14:55 the third</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=964s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 16:04 half-spaces</a>
+        </div>
+        <h2>K = 3: intersections of half-spaces</h2>
+      </div>
+      <p>With \(K = 3\) the algorithm converges with three means \(\boldsymbol\mu_1, \boldsymbol\mu_2, \boldsymbol\mu_3\). The data is drawn in two dimensions to make it visible; nothing in the argument depends on the dimension.</p>
+      <p>A point in cluster 1 must be closer to \(\boldsymbol\mu_1\) than to \(\boldsymbol\mu_2\) <i>and</i> closer to \(\boldsymbol\mu_1\) than to \(\boldsymbol\mu_3\). If either failed, the point would jump to the other cluster and the algorithm would not have converged.</p>
+      <ul>
+        <li>Closer to \(\boldsymbol\mu_1\) than to \(\boldsymbol\mu_2\): the \(\boldsymbol\mu_1\) side of the perpendicular bisector of \(\boldsymbol\mu_1\) and \(\boldsymbol\mu_2\).</li>
+        <li>Closer to \(\boldsymbol\mu_1\) than to \(\boldsymbol\mu_3\): the \(\boldsymbol\mu_1\) side of the bisector of \(\boldsymbol\mu_1\) and \(\boldsymbol\mu_3\). Since \(\boldsymbol\mu_3\) need not lie on the line through \(\boldsymbol\mu_1\) and \(\boldsymbol\mu_2\), this is a different line.</li>
+        <li>Cluster 1's region is the intersection of the two sides.</li>
+      </ul>
+      <p>The bisector of \(\boldsymbol\mu_2\) and \(\boldsymbol\mu_3\) then splits what is left: the region of \(\boldsymbol\mu_2\) (closer to \(\boldsymbol\mu_2\) than to both others) and the region of \(\boldsymbol\mu_3\). There are three separators, one for each pair of means.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 340" role="img" aria-label="Left: three means. The bisector of mu1 and mu2 and the bisector of mu1 and mu3 each cut the plane in two; the region closer to mu1 than to both other means is the intersection of the two mu1 sides, shaded. Right: adding the bisector of mu2 and mu3 divides the plane into three regions, one per mean, meeting at a single point.">
+          <defs><marker id="p07-ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+          <text class="d-h" x="16" y="20">Region of μ₁: two half-planes</text>
+          <polygon points="16,307.6 119.5,307.6 170.8,175.6 64.6,34 16,34" style="fill: var(--accent-soft)"/>
+          <rect class="d-plot" x="16" y="34" width="288" height="273.6"/>
+          <line class="d-ln" x1="269.8" y1="307.6" x2="64.6" y2="34"/>
+          <line class="d-ln" x1="119.5" y1="307.6" x2="225.9" y2="34"/>
+          <line class="d-ln" x1="123.3" y1="112.3" x2="101.7" y2="128.5" marker-end="url(#p07-ah2)"/>
+          <line class="d-ln" x1="144.7" y1="242.7" x2="119.6" y2="232.9" marker-end="url(#p07-ah2)"/>
+          <circle class="pt-new" cx="66.4" cy="156.4" r="6"/>
+          <circle class="pt-new" cx="181.6" cy="70" r="6"/>
+          <circle class="pt-new" cx="260.8" cy="232" r="6"/>
+          <text class="d-t" x="56.4" y="174.4" text-anchor="end">μ₁</text>
+          <text class="d-t" x="171.6" y="88" text-anchor="end">μ₂</text>
+          <text class="d-t" x="270.8" y="250">μ₃</text>
+          <text class="d-h" x="336" y="20">All three regions</text>
+          <polygon points="336,307.6 439.5,307.6 490.8,175.6 384.6,34 336,34" style="fill: var(--accent-soft)"/>
+          <polygon points="624,110.5 624,34 384.6,34 490.8,175.6" style="fill: var(--ok-soft)"/>
+          <polygon points="439.5,307.6 624,307.6 624,110.5 490.8,175.6" style="fill: var(--mark); fill-opacity: .55"/>
+          <rect class="d-plot" x="336" y="34" width="288" height="273.6"/>
+          <line class="d-ln d-dash" style="stroke: var(--muted); stroke-width:1; stroke-dasharray: 3 4" x1="490.8" y1="175.6" x2="589.8" y2="307.6"/>
+          <line class="d-ln" style="stroke-width:1.8" x1="490.8" y1="175.6" x2="384.6" y2="34"/>
+          <line class="d-ln" style="stroke-width:1.8" x1="490.8" y1="175.6" x2="439.5" y2="307.6"/>
+          <line class="d-ln d-dash" style="stroke: var(--muted); stroke-width:1; stroke-dasharray: 3 4" x1="490.8" y1="175.6" x2="545.9" y2="34"/>
+          <line class="d-ln d-dash" style="stroke: var(--muted); stroke-width:1; stroke-dasharray: 3 4" x1="490.8" y1="175.6" x2="336" y2="251.3"/>
+          <line class="d-ln" style="stroke-width:1.8" x1="490.8" y1="175.6" x2="624" y2="110.5"/>
+          <circle class="pt-new" cx="386.4" cy="156.4" r="6"/>
+          <circle class="pt-new" cx="501.6" cy="70" r="6"/>
+          <circle class="pt-new" cx="580.8" cy="232" r="6"/>
+          <text class="d-t" x="376.4" y="174.4" text-anchor="end">μ₁</text>
+          <text class="d-t" x="491.6" y="88" text-anchor="end">μ₂</text>
+          <text class="d-t" x="590.8" y="250">μ₃</text>
+          <text class="d-s" x="82.6" y="49">μ₁ | μ₂</text>
+          <text class="d-s" x="133.5" y="299.6">μ₁ | μ₃</text>
+          <text class="d-s" x="96.7" y="124.5" text-anchor="end">μ₁ side</text>
+          <text class="d-s" x="114.6" y="246.9" text-anchor="end">μ₁ side</text>
+          <text class="d-s" x="402.6" y="49">μ₁ | μ₂</text>
+          <text class="d-s" x="453.5" y="299.6">μ₁ | μ₃</text>
+          <text class="d-s" x="618" y="100.5" text-anchor="end">μ₂ | μ₃</text>
+          <text class="d-s" x="16" y="332">shaded: points closer to μ₁ than to both μ₂ and μ₃</text>
+          <text class="d-s" x="336" y="332">solid: region boundaries · faint dashes: unused parts</text>
+          </svg>
+        </div>
+        <figcaption><b>Three means, three bisectors.</b> Left: the region of \(\boldsymbol\mu_1\) is where the \(\boldsymbol\mu_1\) sides of two bisectors overlap. Right: the third bisector divides the rest between \(\boldsymbol\mu_2\) and \(\boldsymbol\mu_3\). Each region uses only the part of a bisector that borders it; the dashed parts are not boundaries. The means are illustrative.</figcaption>
+      </figure>
+
+      <p>One side of a line is a <dfn>half-space</dfn>: the line divides the plane in two, and each half is a half-space. In higher dimensions a hyperplane plays the role of the line. Every mean is compared with the \(K - 1\) other means, so:</p>
+      <div class="result">
+        <span class="lbl">The region of mean k</span>
+        \[ R_k = \{\mathbf{x} : \lVert\mathbf{x}-\boldsymbol\mu_k\rVert^2 \le \lVert\mathbf{x}-\boldsymbol\mu_j\rVert^2 \ \text{for all } j \ne k\} = \bigcap_{j \ne k} \Big\{ \mathbf{x} : \mathbf{x}^\top(\boldsymbol\mu_j - \boldsymbol\mu_k) \le \frac{\lVert\boldsymbol\mu_j\rVert^2 - \lVert\boldsymbol\mu_k\rVert^2}{2} \Big\} \]
+        <p>Each cluster region is an intersection of \(K - 1\) half-spaces, and the K regions divide the whole space (\(\mathbb{R}^2\) here, \(\mathbb{R}^d\) in general) between them.</p>
+      </div>
+    </section>
+
+    <section id="voronoi">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=1033s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 17:13</a>
+        <h2>Voronoi regions</h2>
+      </div>
+      <p>Regions built this way, one per centre, each holding the points closer to that centre than to any other, are called <dfn>Voronoi regions</dfn>, and together they form a Voronoi partition of the space. The argument above holds in any dimension. So the clusters produced by Lloyd's algorithm always sit in the Voronoi regions of their own means, and Lloyd's algorithm can be read as a search for a good Voronoi partition: one whose clusters have a small objective.</p>
+      <p>Try it below. Drag the means and the regions follow. <i>One Lloyd step</i> moves every mean to the average of the points in its region, the update from <a href="part-06.html">Part 6</a>; the points then fall into the regions of the new means.</p>
+
+      <figure id="vor-fig">
+        <div class="controls">
+          <label for="vor-k">Number of means K</label>
+          <input type="range" id="vor-k" min="2" max="4" step="1" value="3">
+          <output id="vor-k-out" for="vor-k">3</output>
+          <button class="btn" id="vor-step" type="button">One Lloyd step</button>
+          <button class="btn" id="vor-shuffle" type="button">Random start</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Objective F (nearest mean)</span><span class="v mine" id="vor-obj">–</span></div>
+          <div><span class="k">Lloyd steps</span><span class="v" id="vor-steps">–</span></div>
+        </div>
+        <div class="status" id="vor-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="vor-svg" viewBox="0 0 400 400" role="img" aria-label="Sixty-four synthetic points in three blobs with K draggable means. The plane is shaded into the Voronoi regions of the means, bounded by pieces of perpendicular bisectors. Lloyd steps move each mean to the average of its region's points."></svg></div>
+        <figcaption><b>Voronoi regions of the current means</b>, on synthetic data (64 points in three blobs) generated for this page. Each shaded region holds the points closer to its mean than to any other, and its edges are pieces of perpendicular bisectors. Drag a mean, or focus it and use the arrow keys. <i>Random start</i> picks K data points as the means, the initialization of Lecture 17. Keep stepping until the means stop moving: then each mean is the average of the points in its own region, the converged state analysed above.</figcaption>
+      </figure>
+    </section>
+
+    <section id="circles">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=1104s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 18:24</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=1235s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 20:35 the fix</a>
+        </div>
+        <h2>Where Voronoi clusters fail</h2>
+      </div>
+      <p>The geometry also tells us when K-means will fail. Take two-dimensional data on two concentric circles: a ring of points around a smaller circle of points. The natural clustering has two clusters, the outer ring and the inner circle.</p>
+      <p>Run Lloyd's algorithm with \(K = 2\). It converges, as always. But the two clusters must lie in Voronoi regions, so a line separates them. Exactly where the line falls depends on how the points are spaced (it need not be slanted; it could be vertical), but it is a line, and no line can put the whole ring on one side and the inner circle on the other, because the ring surrounds the inner circle. K-means as described can never return the inner/outer split.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 346" role="img" aria-label="Left: points on a small inner circle and a large outer ring, the two natural clusters. Right: K-means with K equal to 2 on the same points splits them with a straight line through the middle, so each cluster contains half of the inner circle and half of the ring.">
+          <text class="d-h" x="16" y="20">What we want</text>
+          <rect class="d-plot" x="16" y="34" width="273.6" height="273.6"/>
+          <circle class="pt-tree" cx="186.1" cy="157" r="4.5"/>
+          <circle class="pt-tree" cx="166.6" cy="137.5" r="4.5"/>
+          <circle class="pt-tree" cx="139" cy="137.5" r="4.5"/>
+          <circle class="pt-tree" cx="119.5" cy="157" r="4.5"/>
+          <circle class="pt-tree" cx="119.5" cy="184.6" r="4.5"/>
+          <circle class="pt-tree" cx="139" cy="204.1" r="4.5"/>
+          <circle class="pt-tree" cx="166.6" cy="204.1" r="4.5"/>
+          <circle class="pt-tree" cx="186.1" cy="184.6" r="4.5"/>
+          <circle class="pt-no" cx="259.9" cy="156.7" r="4.5"/>
+          <circle class="pt-no" cx="252.6" cy="129.5" r="4.5"/>
+          <circle class="pt-no" cx="238.5" cy="105.1" r="4.5"/>
+          <circle class="pt-no" cx="218.5" cy="85.1" r="4.5"/>
+          <circle class="pt-no" cx="194.1" cy="71" r="4.5"/>
+          <circle class="pt-no" cx="166.9" cy="63.7" r="4.5"/>
+          <circle class="pt-no" cx="138.7" cy="63.7" r="4.5"/>
+          <circle class="pt-no" cx="111.5" cy="71" r="4.5"/>
+          <circle class="pt-no" cx="87.1" cy="85.1" r="4.5"/>
+          <circle class="pt-no" cx="67.1" cy="105.1" r="4.5"/>
+          <circle class="pt-no" cx="53" cy="129.5" r="4.5"/>
+          <circle class="pt-no" cx="45.7" cy="156.7" r="4.5"/>
+          <circle class="pt-no" cx="45.7" cy="184.9" r="4.5"/>
+          <circle class="pt-no" cx="53" cy="212.1" r="4.5"/>
+          <circle class="pt-no" cx="67.1" cy="236.5" r="4.5"/>
+          <circle class="pt-no" cx="87.1" cy="256.5" r="4.5"/>
+          <circle class="pt-no" cx="111.5" cy="270.6" r="4.5"/>
+          <circle class="pt-no" cx="138.7" cy="277.9" r="4.5"/>
+          <circle class="pt-no" cx="166.9" cy="277.9" r="4.5"/>
+          <circle class="pt-no" cx="194.1" cy="270.6" r="4.5"/>
+          <circle class="pt-no" cx="218.5" cy="256.5" r="4.5"/>
+          <circle class="pt-no" cx="238.5" cy="236.5" r="4.5"/>
+          <circle class="pt-no" cx="252.6" cy="212.1" r="4.5"/>
+          <circle class="pt-no" cx="259.9" cy="184.9" r="4.5"/>
+          <text class="d-h" x="330" y="20">What K-means (K = 2) can give</text>
+          <rect class="d-plot" x="330" y="34" width="273.6" height="273.6"/>
+          <line class="d-ln-acc" style="stroke-width:2.2" x1="330" y1="34" x2="603.6" y2="307.6"/>
+          <circle class="pt-tree" cx="500.1" cy="157" r="4.5"/>
+          <circle class="pt-tree" cx="480.6" cy="137.5" r="4.5"/>
+          <circle class="pt-tree" cx="453" cy="137.5" r="4.5"/>
+          <circle class="pt-no" cx="433.5" cy="157" r="4.5"/>
+          <circle class="pt-no" cx="433.5" cy="184.6" r="4.5"/>
+          <circle class="pt-no" cx="453" cy="204.1" r="4.5"/>
+          <circle class="pt-no" cx="480.6" cy="204.1" r="4.5"/>
+          <circle class="pt-tree" cx="500.1" cy="184.6" r="4.5"/>
+          <circle class="pt-tree" cx="573.9" cy="156.7" r="4.5"/>
+          <circle class="pt-tree" cx="566.6" cy="129.5" r="4.5"/>
+          <circle class="pt-tree" cx="552.5" cy="105.1" r="4.5"/>
+          <circle class="pt-tree" cx="532.5" cy="85.1" r="4.5"/>
+          <circle class="pt-tree" cx="508.1" cy="71" r="4.5"/>
+          <circle class="pt-tree" cx="480.9" cy="63.7" r="4.5"/>
+          <circle class="pt-tree" cx="452.7" cy="63.7" r="4.5"/>
+          <circle class="pt-tree" cx="425.5" cy="71" r="4.5"/>
+          <circle class="pt-tree" cx="401.1" cy="85.1" r="4.5"/>
+          <circle class="pt-no" cx="381.1" cy="105.1" r="4.5"/>
+          <circle class="pt-no" cx="367" cy="129.5" r="4.5"/>
+          <circle class="pt-no" cx="359.7" cy="156.7" r="4.5"/>
+          <circle class="pt-no" cx="359.7" cy="184.9" r="4.5"/>
+          <circle class="pt-no" cx="367" cy="212.1" r="4.5"/>
+          <circle class="pt-no" cx="381.1" cy="236.5" r="4.5"/>
+          <circle class="pt-no" cx="401.1" cy="256.5" r="4.5"/>
+          <circle class="pt-no" cx="425.5" cy="270.6" r="4.5"/>
+          <circle class="pt-no" cx="452.7" cy="277.9" r="4.5"/>
+          <circle class="pt-no" cx="480.9" cy="277.9" r="4.5"/>
+          <circle class="pt-no" cx="508.1" cy="270.6" r="4.5"/>
+          <circle class="pt-no" cx="532.5" cy="256.5" r="4.5"/>
+          <circle class="pt-tree" cx="552.5" cy="236.5" r="4.5"/>
+          <circle class="pt-tree" cx="566.6" cy="212.1" r="4.5"/>
+          <circle class="pt-tree" cx="573.9" cy="184.9" r="4.5"/>
+          <circle class="pt-new" cx="507.5" cy="130.1" r="6"/><text class="d-t" x="517.5" y="135.1">μ₁</text>
+          <circle class="pt-new" cx="426.1" cy="211.5" r="6"/><text class="d-t" x="416.1" y="216.5" text-anchor="end">μ₂</text>
+          <text class="d-s" x="16" y="338">filled: inner circle · hollow: outer ring</text>
+          <text class="d-s" x="330" y="338">filled: cluster 1 · hollow: cluster 2 · line: boundary</text>
+          </svg>
+        </div>
+        <figcaption><b>Concentric circles defeat K-means.</b> Illustrative points: 8 on an inner circle and 24 on an outer ring. The right panel is an actual converged K = 2 result on these points, from one starting pair. The boundary is a line, so each cluster is half ring and half inner circle. A different start or spacing moves the line, but it stays a line.</figcaption>
+      </figure>
+      <p class="rule-of-thumb">If you do not expect your clusters to sit in Voronoi-like regions, expect K-means to fail on that data.</p>
+      <p class="note">Standard fact, not from the lecture: an intersection of half-spaces is convex, so every K-means cluster region is convex. A ring is not convex, so no choice of K can return the ring as one cluster.</p>
+
+      <h3>The fix, in outline <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=1271s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L16 · 21:11</a></h3>
+      <p>The course does not develop this, but the lecture gives pointers. Recall <a href="part-05.html">Part 5</a>: when features are related non-linearly, map the data to a higher-dimensional space, find linear structure there, and it becomes non-linear structure in the original space. The same idea applies to clustering. The data may have no natural Voronoi structure in its own space, yet after a suitable map to a high-dimensional space its natural clusters may fall into different Voronoi regions, where plain Lloyd's algorithm works. The kernel trick avoids the cost of computing that map. The result is called <dfn>kernel K-means</dfn>.</p>
+      <p>Kernel K-means is closely related to computing eigenvectors of the kernel matrix and using them as a new representation of the data points, which are then clustered. It is also related to a popular method called <dfn>spectral clustering</dfn>, which in turn has much in common with PCA. Neither is covered in this course. <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=1305s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:45</a></p>
+      <p>Two issues about Lloyd's algorithm remain: how to initialize it, and how to choose the number of clusters. <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=EY03QHaaSBY&amp;t=1369s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:49</a></p>
+    </section>
+
+    <!-- ============ LECTURE 17 ============ -->
+    <section id="random-init">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=26s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 0:26</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=62s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 1:02 random boxes</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=126s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 2:06 random data points</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=259s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 4:19 restarts</a>
+        </div>
+        <h2>Random starts and restarts</h2>
+      </div>
+      <p>The convergence argument in <a href="part-06.html">Part 6</a> never used the starting point, so Lloyd's algorithm converges however it is initialized. Where it converges does depend on the start, because it can get stuck in a local minimum. A good initialization gives it a better chance of ending in good clusters. The lecture discusses these options:</p>
+      <ul class="kinds">
+        <li><b>Random boxes.</b> Put each data point into one of the K clusters uniformly at random. The algorithm still converges, but this ignores the structure of the data and gives no initial push to escape poor local minima.</li>
+        <li><b>Random data points as means.</b> Pick K data points uniformly at random and treat them as the initial means. This initializes the means rather than the cluster indicators. Every other point then joins its closest mean, so at least the start has the property we want at the end: each point sits with its nearest mean. With 1000 points and K = 5, the means might be data points number 5, 72, 89, 22 and one more; each of the other 995 points goes to the nearest of these five. This is not yet a converged state: the means are recomputed from the new clusters and Lloyd's algorithm carries on. In practice this is what is typically done.</li>
+        <li><b>Restarts.</b> The K random points may be an unlucky pick. So repeat the whole run with fresh random picks several times and keep the clustering with the best (lowest) objective value.</li>
+      </ul>
+      <ol class="algo">
+        <li class="algo-title">Random initialization with restarts</li>
+        <li>Repeat several times:</li>
+        <li>Pick K data points uniformly at random as the initial means.</li>
+        <li>Assign every point to its nearest mean, then run Lloyd's algorithm to convergence.</li>
+        <li>Record the final partition and its objective \(\sum_{i=1}^n \lVert\mathbf{x}_i - \boldsymbol\mu_{z_i}\rVert^2\).</li>
+        <li>Return the partition with the smallest objective.</li>
+      </ol>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 264" role="img" aria-label="The same 42 synthetic points in three blobs, two of them close together. Left: the three starting means are data points, two from the same far blob; Lloyd's algorithm converges with that blob split in two and the two close blobs merged, objective 84.8. Right: one starting point per blob converges to the natural three clusters, objective 23.5.">
+          <defs><marker id="p07-ah4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="p07-ah4b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+          <text class="d-h" x="16" y="20">Start 1: two seeds in one blob</text>
+          <rect class="d-plot" x="16" y="34" width="285.2" height="173.6"/>
+          <circle class="pt-plain" cx="92.7" cy="158.9" r="4.2"/>
+          <circle class="pt-tree" cx="52" cy="183" r="4.2"/>
+          <circle class="pt-plain" cx="72.5" cy="186.6" r="4.2"/>
+          <circle class="pt-plain" cx="71.4" cy="163.4" r="4.2"/>
+          <circle class="pt-tree" cx="41.7" cy="191" r="4.2"/>
+          <circle class="pt-plain" cx="82.3" cy="138.8" r="4.2"/>
+          <circle class="pt-plain" cx="86.5" cy="179.2" r="4.2"/>
+          <circle class="pt-plain" cx="91.4" cy="163" r="4.2"/>
+          <circle class="pt-plain" cx="85.8" cy="174.5" r="4.2"/>
+          <circle class="pt-tree" cx="61" cy="163.3" r="4.2"/>
+          <circle class="pt-plain" cx="84.5" cy="177.1" r="4.2"/>
+          <circle class="pt-tree" cx="33.1" cy="179.7" r="4.2"/>
+          <circle class="pt-tree" cx="58" cy="180.5" r="4.2"/>
+          <circle class="pt-plain" cx="83.2" cy="177.1" r="4.2"/>
+          <circle class="pt-no" cx="207.5" cy="77.1" r="4.2"/>
+          <circle class="pt-no" cx="177.6" cy="53.1" r="4.2"/>
+          <circle class="pt-no" cx="186.6" cy="81.2" r="4.2"/>
+          <circle class="pt-no" cx="172" cy="83" r="4.2"/>
+          <circle class="pt-no" cx="152.2" cy="82.6" r="4.2"/>
+          <circle class="pt-no" cx="176.5" cy="99.5" r="4.2"/>
+          <circle class="pt-no" cx="153.6" cy="63.8" r="4.2"/>
+          <circle class="pt-no" cx="205.4" cy="79.9" r="4.2"/>
+          <circle class="pt-no" cx="210.8" cy="78.2" r="4.2"/>
+          <circle class="pt-no" cx="184" cy="61.6" r="4.2"/>
+          <circle class="pt-no" cx="197.5" cy="72.7" r="4.2"/>
+          <circle class="pt-no" cx="189.4" cy="76.7" r="4.2"/>
+          <circle class="pt-no" cx="207" cy="75.6" r="4.2"/>
+          <circle class="pt-no" cx="190" cy="91.7" r="4.2"/>
+          <circle class="pt-no" cx="238.9" cy="141.3" r="4.2"/>
+          <circle class="pt-no" cx="270.5" cy="161.6" r="4.2"/>
+          <circle class="pt-no" cx="284.9" cy="145.6" r="4.2"/>
+          <circle class="pt-no" cx="272.7" cy="111.1" r="4.2"/>
+          <circle class="pt-no" cx="235.8" cy="146.9" r="4.2"/>
+          <circle class="pt-no" cx="275.2" cy="150.8" r="4.2"/>
+          <circle class="pt-no" cx="258" cy="142.9" r="4.2"/>
+          <circle class="pt-no" cx="274.5" cy="121.6" r="4.2"/>
+          <circle class="pt-no" cx="263.6" cy="89.7" r="4.2"/>
+          <circle class="pt-no" cx="264.5" cy="132.1" r="4.2"/>
+          <circle class="pt-no" cx="274" cy="138.8" r="4.2"/>
+          <circle class="pt-no" cx="237.1" cy="148.9" r="4.2"/>
+          <circle class="pt-no" cx="239.4" cy="135.4" r="4.2"/>
+          <circle class="pt-no" cx="238.7" cy="163.4" r="4.2"/>
+          <circle class="d-ln" style="stroke-width:1.6" cx="52" cy="183" r="8.5"/>
+          <circle class="d-ln" style="stroke-width:1.6" cx="86.5" cy="179.2" r="8.5"/>
+          <circle class="d-ln" style="stroke-width:1.6" cx="172" cy="83" r="8.5"/>
+          <line class="d-ln d-dash" x1="181" y1="87.3" x2="215.6" y2="103.9" marker-end="url(#p07-ah4a)"/>
+          <circle class="pt-new" cx="49.1" cy="179.5" r="5.5"/>
+          <circle class="pt-new" cx="83.4" cy="168.7" r="5.5"/>
+          <circle class="pt-new" cx="222.8" cy="107.4" r="5.5"/>
+          <text class="d-t" x="16" y="229.6">converged: F = 84.8</text>
+          <text class="d-h" x="339" y="20">Start 2: one seed per blob</text>
+          <rect class="d-plot" x="339" y="34" width="285.2" height="173.6"/>
+          <circle class="pt-tree" cx="415.7" cy="158.9" r="4.2"/>
+          <circle class="pt-tree" cx="375" cy="183" r="4.2"/>
+          <circle class="pt-tree" cx="395.5" cy="186.6" r="4.2"/>
+          <circle class="pt-tree" cx="394.4" cy="163.4" r="4.2"/>
+          <circle class="pt-tree" cx="364.7" cy="191" r="4.2"/>
+          <circle class="pt-tree" cx="405.3" cy="138.8" r="4.2"/>
+          <circle class="pt-tree" cx="409.5" cy="179.2" r="4.2"/>
+          <circle class="pt-tree" cx="414.4" cy="163" r="4.2"/>
+          <circle class="pt-tree" cx="408.8" cy="174.5" r="4.2"/>
+          <circle class="pt-tree" cx="384" cy="163.3" r="4.2"/>
+          <circle class="pt-tree" cx="407.5" cy="177.1" r="4.2"/>
+          <circle class="pt-tree" cx="356.1" cy="179.7" r="4.2"/>
+          <circle class="pt-tree" cx="381" cy="180.5" r="4.2"/>
+          <circle class="pt-tree" cx="406.2" cy="177.1" r="4.2"/>
+          <circle class="pt-plain" cx="530.5" cy="77.1" r="4.2"/>
+          <circle class="pt-plain" cx="500.6" cy="53.1" r="4.2"/>
+          <circle class="pt-plain" cx="509.6" cy="81.2" r="4.2"/>
+          <circle class="pt-plain" cx="495" cy="83" r="4.2"/>
+          <circle class="pt-plain" cx="475.2" cy="82.6" r="4.2"/>
+          <circle class="pt-plain" cx="499.5" cy="99.5" r="4.2"/>
+          <circle class="pt-plain" cx="476.6" cy="63.8" r="4.2"/>
+          <circle class="pt-plain" cx="528.4" cy="79.9" r="4.2"/>
+          <circle class="pt-plain" cx="533.8" cy="78.2" r="4.2"/>
+          <circle class="pt-plain" cx="507" cy="61.6" r="4.2"/>
+          <circle class="pt-plain" cx="520.5" cy="72.7" r="4.2"/>
+          <circle class="pt-plain" cx="512.4" cy="76.7" r="4.2"/>
+          <circle class="pt-plain" cx="530" cy="75.6" r="4.2"/>
+          <circle class="pt-plain" cx="513" cy="91.7" r="4.2"/>
+          <circle class="pt-no" cx="561.9" cy="141.3" r="4.2"/>
+          <circle class="pt-no" cx="593.5" cy="161.6" r="4.2"/>
+          <circle class="pt-no" cx="607.9" cy="145.6" r="4.2"/>
+          <circle class="pt-no" cx="595.7" cy="111.1" r="4.2"/>
+          <circle class="pt-no" cx="558.8" cy="146.9" r="4.2"/>
+          <circle class="pt-no" cx="598.2" cy="150.8" r="4.2"/>
+          <circle class="pt-no" cx="581" cy="142.9" r="4.2"/>
+          <circle class="pt-no" cx="597.5" cy="121.6" r="4.2"/>
+          <circle class="pt-no" cx="586.6" cy="89.7" r="4.2"/>
+          <circle class="pt-no" cx="587.5" cy="132.1" r="4.2"/>
+          <circle class="pt-no" cx="597" cy="138.8" r="4.2"/>
+          <circle class="pt-no" cx="560.1" cy="148.9" r="4.2"/>
+          <circle class="pt-no" cx="562.4" cy="135.4" r="4.2"/>
+          <circle class="pt-no" cx="561.7" cy="163.4" r="4.2"/>
+          <circle class="d-ln" style="stroke-width:1.6" cx="375" cy="183" r="8.5"/>
+          <line class="d-ln d-dash" x1="383.7" y1="178.2" x2="387.1" y2="176.4" marker-end="url(#p07-ah4b)"/>
+          <circle class="d-ln" style="stroke-width:1.6" cx="495" cy="83" r="8.5"/>
+          <circle class="d-ln" style="stroke-width:1.6" cx="598.2" cy="150.8" r="8.5"/>
+          <line class="d-ln d-dash" x1="590.4" y1="144.5" x2="588.4" y2="142.9" marker-end="url(#p07-ah4b)"/>
+          <circle class="pt-new" cx="394.1" cy="172.6" r="5.5"/>
+          <circle class="pt-new" cx="509.4" cy="76.9" r="5.5"/>
+          <circle class="pt-new" cx="582.1" cy="137.9" r="5.5"/>
+          <text class="d-t" x="339" y="229.6">converged: F = 23.5</text>
+          <text class="d-s" x="16" y="258">rings: starting means (data points) · yellow: converged means · marker style: final cluster</text>
+          </svg>
+        </div>
+        <figcaption><b>Same data, two random starts.</b> Synthetic data (42 points in three blobs, two of them close together) generated for this page. Both starts use data points as the initial means. Start 1 takes two from the same far blob; Lloyd's algorithm converges with that blob split in two and the two near blobs merged, objective 84.8. Start 2 converges to the natural clusters, objective 23.5. Restarting and keeping the lower objective returns start 2.</figcaption>
+      </figure>
+    </section>
+
+    <section id="kmeans-pp">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=290s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 4:50</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=321s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 5:21 the idea</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=423s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 7:03 the algorithm</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=657s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 10:57 the score</a>
+        </div>
+        <h2>K-means++: spread the initial means out</h2>
+      </div>
+      <p>A more principled option is <dfn>K-means++</dfn>, which is the usual K-means (Lloyd's) algorithm with a better initialization. It still starts from K data points, but picks them with care.</p>
+      <p>What should good initial means look like? At convergence the means represent the clusters: the whole data set is compressed into K representatives. Representatives should be as different from each other as possible. If two of them were close, two clusters would describe nearly the same thing, and one cluster would do. So K-means++ starts with means that are far apart, with a probabilistic twist, and it picks them one at a time instead of all at once.</p>
+      <ol class="algo">
+        <li class="algo-title">K-means++ initialization (superscript 0 marks the initial means)</li>
+        <li>Pick the first mean \(\boldsymbol\mu^0_1\) uniformly at random from \(\{\mathbf{x}_1, \dots, \mathbf{x}_n\}\).</li>
+        <li>For \(l = 2, \dots, K\):
+          <ul>
+            <li>Give every data point the score \(s(\mathbf{x}) = \min_{j = 1, \dots, l-1} \lVert \mathbf{x} - \boldsymbol\mu^0_j \rVert^2\), its squared distance to the closest mean picked so far.</li>
+            <li>Pick \(\boldsymbol\mu^0_l\) at random from the data points, choosing \(\mathbf{x}_i\) with probability \(s(\mathbf{x}_i) \,/\, \sum_{m=1}^n s(\mathbf{x}_m)\).</li>
+          </ul>
+        </li>
+        <li>Run Lloyd's algorithm starting from \(\boldsymbol\mu^0_1, \dots, \boldsymbol\mu^0_K\).</li>
+      </ol>
+      <p>Why the minimum? The distance to the closest chosen mean measures how far a point is from all of them: if even the closest one is far away, every chosen mean is far away. A point that has already been picked has score 0, so it cannot be picked twice. Standard name: sampling in proportion to this squared distance is called <dfn>D² sampling</dfn>.</p>
+
+      <h3>Sampling in proportion to a score <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=530s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 8:50</a></h3>
+      <p>Scores become probabilities by dividing each by their total. Suppose only three points remain, with scores 10, 20 and 30. The total is 60, so:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Point</th><th class="num">Score s(x)</th><th class="num">Probability</th></tr></thead>
+          <tbody>
+            <tr><td>\(\mathbf{x}_1\)</td><td class="num">10</td><td class="num">10/60 = 1/6</td></tr>
+            <tr><td>\(\mathbf{x}_2\)</td><td class="num">20</td><td class="num">20/60 = 1/3</td></tr>
+            <tr><td>\(\mathbf{x}_3\)</td><td class="num">30</td><td class="num">30/60 = 1/2</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>With 1000 points and 5 means already picked, the other 995 points are the candidates for the sixth mean, and the same normalization turns their 995 scores into a probability distribution to sample from.</p>
+
+      <figure id="pp-fig">
+        <div class="controls">
+          <label for="pp-k">Means to pick K</label>
+          <input type="range" id="pp-k" min="2" max="6" step="1" value="4">
+          <output id="pp-k-out" for="pp-k">4</output>
+          <button class="btn" id="pp-next" type="button">Pick next mean</button>
+          <button class="btn" id="pp-reset" type="button">Start again</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Means picked</span><span class="v" id="pp-count">–</span></div>
+          <div><span class="k">Sum of scores Σ s(x)</span><span class="v mine" id="pp-sum">–</span></div>
+          <div><span class="k">Most likely next pick</span><span class="v" id="pp-max">–</span></div>
+        </div>
+        <div class="status" id="pp-status" aria-live="polite"></div>
+        <div class="chart-wrap sq" id="pp-wrap">
+          <svg id="pp-svg" viewBox="0 0 400 400" role="img" aria-label="Forty synthetic points in four blobs. The means picked so far are marked; each point has a halo whose area is its probability of being picked next, proportional to its squared distance to the nearest picked mean."></svg>
+          <div class="tip" id="pp-tip" hidden></div>
+        </div>
+        <figcaption><b>K-means++ picking its initial means</b>, on synthetic data (40 points in four blobs) generated for this page. A halo's area is proportional to the chance that point is picked next: its score (squared length of its thin grey line to the nearest picked mean) over the sum of all scores. The ringed point is the most likely next pick, but any point with a halo can be picked. Hover a point for its score. Once K means are picked, the sum of scores is the objective of assigning each point to its nearest initial mean.</figcaption>
+      </figure>
+    </section>
+
+    <section id="why-random">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=755s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 12:35</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=824s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 13:44 adversarial data</a>
+        </div>
+        <h2>Why sample instead of taking the farthest point?</h2>
+      </div>
+      <p>Why not simply take the point with the largest score, the one whose nearest chosen mean is farthest away? In the example that rule always picks \(\mathbf{x}_3\). Under K-means++, \(\mathbf{x}_3\) is still the most likely pick (probability 1/2), but \(\mathbf{x}_2\) or even \(\mathbf{x}_1\) can be chosen.</p>
+      <p>The randomness is what makes a guarantee possible. For any deterministic rule one can build an adversarial data set on which the guarantee fails. A randomized rule can instead promise something on average. K-means++ does the natural thing: the point the deterministic rule would choose gets the highest probability, and every other point still gets some.</p>
+    </section>
+
+    <section id="guarantee">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=858s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 14:18</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=956s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 15:56 NP-hard</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=1027s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 17:07 the cost</a>
+        </div>
+        <h2>The guarantee, and the cost</h2>
+      </div>
+      <p>Run K-means++ and then Lloyd's algorithm. Once the initial means are fixed, Lloyd's algorithm is deterministic. The initial means are random, though, so the final objective value is a random quantity. The guarantee compares its expected value, over the random initialization, with the best objective any partition can achieve.</p>
+      <div class="result">
+        <span class="lbl">K-means++ guarantee (stated, not proved, in the course)</span>
+        \[ \mathbb{E}\Big[\sum_{i=1}^n \lVert\mathbf{x}_i - \boldsymbol\mu_{z_i}\rVert^2\Big] \;\le\; c \cdot \min_{z_1, \dots, z_n} \sum_{i=1}^n \lVert\mathbf{x}_i - \boldsymbol\mu_{z_i}\rVert^2 \]
+        <p>Here \(c\) is a constant factor that does not depend on the data. Finding the minimizing partition on the right is NP-hard, so we cannot expect to reach it. K-means++ promises that on average it will not be too far away. For example, if the best possible objective is 10, the average K-means++ objective might be at most \(5 \times 10 = 50\): worse than the best, but not by much. <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=992s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:32</a></p>
+      </div>
+      <p class="note">Standard result, beyond the lecture (Arthur and Vassilvitskii, 2007): the factor is \(c = 8(\ln K + 2)\), so it grows only slowly with K. It already holds for the initial means alone, and Lloyd's iterations can only lower the objective from there.</p>
+
+      <h3>The cost <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=1027s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L17 · 17:07</a></h3>
+      <p>The price is time. Each of the K rounds computes a score for every data point, normalizes the scores and samples. With a billion points and 10 means, that is 10 passes over a billion points before Lloyd's algorithm even starts. There are tricks to speed this up, but the K rounds remain.</p>
+      <p>Picking K points uniformly at random, and trying several times, is faster, but it is not principled: nothing pushes the means apart. Even so, in practice, especially with high-dimensional data, the uniform method is used extensively. The choice depends on how much time and computing you have. K-means++ is a solid way to initialize when you can afford it. <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=Cbrdtxq6bdk&amp;t=1061s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>17:41</a></p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Initialization</th><th>How the start is chosen</th><th>Cost</th><th>Guarantee</th></tr></thead>
+          <tbody>
+            <tr><td>Random boxes</td><td>Each point to a random cluster</td><td>Cheap</td><td>None; ignores the data</td></tr>
+            <tr><td>Random data points + restarts</td><td>K points uniformly at random; repeat, keep the lowest objective</td><td>Cheap per run</td><td>None, but widely used</td></tr>
+            <tr><td>K-means++</td><td>One at a time, in proportion to squared distance to the nearest chosen mean</td><td>K passes over the data</td><td>Expected objective \(\le c \times\) optimum</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ LECTURE 18 ============ -->
+    <section id="choose-k">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=8s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 0:08</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=78s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 1:18 the objective</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=115s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 1:55 K = n</a>
+        </div>
+        <h2>The objective alone cannot pick K</h2>
+      </div>
+      <p>In practice nobody gives you K. You get data points, and usually you do not know how many natural clusters they contain, so K has to be chosen from the data. The lecture gives broad principles. The specific methods are all heuristics, there are more of them than one lecture can cover, and some are worked through in tutorial sessions.</p>
+      <p>Could the objective itself choose K? Recall</p>
+      <div class="eq">\[ F(z_1, \dots, z_n) = \sum_{i=1}^n \lVert \mathbf{x}_i - \boldsymbol\mu_{z_i} \rVert^2 \]</div>
+      <p>Take \(K = n\). Every data point is its own cluster and its own mean, every term is 0, and \(F = 0\), the smallest value \(F\) can take. If K were chosen by minimizing \(F\) as well, \(K = n\) would always win. That is useless: a separate cluster for every point is hardly a clustering, and it compresses nothing.</p>
+      <p>So two goals pull in opposite directions. For a fixed K we still want the partition that minimizes \(F\), or gets as close as we can. But we also want K small, because the point is to understand the data in compressed form. A larger K always allows a lower objective, so the objective alone cannot decide K.</p>
+    </section>
+
+    <section id="penalty">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=248s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 4:08</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=315s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 5:15 paying for a cluster</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=410s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 6:50 the plot</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=544s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 9:04 the procedure</a>
+        </div>
+        <h2>Objective plus a penalty on K</h2>
+      </div>
+      <p>For each candidate K, measure two things: the objective of the partition the algorithm returns, and how big K is. Then penalize large K:</p>
+      <div class="eq">\[ K^* = \arg\min_{K} \;\Big[\, F_K + \text{penalty}(K) \,\Big] \]</div>
+      <p class="note">\(F_K\) is the objective of the best partition found with K clusters, and \(\text{penalty}(K)\) is an increasing function of K that we choose.</p>
+      <p>Think of the penalty as the price of buying one more cluster. Going from \(K = 5\) to \(K = 6\) costs \(\text{penalty}(6) - \text{penalty}(5)\). With more clusters, clusters typically get smaller and points get closer to their means, so the objective drops. The purchase is worth it only if it drops by more than the price. From \(K = 1\) to \(K = 2\) the drop is usually large, since with one cluster nothing is really being clustered. As K grows, the price keeps rising while the extra drop shrinks, and somewhere the two balance.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 318" role="img" aria-label="For 60 synthetic points in four blobs, the best K-means objective falls steeply from K = 1 to K = 4 and then flattens. A penalty of 45 per cluster rises in a straight line. Their sum falls, then rises, with its minimum at K = 4.">
+          <line class="d-rule" x1="58" y1="270" x2="458" y2="270"/><text class="d-al" x="50" y="274" text-anchor="end">0</text>
+          <line class="d-rule" x1="58" y1="245" x2="458" y2="245"/><text class="d-al" x="50" y="249" text-anchor="end">100</text>
+          <line class="d-rule" x1="58" y1="220" x2="458" y2="220"/><text class="d-al" x="50" y="224" text-anchor="end">200</text>
+          <line class="d-rule" x1="58" y1="195" x2="458" y2="195"/><text class="d-al" x="50" y="199" text-anchor="end">300</text>
+          <line class="d-rule" x1="58" y1="170" x2="458" y2="170"/><text class="d-al" x="50" y="174" text-anchor="end">400</text>
+          <line class="d-rule" x1="58" y1="145" x2="458" y2="145"/><text class="d-al" x="50" y="149" text-anchor="end">500</text>
+          <line class="d-rule" x1="58" y1="120" x2="458" y2="120"/><text class="d-al" x="50" y="124" text-anchor="end">600</text>
+          <line class="d-rule" x1="58" y1="95" x2="458" y2="95"/><text class="d-al" x="50" y="99" text-anchor="end">700</text>
+          <line class="d-rule" x1="58" y1="70" x2="458" y2="70"/><text class="d-al" x="50" y="74" text-anchor="end">800</text>
+          <line class="d-rule" x1="58" y1="45" x2="458" y2="45"/><text class="d-al" x="50" y="49" text-anchor="end">900</text>
+          <line class="d-rule" x1="58" y1="20" x2="458" y2="20"/><text class="d-al" x="50" y="24" text-anchor="end">1000</text>
+          <text class="d-al" x="78" y="286" text-anchor="middle">1</text>
+          <text class="d-al" x="118" y="286" text-anchor="middle">2</text>
+          <text class="d-al" x="158" y="286" text-anchor="middle">3</text>
+          <text class="d-al" x="198" y="286" text-anchor="middle">4</text>
+          <text class="d-al" x="238" y="286" text-anchor="middle">5</text>
+          <text class="d-al" x="278" y="286" text-anchor="middle">6</text>
+          <text class="d-al" x="318" y="286" text-anchor="middle">7</text>
+          <text class="d-al" x="358" y="286" text-anchor="middle">8</text>
+          <text class="d-al" x="398" y="286" text-anchor="middle">9</text>
+          <text class="d-al" x="438" y="286" text-anchor="middle">10</text>
+          <line class="d-ln" x1="58" y1="270" x2="458" y2="270"/>
+          <text class="d-s" x="258" y="306" text-anchor="middle">number of clusters K</text>
+          <text class="d-s" x="14" y="145" text-anchor="middle" transform="rotate(-90 14 145)">value</text>
+          <line class="d-ln-mut" style="stroke-width:1.2" x1="198" y1="20" x2="198" y2="270"/>
+          <polyline class="d-ln d-dash" points="78,258.8 118,247.5 158,236.3 198,225 238,213.8 278,202.5 318,191.3 358,180 398,168.8 438,157.5"/>
+          <polyline class="d-ln" style="stroke-width:1.8" points="78,42.5 118,156.3 158,211.8 198,248.3 238,252.6 278,255.2 318,257.3 358,258.8 398,259.5 438,260.7"/>
+          <polyline class="d-ln-acc" style="stroke-width:2.2" points="78,31.2 118,133.8 158,178 198,203.3 238,196.3 278,187.7 318,178.6 358,168.8 398,158.2 438,148.2"/>
+          <circle class="pt-plain" cx="78" cy="42.5" r="3.6"/>
+          <circle class="pt-plain" cx="118" cy="156.3" r="3.6"/>
+          <circle class="pt-plain" cx="158" cy="211.8" r="3.6"/>
+          <circle class="pt-plain" cx="198" cy="248.3" r="3.6"/>
+          <circle class="pt-plain" cx="238" cy="252.6" r="3.6"/>
+          <circle class="pt-plain" cx="278" cy="255.2" r="3.6"/>
+          <circle class="pt-plain" cx="318" cy="257.3" r="3.6"/>
+          <circle class="pt-plain" cx="358" cy="258.8" r="3.6"/>
+          <circle class="pt-plain" cx="398" cy="259.5" r="3.6"/>
+          <circle class="pt-plain" cx="438" cy="260.7" r="3.6"/>
+          <circle class="pt-no" cx="78" cy="258.8" r="3.2"/>
+          <circle class="pt-no" cx="118" cy="247.5" r="3.2"/>
+          <circle class="pt-no" cx="158" cy="236.3" r="3.2"/>
+          <circle class="pt-no" cx="198" cy="225" r="3.2"/>
+          <circle class="pt-no" cx="238" cy="213.8" r="3.2"/>
+          <circle class="pt-no" cx="278" cy="202.5" r="3.2"/>
+          <circle class="pt-no" cx="318" cy="191.3" r="3.2"/>
+          <circle class="pt-no" cx="358" cy="180" r="3.2"/>
+          <circle class="pt-no" cx="398" cy="168.8" r="3.2"/>
+          <circle class="pt-no" cx="438" cy="157.5" r="3.2"/>
+          <circle class="pt-tree" cx="78" cy="31.2" r="4"/>
+          <circle class="pt-tree" cx="118" cy="133.8" r="4"/>
+          <circle class="pt-tree" cx="158" cy="178" r="4"/>
+          <circle class="pt-new" cx="198" cy="203.3" r="6"/>
+          <circle class="pt-tree" cx="238" cy="196.3" r="4"/>
+          <circle class="pt-tree" cx="278" cy="187.7" r="4"/>
+          <circle class="pt-tree" cx="318" cy="178.6" r="4"/>
+          <circle class="pt-tree" cx="358" cy="168.8" r="4"/>
+          <circle class="pt-tree" cx="398" cy="158.2" r="4"/>
+          <circle class="pt-tree" cx="438" cy="148.2" r="4"/>
+          <text class="d-t" x="198" y="189.3" text-anchor="middle">K* = 4</text>
+          <line class="d-ln" style="stroke-width:1.8" x1="486" y1="26" x2="508" y2="26"/>
+          <circle class="pt-plain" cx="497" cy="26" r="3.6"/>
+          <text class="d-s" x="516" y="30">objective F (best run)</text>
+          <line class="d-ln d-dash" x1="486" y1="46" x2="508" y2="46"/>
+          <circle class="pt-no" cx="497" cy="46" r="3.2"/>
+          <text class="d-s" x="516" y="50">penalty 45 · K</text>
+          <line class="d-ln-acc" style="stroke-width:2.2" x1="486" y1="66" x2="508" y2="66"/>
+          <circle class="pt-tree" cx="497" cy="66" r="4"/>
+          <text class="d-s" x="516" y="70">objective + penalty</text>
+          <text class="d-row" x="488" y="106">The 60 points</text>
+          <rect class="d-plot" x="488" y="116" width="143" height="143"/>
+          <circle class="pt-plain" cx="510.7" cy="139" r="2.6"/>
+          <circle class="pt-plain" cx="515.6" cy="153.2" r="2.6"/>
+          <circle class="pt-plain" cx="537.7" cy="145.9" r="2.6"/>
+          <circle class="pt-plain" cx="520.1" cy="153" r="2.6"/>
+          <circle class="pt-plain" cx="510" cy="163.8" r="2.6"/>
+          <circle class="pt-plain" cx="512.9" cy="153.5" r="2.6"/>
+          <circle class="pt-plain" cx="535.9" cy="160.7" r="2.6"/>
+          <circle class="pt-plain" cx="519.6" cy="170.5" r="2.6"/>
+          <circle class="pt-plain" cx="516.4" cy="162.4" r="2.6"/>
+          <circle class="pt-plain" cx="527.8" cy="151.4" r="2.6"/>
+          <circle class="pt-plain" cx="523.3" cy="184.1" r="2.6"/>
+          <circle class="pt-plain" cx="517.8" cy="137.9" r="2.6"/>
+          <circle class="pt-plain" cx="526.4" cy="153" r="2.6"/>
+          <circle class="pt-plain" cx="523.2" cy="158.7" r="2.6"/>
+          <circle class="pt-plain" cx="534" cy="188.3" r="2.6"/>
+          <circle class="pt-plain" cx="523.6" cy="137.5" r="2.6"/>
+          <circle class="pt-plain" cx="583.1" cy="164.1" r="2.6"/>
+          <circle class="pt-plain" cx="579.4" cy="165.7" r="2.6"/>
+          <circle class="pt-plain" cx="610.4" cy="159.4" r="2.6"/>
+          <circle class="pt-plain" cx="598.1" cy="150.9" r="2.6"/>
+          <circle class="pt-plain" cx="599.7" cy="163" r="2.6"/>
+          <circle class="pt-plain" cx="619.5" cy="134.3" r="2.6"/>
+          <circle class="pt-plain" cx="586.4" cy="153.6" r="2.6"/>
+          <circle class="pt-plain" cx="586.5" cy="146.7" r="2.6"/>
+          <circle class="pt-plain" cx="623.3" cy="153.4" r="2.6"/>
+          <circle class="pt-plain" cx="585.7" cy="129.5" r="2.6"/>
+          <circle class="pt-plain" cx="596.4" cy="158" r="2.6"/>
+          <circle class="pt-plain" cx="589.6" cy="141.6" r="2.6"/>
+          <circle class="pt-plain" cx="598.8" cy="160.4" r="2.6"/>
+          <circle class="pt-plain" cx="581.1" cy="147.6" r="2.6"/>
+          <circle class="pt-plain" cx="520.6" cy="243.2" r="2.6"/>
+          <circle class="pt-plain" cx="532.9" cy="218.5" r="2.6"/>
+          <circle class="pt-plain" cx="529.9" cy="225.3" r="2.6"/>
+          <circle class="pt-plain" cx="517.3" cy="221.9" r="2.6"/>
+          <circle class="pt-plain" cx="536.2" cy="226" r="2.6"/>
+          <circle class="pt-plain" cx="527.7" cy="206.7" r="2.6"/>
+          <circle class="pt-plain" cx="543.1" cy="246.8" r="2.6"/>
+          <circle class="pt-plain" cx="545.8" cy="232.1" r="2.6"/>
+          <circle class="pt-plain" cx="511" cy="220.6" r="2.6"/>
+          <circle class="pt-plain" cx="536.8" cy="227.7" r="2.6"/>
+          <circle class="pt-plain" cx="524.8" cy="220.7" r="2.6"/>
+          <circle class="pt-plain" cx="517.8" cy="213.5" r="2.6"/>
+          <circle class="pt-plain" cx="526.4" cy="221.8" r="2.6"/>
+          <circle class="pt-plain" cx="530.4" cy="233.3" r="2.6"/>
+          <circle class="pt-plain" cx="525.1" cy="203.6" r="2.6"/>
+          <circle class="pt-plain" cx="511.2" cy="209" r="2.6"/>
+          <circle class="pt-plain" cx="526.3" cy="243.4" r="2.6"/>
+          <circle class="pt-plain" cx="613.4" cy="215.9" r="2.6"/>
+          <circle class="pt-plain" cx="600.8" cy="219.6" r="2.6"/>
+          <circle class="pt-plain" cx="589.5" cy="210.4" r="2.6"/>
+          <circle class="pt-plain" cx="603.1" cy="213.2" r="2.6"/>
+          <circle class="pt-plain" cx="584.1" cy="225.4" r="2.6"/>
+          <circle class="pt-plain" cx="591.9" cy="218.3" r="2.6"/>
+          <circle class="pt-plain" cx="583.7" cy="199" r="2.6"/>
+          <circle class="pt-plain" cx="600.9" cy="202.5" r="2.6"/>
+          <circle class="pt-plain" cx="596.4" cy="217.7" r="2.6"/>
+          <circle class="pt-plain" cx="588.7" cy="200.2" r="2.6"/>
+          <circle class="pt-plain" cx="594.6" cy="206.8" r="2.6"/>
+          <circle class="pt-plain" cx="590.6" cy="222.8" r="2.6"/>
+          <circle class="pt-plain" cx="615.6" cy="210.4" r="2.6"/>
+          </svg>
+        </div>
+        <figcaption><b>Objective plus penalty picks K.</b> Synthetic data (60 points in four blobs) generated for this page. For each K the objective is the best of 25 K-means++ runs. With the illustrative penalty \(45K\), the sum is smallest at \(K^* = 4\). The objective keeps falling and would reach 0 at \(K = n = 60\). K takes whole values only; the lines just show the trend.</figcaption>
+      </figure>
+      <p>This is the lecture's sketch: against \(K = 1, 2, \dots, n\), the objective falls and reaches 0 at \(K = n\), the penalty rises, and their sum falls at first until the penalty takes over and it starts to rise. The K at the bottom is the choice.</p>
+      <ol class="algo">
+        <li class="algo-title">Choosing K by objective + penalty</li>
+        <li>For each candidate K, run Lloyd's algorithm. Any initialization works: K-means++, or uniform random starts run several times.</li>
+        <li>Keep the best partition for that K and its objective \(F_K\).</li>
+        <li>Compute \(F_K + \text{penalty}(K)\).</li>
+        <li>Choose the \(K^*\) with the smallest sum.</li>
+      </ol>
+      <p>What the procedure leaves open is the penalty function itself. That is where specific criteria come in.</p>
+    </section>
+
+    <section id="aic-bic">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=611s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 10:11</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=645s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 10:45 the formulas</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=718s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 11:58 assumptions</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=820s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 13:40 elbow</a>
+        </div>
+        <h2>AIC, BIC and the elbow method</h2>
+      </div>
+      <p>Two common criteria of the form "objective plus penalty":</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Criterion</th><th>Minimize</th><th>Penalty grows like</th></tr></thead>
+          <tbody>
+            <tr><td><b>AIC</b>, Akaike information criterion</td><td>\(2K - 2\ln\mathcal{L}\)</td><td>K</td></tr>
+            <tr><td><b>BIC</b>, Bayesian information criterion</td><td>\(K\ln n - 2\ln\mathcal{L}\)</td><td>K times \(\ln n\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Here \(\mathcal{L}\) is a <dfn>likelihood</dfn>: roughly, how probable the observed data is under parameters estimated from that data. The term \(-2\ln\mathcal{L}\) plays the part of the objective, measuring how well the model fits, and the other term is the penalty on K. Both penalties grow linearly in K. BIC's also grows with the number of points, through \(\ln n\).</p>
+      <p>Each criterion is optimal under a different assumption about how the data is generated probabilistically. With such an assumption you can measure fit in a more nuanced way than the K-means objective, through the likelihood. The course has not yet modelled data probabilistically, so the lecture leaves the details for later. Estimation starts in <a href="part-08.html">Part 8</a>, and the lecture plans to revisit model selection once that is in place.</p>
+      <p class="note">Standard definitions: the K in AIC and BIC counts the free parameters of the probabilistic model. For a clustering model that number grows with the number of clusters.</p>
+      <p>These criteria are not set in stone. The <dfn>elbow method</dfn> and other choices are also common in practice. The lecture only names the elbow method. Standard description: plot the objective against K and pick the K where the curve bends from steep to flat. In the figure above that is \(K = 4\).</p>
+      <p class="rule-of-thumb">Run the algorithm for several values of K, then pick K with a criterion that balances the objective against a penalty on K.</p>
+    </section>
+
+    <section id="summary">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=892s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 14:52</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4-ycWgdMXD4&amp;t=953s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L18 · 15:53 what comes next</a>
+        </div>
+        <h2>Lloyd's algorithm: four questions, answered</h2>
+      </div>
+      <p>That completes the discussion of Lloyd's algorithm. The four questions posed about it in <a href="part-06.html#four-questions">Part 6</a> now all have answers:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Question</th><th>Answer</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Does it converge?</td><td>Yes, though possibly to a local optimum.</td><td><a href="part-06.html">Part 6</a></td></tr>
+            <tr><td>What clusters does it produce?</td><td>Voronoi regions. With the kernel trick, Voronoi regions in a high-dimensional space.</td><td><a href="#voronoi">L16</a></td></tr>
+            <tr><td>How should it be initialized?</td><td>K-means++, which comes with a guarantee on the expected objective (or random data points with restarts).</td><td><a href="#kmeans-pp">L17</a></td></tr>
+            <tr><td>How do we choose K?</td><td>Minimize objective + penalty(K).</td><td><a href="#penalty">L18</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>This ends clustering. So far the course has been about unsupervised learning: representation learning (PCA and kernel PCA) and clustering, with K-means as the main example. The next topic, <a href="part-08.html">estimation</a>, continues with unsupervised learning, but it will later apply to supervised learning too, so it acts as a bridge between the two.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Convergence condition</dt><dd>At convergence every point is at least as close to its own mean as to any other mean.</dd></div>
+        <div><dt>Perpendicular bisector</dt><dd>The line (hyperplane) through the midpoint of two means at right angles to the segment between them; the K = 2 boundary.</dd></div>
+        <div><dt>Half-space</dt><dd>One side of a line in \(\mathbb{R}^2\), or of a hyperplane in \(\mathbb{R}^d\): \(\{\mathbf{x} : \mathbf{x}^\top\mathbf{w} \le b\}\).</dd></div>
+        <div><dt>Voronoi region</dt><dd>The set of points closer to one centre than to every other; an intersection of \(K-1\) half-spaces. K-means clusters lie in them.</dd></div>
+        <div><dt>Kernel K-means</dt><dd>K-means run in a high-dimensional feature space via the kernel trick, so clusters can be non-linear in the original space.</dd></div>
+        <div><dt>Local minimum</dt><dd>A partition Lloyd's algorithm cannot improve on by its own steps, though better partitions exist.</dd></div>
+        <div><dt>Random initialization</dt><dd>Start from K data points picked uniformly at random as the means.</dd></div>
+        <div><dt>Restarts</dt><dd>Run from several random starts and keep the partition with the lowest objective.</dd></div>
+        <div><dt>K-means++</dt><dd>Lloyd's algorithm with initial means picked one at a time by D² sampling.</dd></div>
+        <div><dt>Score / D² sampling</dt><dd>\(s(\mathbf{x}) = \min_j \lVert\mathbf{x} - \boldsymbol\mu^0_j\rVert^2\); the next mean is \(\mathbf{x}_i\) with probability \(s(\mathbf{x}_i)/\sum_m s(\mathbf{x}_m)\).</dd></div>
+        <div><dt>Penalty on K</dt><dd>An increasing function of K added to the objective so that extra clusters must pay for themselves.</dd></div>
+        <div><dt>AIC</dt><dd>Akaike information criterion, \(2K - 2\ln\mathcal{L}\): penalty linear in K.</dd></div>
+        <div><dt>BIC</dt><dd>Bayesian information criterion, \(K\ln n - 2\ln\mathcal{L}\): penalty grows with K and with \(\ln n\).</dd></div>
+        <div><dt>Elbow method</dt><dd>Pick the K where the objective-versus-K curve bends from steep to flat.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>K-means with K = 2 has converged with \(\boldsymbol\mu_1 = (0, 0)\) and \(\boldsymbol\mu_2 = (4, 0)\). Which points can belong to cluster 1?</span><span class="tog"></span></summary>
+          <p>\(\mathbf{x}^\top(\boldsymbol\mu_2 - \boldsymbol\mu_1) \le \tfrac12(16 - 0)\), that is \(4x \le 8\), or \(x \le 2\). The boundary is the vertical line \(x = 2\), the perpendicular bisector of the two means.</p></details>
+        <details><summary><span class="q">Q2</span><span>Write the boundary between \(\boldsymbol\mu_1 = (1, 1)\) and \(\boldsymbol\mu_2 = (3, 5)\), and check that the midpoint lies on it.</span><span class="tog"></span></summary>
+          <p>\(\mathbf{w} = (2, 4)\) and \(b = \tfrac12(9 + 25 - 1 - 1) = 16\), so the boundary is \(2x + 4y = 16\), or \(x + 2y = 8\). The midpoint \((2, 3)\) gives \(2 + 6 = 8\).</p></details>
+        <details><summary><span class="q">Q3</span><span>With K = 4, how many half-spaces cut out each cluster's region, and how many pairwise bisectors are there?</span><span class="tog"></span></summary>
+          <p>Each region is an intersection of \(K - 1 = 3\) half-spaces, one for each other mean. There is one bisector per pair of means: \(4 \times 3 / 2 = 6\).</p></details>
+        <details><summary><span class="q">Q4</span><span>Why can't K-means with K = 2 put an inner circle of points in one cluster and the surrounding ring in the other?</span><span class="tog"></span></summary>
+          <p>The converged clusters lie in Voronoi regions, so with K = 2 they are separated by a straight line. No line can have the whole ring on one side and the inner circle on the other, because the ring surrounds the inner circle.</p></details>
+        <details><summary><span class="q">Q5</span><span>One-dimensional data \(0, 1, 2, 10\). K-means++ has picked \(\mu^0_1 = 0\). What is the probability of each point becoming \(\mu^0_2\)?</span><span class="tog"></span></summary>
+          <p>Scores are squared distances to 0: \(0, 1, 4, 100\), total 105. Probabilities: \(0\), \(1/105 \approx 0.010\), \(4/105 \approx 0.038\), \(100/105 \approx 0.952\). The far point is very likely, but not certain.</p></details>
+        <details><summary><span class="q">Q6</span><span>Why does K-means++ sample instead of always taking the point farthest from the chosen means?</span><span class="tog"></span></summary>
+          <p>Its guarantee is about the expected objective. For any deterministic rule, an adversarial data set can be built on which the guarantee fails. Randomizing, while still giving the farthest point the highest probability, allows a guarantee on average.</p></details>
+        <details><summary><span class="q">Q7</span><span>In the objective-plus-penalty figure, \(F_3 = 232.8\), \(F_4 = 87.0\), \(F_5 = 69.8\) and the penalty is \(45K\). Is the fourth cluster worth buying? The fifth?</span><span class="tog"></span></summary>
+          <p>The fourth costs 45 and lowers the objective by 145.8, so yes. The fifth costs 45 but lowers it by only 17.2, so no, and every later cluster lowers it by even less. So \(K^* = 4\).</p></details>
+        <details><summary><span class="q">Q8</span><span>For \(n = 100\) points, which penalizes each extra unit of K more, AIC or BIC?</span><span class="tog"></span></summary>
+          <p>AIC adds 2 per unit of K; BIC adds \(\ln 100 \approx 4.6\). BIC penalizes more whenever \(\ln n > 2\), that is for \(n \ge 8\).</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-06.html"><span class="dir">← Part 6</span><span class="nm">K-means: the algorithm and its convergence</span></a><a class="next" href="index.html"><span class="dir">Part 8 · coming</span><span class="nm">Estimation: maximum likelihood and Bayesian</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const mkRand = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const mkNormal = rand => () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+  const d2 = (p, q) => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2;
+  const blobs = (seed, spec) => { const rand = mkRand(seed), normal = mkNormal(rand), pts = []; spec.forEach(([cx, cy, n, sd]) => { for (let i = 0; i < n; i++) { const x = cx + sd * normal(), y = cy + sd * normal(); if (x < 0.3 || x > 9.7 || y < 0.3 || y > 9.7) { i--; continue; } pts.push([x, y]); } }); return pts; };
+  const frame = (svg, sx, sy) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = 0; v <= 10; v += 2) { mk('line', { x1: sx(0), x2: sx(10), y1: sy(v), y2: sy(v) }, g); mk('line', { x1: sx(v), x2: sx(v), y1: sy(0), y2: sy(10) }, g); }
+  };
+  const LBL = 'paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round';
+  const toLocal = (svg, e) => { const ctm = svg.getScreenCTM(); if (!ctm) return null; const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(ctm.inverse()); };
+
+  /* ---------- Voronoi regions of draggable means, with Lloyd steps ---------- */
+  (() => {
+    const svg = document.getElementById('vor-svg'); if (!svg) return;
+    const pts = blobs(1607, [[2.6, 7.1, 22, 0.9], [7.3, 7.6, 18, 0.8], [5.1, 2.7, 24, 1.0]]);
+    const n = pts.length;
+    const P = 20, S = (400 - 2 * P) / 10;
+    const sx = x => P + x * S, sy = y => 400 - P - y * S, ix = px => (px - P) / S, iy = py => (400 - P - py) / S;
+    const fills = ['fill: var(--accent-soft)', 'fill: var(--ok-soft)', 'fill: var(--mark); fill-opacity: .5', 'fill: var(--rule); fill-opacity: .7'];
+    const presets = [[1.4, 4.4], [4.4, 8.9], [8.9, 4.6], [5.4, 5.6]];
+    const gCells = mk('g', {}, svg);
+    frame(svg, sx, sy);
+    const gEdges = mk('g', {}, svg);
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    pts.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.6 }, gDots));
+    mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P, style: 'fill: none; stroke: var(--rule)' }, svg);
+    const gMeans = mk('g', {}, svg);
+    const kIn = document.getElementById('vor-k'), kOut = document.getElementById('vor-k-out');
+    const objOut = document.getElementById('vor-obj'), stepOut = document.getElementById('vor-steps'), status = document.getElementById('vor-status');
+    let pick = mkRand(4242);
+    let K = parseInt(kIn.value, 10), mu = presets.slice(0, K).map(p => p.slice()), steps = 0, busy = false, drag = -1, handles = [];
+
+    const clip = (poly, a, c) => { const out = []; for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; const fp = a[0] * p[0] + a[1] * p[1] - c, fq = a[0] * q[0] + a[1] * q[1] - c; if (fp <= 0) out.push(p); if ((fp < 0 && fq > 0) || (fp > 0 && fq < 0)) { const t = fp / (fp - fq); out.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]); } } return out; };
+    const cellOf = k => { let poly = [[0, 0], [10, 0], [10, 10], [0, 10]]; mu.forEach((m, j) => { if (j === k) return; const a = [m[0] - mu[k][0], m[1] - mu[k][1]]; if (Math.abs(a[0]) + Math.abs(a[1]) < 1e-12) return; poly = clip(poly, a, (m[0] * m[0] + m[1] * m[1] - mu[k][0] ** 2 - mu[k][1] ** 2) / 2); }); return poly; };
+    const assign = () => pts.map(p => { let b = 0, bd = Infinity; mu.forEach((m, k) => { const d = d2(p, m); if (d < bd) { bd = d; b = k; } }); return b; });
+    const objective = z => pts.reduce((s, p, i) => s + d2(p, mu[z[i]]), 0);
+
+    const buildHandles = () => {
+      gMeans.textContent = '';
+      handles = mu.map((_, k) => {
+        const g = mk('g', { tabindex: 0, role: 'button', 'aria-label': `Mean ${k + 1}: drag, or use the arrow keys`, style: 'cursor: grab; touch-action: none' }, gMeans);
+        mk('circle', { r: 16, style: 'fill: var(--surface); fill-opacity: 0' }, g);
+        mk('circle', { r: 7.5, class: 'c-centroid' }, g);
+        const t = mk('text', { x: 11, y: -9, class: 'c-note', style: LBL }, g); t.textContent = 'μ' + '₁₂₃₄'[k];
+        g.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+        g.addEventListener('pointerdown', e => { if (busy) return; drag = k; g.setPointerCapture && g.setPointerCapture(e.pointerId); e.preventDefault(); });
+        g.addEventListener('pointermove', e => { if (drag !== k) return; const loc = toLocal(svg, e); if (!loc) return; mu[k] = [Math.min(9.8, Math.max(0.2, ix(loc.x))), Math.min(9.8, Math.max(0.2, iy(loc.y)))]; steps = 0; draw(); });
+        const end = () => { if (drag === k) { drag = -1; draw(); } };
+        g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
+        g.addEventListener('keydown', e => { const dv = { ArrowLeft: [-0.25, 0], ArrowRight: [0.25, 0], ArrowUp: [0, 0.25], ArrowDown: [0, -0.25] }[e.key]; if (!dv || busy) return; e.preventDefault(); mu[k] = [Math.min(9.8, Math.max(0.2, mu[k][0] + dv[0])), Math.min(9.8, Math.max(0.2, mu[k][1] + dv[1]))]; steps = 0; draw(); });
+        return g;
+      });
+    };
+    const draw = (msg) => {
+      gCells.textContent = ''; gEdges.textContent = '';
+      mu.forEach((_, k) => { const c = cellOf(k); if (c.length < 3) return; const d = c.map(p => sx(p[0]).toFixed(1) + ',' + sy(p[1]).toFixed(1)).join(' '); mk('polygon', { points: d, style: fills[k] }, gCells); mk('polygon', { points: d, style: 'fill: none; stroke: var(--ink-2); stroke-width: 1.3; stroke-linejoin: round' }, gEdges); });
+      handles.forEach((g, k) => g.setAttribute('transform', `translate(${sx(mu[k][0]).toFixed(1)} ${sy(mu[k][1]).toFixed(1)})`));
+      const z = assign();
+      objOut.textContent = objective(z).toFixed(1);
+      stepOut.textContent = String(steps);
+      kOut.textContent = String(K);
+      if (msg !== undefined) status.textContent = msg;
+      else if (drag >= 0) status.textContent = '';
+    };
+    const lloydTarget = () => { const z = assign(); return mu.map((m, k) => { const mem = pts.filter((_, i) => z[i] === k); if (!mem.length) return m.slice(); return [mem.reduce((s, p) => s + p[0], 0) / mem.length, mem.reduce((s, p) => s + p[1], 0) / mem.length]; }); };
+    const reset = (means, msg) => { mu = means; steps = 0; buildHandles(); draw(msg); };
+
+    reset(mu, 'Not converged yet: these means are not the averages of their regions. Try One Lloyd step.');
+    document.getElementById('vor-step').addEventListener('click', () => {
+      if (busy) return;
+      const from = mu.map(m => m.slice()), to = lloydTarget();
+      const moved = Math.max(...to.map((t, k) => d2(t, from[k])));
+      if (moved < 1e-12) { draw(`Converged after ${steps} step${steps === 1 ? '' : 's'}: every mean is the average of the points in its own Voronoi region, so no point changes cluster.`); return; }
+      busy = true; steps += 1;
+      tween(0, 1, v => { mu = from.map((f, k) => [f[0] + (to[k][0] - f[0]) * v, f[1] + (to[k][1] - f[1]) * v]); draw(v >= 1 ? 'Each mean moved to the average of the points in its region; the regions were redrawn around the new means.' : undefined); if (v >= 1) { mu = to; busy = false; } });
+    });
+    document.getElementById('vor-shuffle').addEventListener('click', () => {
+      if (busy) return;
+      const idx = []; while (idx.length < K) { const i = Math.floor(pick() * n); if (!idx.includes(i)) idx.push(i); }
+      reset(idx.map(i => pts[i].slice()), `New start: ${K} data points picked uniformly at random as the means.`);
+    });
+    kIn.addEventListener('input', () => { if (busy) { kIn.value = K; return; } K = parseInt(kIn.value, 10); reset(presets.slice(0, K).map(p => p.slice()), ''); });
+  })();
+
+  /* ---------- K-means++ seeding, step by step ---------- */
+  (() => {
+    const svg = document.getElementById('pp-svg'); if (!svg) return;
+    const pts = blobs(2718, [[2.2, 7.6, 12, 0.75], [7.8, 7.9, 9, 0.75], [3.0, 2.4, 11, 0.75], [7.6, 3.0, 8, 0.75]]);
+    const n = pts.length;
+    const P = 20, S = (400 - 2 * P) / 10;
+    const sx = x => P + x * S, sy = y => 400 - P - y * S;
+    frame(svg, sx, sy);
+    mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P, style: 'fill: none; stroke: var(--rule)' }, svg);
+    const gHalo = mk('g', {}, svg);
+    const halos = pts.map(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 0, style: 'fill: var(--accent-soft); fill-opacity: .75; stroke: var(--accent); stroke-width: 1' }, gHalo));
+    const gRes = mk('g', { class: 'c-resid' }, svg);
+    const res = pts.map(() => mk('line', {}, gRes));
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    pts.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.4 }, gDots));
+    const hl = mk('circle', { class: 'c-hl', r: 9, cx: -40, cy: -40 }, svg);
+    const gMeans = mk('g', {}, svg);
+    const kIn = document.getElementById('pp-k'), kOut = document.getElementById('pp-k-out');
+    const nextBtn = document.getElementById('pp-next'), cOut = document.getElementById('pp-count'), sOut = document.getElementById('pp-sum'), mOut = document.getElementById('pp-max');
+    const status = document.getElementById('pp-status'), wrap = document.getElementById('pp-wrap'), tip = document.getElementById('pp-tip');
+    const C = 48; // halo radius = C * sqrt(p), so halo area is proportional to p
+    let runSeed = 31, rand = mkRand(runSeed), K = parseInt(kIn.value, 10), chosen = [], score = [], prob = [];
+
+    const scores = () => { score = pts.map(p => Math.min(...chosen.map(i => d2(p, pts[i])))); const tot = score.reduce((a, b) => a + b, 0); prob = score.map(s => s / tot); return tot; };
+    const draw = msg => {
+      const done = chosen.length >= K;
+      const tot = scores();
+      pts.forEach((p, i) => {
+        let bj = chosen[0], bd = Infinity; chosen.forEach(j => { const d = d2(p, pts[j]); if (d < bd) { bd = d; bj = j; } });
+        res[i].setAttribute('x1', sx(p[0])); res[i].setAttribute('y1', sy(p[1])); res[i].setAttribute('x2', sx(pts[bj][0])); res[i].setAttribute('y2', sy(pts[bj][1]));
+        halos[i].setAttribute('r', done ? 0 : (C * Math.sqrt(prob[i])).toFixed(2));
+      });
+      gMeans.textContent = '';
+      chosen.forEach((i, k) => { mk('circle', { cx: sx(pts[i][0]), cy: sy(pts[i][1]), r: 7.5, class: 'c-centroid' }, gMeans); mk('text', { x: sx(pts[i][0]) + 10, y: sy(pts[i][1]) - 9, class: 'c-note', style: LBL }, gMeans).textContent = 'μ' + '₁₂₃₄₅₆'[k] + '⁰'; });
+      let bi = 0; prob.forEach((p, i) => { if (p > prob[bi]) bi = i; });
+      if (done) { hl.setAttribute('cx', -40); mOut.textContent = '–'; } else { hl.setAttribute('cx', sx(pts[bi][0])); hl.setAttribute('cy', sy(pts[bi][1])); mOut.textContent = (100 * prob[bi]).toFixed(1) + '%'; }
+      cOut.textContent = `${chosen.length} of ${K}`;
+      sOut.textContent = tot.toFixed(1);
+      kOut.textContent = String(K);
+      nextBtn.disabled = done; nextBtn.style.opacity = done ? '.5' : '';
+      status.textContent = msg;
+    };
+    const sample = () => { let r = rand(), i = 0; while (i < n - 1 && r >= prob[i]) { r -= prob[i]; i++; } return i; };
+    const start = () => { rand = mkRand(runSeed); chosen = [Math.floor(rand() * n)]; draw(`μ₁⁰ was picked uniformly at random: every one of the ${n} points had probability 1/${n}. Halos now show each point's chance of becoming μ₂⁰.`); };
+    start();
+    nextBtn.addEventListener('click', () => {
+      if (chosen.length >= K) return;
+      let bi = 0; prob.forEach((p, i) => { if (p > prob[bi]) bi = i; });
+      const i = sample(), pi = prob[i], best = prob[bi];
+      chosen.push(i);
+      const l = chosen.length, sub = '₁₂₃₄₅₆';
+      const what = i === bi ? 'the most likely point' : `the most likely point had ${(100 * best).toFixed(1)}%`;
+      const tail = l >= K ? ' Seeding is done; Lloyd’s algorithm would start from these means.' : '';
+      draw(`μ${sub[l - 1]}⁰ picked with probability ${(100 * pi).toFixed(1)}% (${what}).${tail}`);
+    });
+    document.getElementById('pp-reset').addEventListener('click', () => { runSeed += 1; start(); });
+    kIn.addEventListener('input', () => { K = parseInt(kIn.value, 10); runSeed += 1; start(); });
+
+    svg.addEventListener('pointermove', e => {
+      const loc = toLocal(svg, e); if (!loc) return;
+      let bi = -1, bd = 14 * 14;
+      pts.forEach((p, i) => { const dx = sx(p[0]) - loc.x, dy = sy(p[1]) - loc.y, d = dx * dx + dy * dy; if (d < bd) { bd = d; bi = i; } });
+      if (bi < 0) { tip.hidden = true; return; }
+      const k = chosen.indexOf(bi);
+      tip.innerHTML = k >= 0 ? `<b>Point ${bi + 1}</b><br>chosen as mean ${k + 1}, score 0` : `<b>Point ${bi + 1}</b><br>score s(x) = ${score[bi].toFixed(2)}<br>${chosen.length >= K ? 'seeding done' : 'chance of next pick ' + (100 * prob[bi]).toFixed(1) + '%'}`;
+      tip.hidden = false;
+      const r = wrap.getBoundingClientRect();
+      let left = e.clientX - r.left + wrap.scrollLeft + 14;
+      const tw = tip.offsetWidth;
+      if (left + tw > wrap.scrollLeft + r.width - 4) left = e.clientX - r.left + wrap.scrollLeft - tw - 14;
+      tip.style.left = left + 'px';
+      tip.style.top = Math.max(0, e.clientY - r.top - 54) + 'px';
+    });
+    svg.addEventListener('pointerleave', () => { tip.hidden = true; });
+  })();
+})();
+</script>
+</body>
+</html>
