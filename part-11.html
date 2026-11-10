@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 11 · Kernel and probabilistic regression · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 11: lectures 32–35 on kernel regression, the probabilistic view of linear regression, how good the maximum likelihood estimator is, and cross-validation.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 11 of 18</span><span class="sep">·</span><a href="part-10.html">← Part 10</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Kernel regression, the probabilistic view, and cross-validation</h1>
+    <p class="lede">Notes for lectures 32 to 35. Linear regression is kernelized by writing its solution as a weighted sum of the data points, then recast as maximum likelihood under Gaussian noise. That probabilistic view measures how far the estimator lands from the truth on average, which motivates a new estimator with an added \(\lambda I\) and the cross-validation procedure used to choose \(\lambda\).</p>
+    <div class="meta">
+      <span><b>Part 11</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>66 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L32 · 18:50</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L33 · 15:13</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L34 · 11:48</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L35 · 20:13</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 32</h4>
+      <ul>
+        <li><a href="#nonlinear">Beyond a linear fit</a></li>
+        <li><a href="#span">w* lies in the span</a></li>
+        <li><a href="#dual">Solving for α*</a></li>
+        <li><a href="#kernel-predict">Predicting with a kernel</a></li>
+        <li><a href="#three-views">Three views so far</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 33</h4>
+      <ul>
+        <li><a href="#noise-model">Labels as noisy outputs</a></li>
+        <li><a href="#mle">MLE gives least squares</a></li>
+        <li><a href="#noise-loss">Noise model = loss</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 34</h4>
+      <ul>
+        <li><a href="#random-estimator">ŵ_ML is random</a></li>
+        <li><a href="#mse">Its mean squared error</a></li>
+        <li><a href="#what-to-change">Which term can we touch?</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 35</h4>
+      <ul>
+        <li><a href="#trace-eig">Trace and eigenvalues</a></li>
+        <li><a href="#new-estimator">Adding λI</a></li>
+        <li><a href="#existence">Some λ always helps</a></li>
+        <li><a href="#validation">Validation</a></li>
+        <li><a href="#k-fold">K-fold cross-validation</a></li>
+        <li><a href="#principled">A principled route?</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li><b>Kernel regression.</b> A least-squares solution can always be taken in the span of the data, \(\mathbf{w}^* = X\boldsymbol{\alpha}^*\). Then \(\boldsymbol{\alpha}^* = K^{-1}\mathbf{y}\) with the \(n \times n\) kernel matrix \(K\), and a prediction is \(\sum_i \alpha^*_i\, k(\mathbf{x}_i, \mathbf{x}_{\text{test}})\). No feature map is ever computed.</li>
+        <li><b>Probabilistic view.</b> Model labels as \(y \mid \mathbf{x} = \mathbf{w}^\top\mathbf{x} + \epsilon\) with \(\epsilon \sim \mathcal{N}(0, \sigma^2)\). Maximum likelihood is then least squares, so \(\hat{\mathbf{w}}_{\text{ML}} = \mathbf{w}^*\). Choosing a noise model means choosing a loss: Laplacian noise gives absolute error.</li>
+        <li><b>How good is \(\hat{\mathbf{w}}_{\text{ML}}\)?</b> It is random because \(\mathbf{y}\) is. Its average squared distance from the true \(\mathbf{w}\) is \(\sigma^2\,\mathrm{tr}\big((XX^\top)^{-1}\big) = \sigma^2\sum_i 1/\lambda_i\). The noise is out of our hands, so any improvement has to come from the feature term.</li>
+        <li><b>A new estimator.</b> \(\hat{\mathbf{w}}_{\text{new}} = (XX^\top + \lambda I)^{-1}X\mathbf{y}\) adds \(\lambda\) to every eigenvalue, which tames the small ones. Some \(\lambda\) is guaranteed to beat \(\hat{\mathbf{w}}_{\text{ML}}\) in mean squared error, but the theorem does not say which.</li>
+        <li><b>Cross-validation.</b> Choose \(\lambda\) by holding data out. K-fold cross-validation averages the validation error over \(K\) held-out folds. Leave-one-out is the extreme case \(K = n\).</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 32 ============ -->
+    <section id="nonlinear">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=0s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 0:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=63s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 1:03 the kernel PCA idea</a>
+        </div>
+        <h2>When the relationship is not linear</h2>
+      </div>
+      <p>So far the label has been explained by \(\mathbf{w}^\top\mathbf{x}\). Suppose the features are height and weight and the label is best explained by something like height² + 3 × weight − weight², or needs a cross term such as height × weight. Linear regression can still be run, but no \(\mathbf{w}\) can produce squared or cross terms. Even the best \(\mathbf{w}\) will then make large errors on the training set and on the validation set.</p>
+      <p>The way out is the one that took us from PCA to kernel PCA in <a href="part-05.html">Part 5</a>. There, the PCA problem was rewritten so that the data entered only through dot products between data points, and those dot products were then replaced by a kernel matrix. The effect is the same as mapping every point to a higher-dimensional space and working there, without ever computing the mapping. Here we want a linear regressor in that higher-dimensional space.</p>
+      <p class="rule-of-thumb">To kernelize regression, express its solution through the dot products \(\mathbf{x}_i^\top\mathbf{x}_j\) alone.</p>
+    </section>
+
+    <section id="span">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=126s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 2:06</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=291s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 4:51 the argument</a>
+        </div>
+        <h2>The solution lies in the span of the data</h2>
+      </div>
+      <p>The closed form from <a href="part-10.html">Part 10</a> is \(\mathbf{w}^* = (XX^\top)^{\dagger}X\mathbf{y}\), where \(X = [\mathbf{x}_1 \cdots \mathbf{x}_n] \in \mathbb{R}^{d\times n}\) holds the data points as columns and \(\mathbf{y} \in \mathbb{R}^n\) the labels. The lecture writes "inverse" throughout and means the pseudo-inverse whenever the inverse does not exist.</p>
+      <p>As written, this does not depend on dot products directly. \(XX^\top\) is a \(d \times d\) matrix. The matrix of pairwise dot products, \(X^\top X\), is \(n \times n\), and it does not appear. The step that unlocks a rewrite is this observation:</p>
+      <div class="result">
+        <span class="lbl">Key observation</span>
+        <p>A minimizer \(\mathbf{w}^*\) of the squared error can always be taken to lie in the <dfn>span of the data points</dfn>.</p>
+      </div>
+      <p>The lecture argues it with a picture <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=222s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:42</a>. Take 3-D data points that all lie on a 2-D plane through the origin. Suppose a minimizer \(\mathbf{w}^*\) sticks out of the plane. Let \(\tilde{\mathbf{w}}\) be its projection onto the plane, so that \(\mathbf{w}^* = \tilde{\mathbf{w}} + \tilde{\mathbf{w}}_\perp\), where \(\tilde{\mathbf{w}}_\perp\) is perpendicular to the plane and therefore to every data point:</p>
+      <div class="eq">\[ \mathbf{w}^{*\top}\mathbf{x}_i = (\tilde{\mathbf{w}} + \tilde{\mathbf{w}}_\perp)^\top\mathbf{x}_i = \tilde{\mathbf{w}}^\top\mathbf{x}_i + \underbrace{\tilde{\mathbf{w}}_\perp^\top\mathbf{x}_i}_{=\,0} = \tilde{\mathbf{w}}^\top\mathbf{x}_i \qquad \text{for every } i \]</div>
+      <p>So \(\tilde{\mathbf{w}}\) makes exactly the same prediction as \(\mathbf{w}^*\) on every training point, and suffers exactly the same squared error \(\sum_i(\tilde{\mathbf{w}}^\top\mathbf{x}_i - y_i)^2\). It cannot be strictly better, since \(\mathbf{w}^*\) is a minimizer, and it is not worse. We may as well use \(\tilde{\mathbf{w}}\). In general, without loss of generality, the minimizer is a linear combination of the data points:</p>
+      <div class="eq">\[ \mathbf{w}^* = X\boldsymbol{\alpha}^* = \sum_{i=1}^n \alpha^*_i\,\mathbf{x}_i \qquad \text{for some } \boldsymbol{\alpha}^* \in \mathbb{R}^n \]</div>
+      <p class="note">\(\boldsymbol{\alpha}^*\) has one entry per data point: \(\alpha^*_i\) is the weight given to \(\mathbf{x}_i\) when the data points are added up to form \(\mathbf{w}^*\).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 250" role="img" aria-label="Left: data points on a tilted plane through the origin in three dimensions. The vector w star leaves the plane; its projection w tilde lies in the plane and the dashed perpendicular part w tilde perp joins them. Right: the algebra showing both give the same predictions.">
+            <defs>
+              <marker id="p11a-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p11a-ahc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <text class="d-h" x="20" y="22">Data on a plane in 3-D</text>
+            <path class="d-plot" d="M30 210 L290 210 L370 120 L110 120 Z" style="fill: var(--accent-soft); fill-opacity:.45"/>
+            <circle class="pt-plain" cx="80" cy="195" r="4"/><circle class="pt-plain" cx="130" cy="150" r="4"/><circle class="pt-plain" cx="215" cy="198" r="4"/><circle class="pt-plain" cx="270" cy="192" r="4"/>
+            <circle class="pt-plain" cx="255" cy="133" r="4"/><circle class="pt-plain" cx="190" cy="135" r="4"/><circle class="pt-plain" cx="120" cy="182" r="4"/><circle class="pt-plain" cx="330" cy="140" r="4"/>
+            <line class="d-ln" x1="180" y1="175" x2="284" y2="57" marker-end="url(#p11a-ah)" style="stroke-width:2"/>
+            <path class="d-ln d-dash" d="M285 148 L285 60"/>
+            <path class="d-ln" d="M276.3 150.2 L276.3 141.2 L285 139" style="stroke-width:1"/>
+            <line class="d-ln-acc" x1="180" y1="175" x2="283" y2="148.5" marker-end="url(#p11a-ahc)" style="stroke-width:2.2"/>
+            <circle class="pt-new" cx="180" cy="175" r="4"/>
+            <text class="d-al" x="170" y="193" text-anchor="end">0</text>
+            <text class="d-t" x="293" y="58">w*</text>
+            <text class="d-t" x="293" y="106">w̃⊥</text>
+            <text class="d-t" x="232" y="177" style="fill: var(--accent)">w̃</text>
+            <text class="d-s" x="30" y="234">all data points lie on this plane (their span)</text>
+
+            <line class="d-rule" x1="400" y1="10" x2="400" y2="240"/>
+
+            <text class="d-h" x="420" y="22">Why w̃ is just as good</text>
+            <text x="420" y="54">w* = w̃ + w̃⊥</text>
+            <text class="d-s" x="420" y="80">w̃⊥ is perpendicular to the plane,</text>
+            <text class="d-s" x="420" y="96">so w̃⊥ᵀxᵢ = 0 for every data point</text>
+            <text x="420" y="126">w*ᵀxᵢ = w̃ᵀxᵢ + w̃⊥ᵀxᵢ = w̃ᵀxᵢ</text>
+            <text class="d-s" x="420" y="152">same prediction on every training point,</text>
+            <text class="d-s" x="420" y="168">so the same squared error</text>
+            <text class="d-s" x="420" y="198">so we may take w* inside the span:</text>
+            <text class="d-t" x="420" y="222" style="fill: var(--accent)">w* = Xα*,  α* ∈ ℝⁿ</text>
+          </svg>
+        </div>
+        <figcaption><b>Leaving the span gains nothing.</b> The part of \(\mathbf{w}^*\) perpendicular to the data's plane is orthogonal to every \(\mathbf{x}_i\), so dropping it changes no prediction on the training data and no error. A minimizer inside the span always exists.</figcaption>
+      </figure>
+    </section>
+
+    <section id="dual">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=544s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 9:04</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=681s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 11:21 the kernel matrix</a>
+        </div>
+        <h2>Solving for \(\boldsymbol{\alpha}^*\)</h2>
+      </div>
+      <p>We now have two descriptions of the same vector: \(\mathbf{w}^* = X\boldsymbol{\alpha}^*\), and the closed form from the gradient analysis of <a href="part-10.html">Part 10</a>. Setting them equal:</p>
+      <div class="eq">\[ X\boldsymbol{\alpha}^* = (XX^\top)^{\dagger}X\mathbf{y} \]</div>
+      <p>The goal is to get rid of \(XX^\top\) and see \(X^\top X\) instead. First pre-multiply both sides by \(XX^\top\), which cancels the (pseudo-)inverse on the right:</p>
+      <div class="eq">\[ XX^\top X\boldsymbol{\alpha}^* = XX^\top(XX^\top)^{\dagger}X\mathbf{y} = X\mathbf{y} \]</div>
+      <p class="note">Strictly, \(XX^\top(XX^\top)^{\dagger}\) is the projection onto the column space of \(X\), and \(X\mathbf{y}\) already lies in that space, so the right side is exactly \(X\mathbf{y}\). The lecture simply says the two cancel.</p>
+      <p>The left side now contains \(X^\top X\), but an \(X\) also sits alone on the right. Pre-multiply both sides by \(X^\top\):</p>
+      <div class="eq">\[ X^\top X\,X^\top X\,\boldsymbol{\alpha}^* = X^\top X\,\mathbf{y} \quad\Longleftrightarrow\quad (X^\top X)^2\,\boldsymbol{\alpha}^* = X^\top X\,\mathbf{y} \]</div>
+      <p>\(X^\top X\) is the matrix of all pairwise dot products, \((X^\top X)_{ij} = \mathbf{x}_i^\top\mathbf{x}_j\): the <dfn>kernel matrix</dfn> \(K\) we met in kernel PCA. In terms of \(K\):</p>
+      <div class="result">
+        <span class="lbl">Result</span>
+        \[ K^2\boldsymbol{\alpha}^* = K\mathbf{y}, \qquad \text{so if } K \text{ is invertible,} \qquad \boldsymbol{\alpha}^* = K^{-1}\mathbf{y}, \qquad K = X^\top X \in \mathbb{R}^{n\times n} \]
+        <p>The weights that combine the data points into \(\mathbf{w}^*\) are the inverse of the kernel matrix applied to the labels. The data now enters only through dot products.</p>
+      </div>
+    </section>
+
+    <section id="kernel-predict">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=715s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 11:55</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=889s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 14:49 the algorithm</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=920s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 15:20 reading it</a>
+        </div>
+        <h2>Predicting with a kernel</h2>
+      </div>
+      <p>What is \(\boldsymbol{\alpha}^*\) good for? Map every point to a higher-dimensional space with a feature map \(\phi\) and solve linear regression there:</p>
+      <div class="eq">\[ \mathbf{w}^* = \arg\min_{\mathbf{w}} \sum_{i=1}^n \big(\mathbf{w}^\top\phi(\mathbf{x}_i) - y_i\big)^2, \qquad \text{prediction for a new point: } \mathbf{w}^{*\top}\phi(\mathbf{x}_{\text{test}}) \]</div>
+      <p>Computing \(\phi\) explicitly is exactly what we cannot afford; that is the whole point of kernels (<a href="part-05.html">Part 5</a>). But the argument above works unchanged with \(\phi(\mathbf{x}_i)\) in place of \(\mathbf{x}_i\). So \(\mathbf{w}^*\) is a linear combination of the mapped data points, and the kernel matrix becomes \(K_{ij} = \phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_j) = k(\mathbf{x}_i, \mathbf{x}_j)\):</p>
+      <div class="eq">\[ \mathbf{w}^* = \sum_{i=1}^n \alpha^*_i\,\phi(\mathbf{x}_i) \quad\Longrightarrow\quad \mathbf{w}^{*\top}\phi(\mathbf{x}_{\text{test}}) = \sum_{i=1}^n \alpha^*_i\,\phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_{\text{test}}) = \sum_{i=1}^n \alpha^*_i\,k(\mathbf{x}_i, \mathbf{x}_{\text{test}}) \]</div>
+      <p>The kernel function evaluates dot products in the high-dimensional space without going there. \(K\) is the same \(n \times n\) matrix as in kernel PCA, evaluated on the data set. The one new ingredient is \(\mathbf{y}\), through \(\boldsymbol{\alpha}^* = K^{-1}\mathbf{y}\). It has to appear: PCA is unsupervised, while regression is supervised, so the labels must matter.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 270" role="img" aria-label="Top row, greyed out: mapping x test to phi of x test in a huge space and taking the dot product with w star. Middle row: training computes the n by n kernel matrix K and alpha star equals K inverse y. Bottom row: prediction evaluates the kernel between x test and each training point and adds them up weighted by alpha star.">
+            <defs>
+              <marker id="p11b-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p11b-ahc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <text class="d-row" x="20" y="30">Explicit feature map · too costly</text>
+            <rect class="d-off" x="20" y="40" width="110" height="40" rx="6"/><text class="t-off" x="75" y="65" text-anchor="middle">x_test</text>
+            <rect class="d-off" x="170" y="40" width="190" height="40" rx="6"/><text class="t-off" x="265" y="65" text-anchor="middle">φ(x_test) ∈ ℝᴰ, D huge</text>
+            <rect class="d-off" x="400" y="40" width="150" height="40" rx="6"/><text class="t-off" x="475" y="65" text-anchor="middle">w*ᵀφ(x_test)</text>
+            <line class="d-ln d-dash" x1="132" y1="60" x2="166" y2="60" marker-end="url(#p11b-ah)"/>
+            <line class="d-ln d-dash" x1="362" y1="60" x2="396" y2="60" marker-end="url(#p11b-ah)"/>
+            <text class="d-s t-off" x="566" y="56">needs φ and</text><text class="d-s t-off" x="566" y="72">w* ∈ ℝᴰ</text>
+
+            <text class="d-row" x="20" y="120">Kernel regression · training</text>
+            <rect class="d-box" x="20" y="130" width="110" height="44" rx="6"/><text x="75" y="157" text-anchor="middle">x₁ … xₙ, y</text>
+            <rect class="d-box" x="170" y="130" width="190" height="44" rx="6"/><text x="265" y="157" text-anchor="middle">K ∈ ℝⁿˣⁿ, Kᵢⱼ = k(xᵢ, xⱼ)</text>
+            <rect class="d-box-acc" x="400" y="130" width="150" height="44" rx="6"/><text class="d-t" x="475" y="157" text-anchor="middle">α* = K⁻¹y</text>
+            <line class="d-ln" x1="132" y1="152" x2="166" y2="152" marker-end="url(#p11b-ah)"/>
+            <line class="d-ln" x1="362" y1="152" x2="396" y2="152" marker-end="url(#p11b-ah)"/>
+            <text class="d-s" x="566" y="148">n numbers,</text><text class="d-s" x="566" y="164">one per point</text>
+
+            <text class="d-row" x="20" y="202">Kernel regression · prediction</text>
+            <rect class="d-box" x="20" y="212" width="110" height="44" rx="6"/><text x="75" y="239" text-anchor="middle">x_test</text>
+            <rect class="d-box" x="170" y="212" width="190" height="44" rx="6"/><text x="265" y="239" text-anchor="middle">k(xᵢ, x_test), i = 1 … n</text>
+            <rect class="d-box-acc" x="400" y="212" width="270" height="44" rx="6"/><text class="d-t" x="535" y="239" text-anchor="middle">ŷ = Σᵢ α*ᵢ k(xᵢ, x_test)</text>
+            <line class="d-ln" x1="132" y1="234" x2="166" y2="234" marker-end="url(#p11b-ah)"/>
+            <line class="d-ln" x1="362" y1="234" x2="396" y2="234" marker-end="url(#p11b-ah)"/>
+            <line class="d-ln-acc" x1="475" y1="176" x2="475" y2="208" marker-end="url(#p11b-ahc)"/>
+            <text class="d-s" x="482" y="196">weights</text>
+          </svg>
+        </div>
+        <figcaption><b>Same prediction, no feature map.</b> The greyed-out route needs \(\phi\) and a vector \(\mathbf{w}^*\) in the huge space. Kernel regression stores only \(n\) numbers \(\boldsymbol{\alpha}^*\) and needs only kernel evaluations, and it gives the same \(\hat y\) because \(\mathbf{w}^* = \sum_i \alpha^*_i\phi(\mathbf{x}_i)\).</figcaption>
+      </figure>
+
+      <ol class="algo">
+        <li class="algo-title">Kernel regression</li>
+        <li>Input: data \(\{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}\) and a kernel function \(k\).</li>
+        <li>Evaluate the kernel on every pair of data points to get the \(n \times n\) matrix \(K\), \(K_{ij} = k(\mathbf{x}_i, \mathbf{x}_j)\).</li>
+        <li>Compute \(\boldsymbol{\alpha}^* = K^{-1}\mathbf{y}\).</li>
+        <li>For any test point, predict \(\hat y = \sum_{i=1}^n \alpha^*_i\, k(\mathbf{x}_i, \mathbf{x}_{\text{test}})\).</li>
+      </ol>
+
+      <h3>Reading the prediction</h3>
+      <p>Think of the kernel as a measure of similarity. \(k(\mathbf{x}_i, \mathbf{x}_{\text{test}})\) says how similar the test point is to training point \(i\). \(\alpha^*_i\) says how important point \(i\) is to \(\mathbf{w}^*\). A test point can be very similar to a training point that matters little for \(\mathbf{w}^*\), so neither number decides alone. The prediction adds up their product over all training points.</p>
+      <p>Picking a kernel (quadratic, cubic, Gaussian, which is the RBF kernel of <a href="part-05.html">Part 5</a>, or any other) picks the higher-dimensional space in which the regression is solved <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=990s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:30</a>. This is <dfn>kernel regression</dfn>: regression is to kernel regression as PCA is to kernel PCA.</p>
+
+      <figure id="kr-fig">
+        <div class="controls">
+          <label for="kr-kern">Kernel</label>
+          <input type="range" id="kr-kern" min="0" max="4" step="1" value="0">
+          <output id="kr-kern-out" for="kr-kern">linear, 1 + xx′</output>
+          <button class="btn" id="kr-next" type="button">Next kernel</button>
+          <label for="kr-xt">Test point x_test</label>
+          <input type="range" id="kr-xt" min="-1" max="1" step="0.01" value="0.35">
+          <output id="kr-xt-out" for="kr-xt">0.35</output>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Prediction ŷ at x_test</span><span class="v mine" id="kr-pred">–</span></div>
+          <div><span class="k">Training error (MSE)</span><span class="v" id="kr-mse">–</span></div>
+          <div><span class="k">Feature-space dimension</span><span class="v" id="kr-dim">–</span></div>
+        </div>
+        <div class="status" id="kr-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="kr-svg" viewBox="0 0 640 420" role="img" aria-label="Top: ten synthetic training points following a U-shaped curve and the kernel regression fit for the chosen kernel, with a vertical line at the test point and its prediction. Bottom: one bar per training point showing alpha star i times the kernel between that point and the test point; the bars add up to the prediction."></svg></div>
+        <figcaption><b>Kernel regression on synthetic data</b> (10 points generated for this page from \(y = 1.6x^2 - 0.6\) plus noise). Every curve comes from the same three lines of the algorithm: build \(K\), solve for \(\boldsymbol{\alpha}^*\), add up \(\alpha^*_i k(\mathbf{x}_i, x_{\text{test}})\). The bars are those products (rescaled so the tallest fills the panel) and add up to \(\hat y\). The linear kernel can only fit a line; the polynomial kernels bend; the Gaussian kernels make only nearby points count. For the polynomial kernels \(K\) is singular (10 points, at most 4 feature dimensions), so the widget uses the pseudo-inverse \(K^{\dagger}\), which still solves \(K^2\boldsymbol{\alpha} = K\mathbf{y}\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="three-views">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=1026s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L32 · 17:06</a>
+        <h2>Three views so far, and the next one</h2>
+      </div>
+      <p>The lecture takes stock of what we know about linear regression:</p>
+      <ul>
+        <li><b>Geometry.</b> The predictions \(X^\top\mathbf{w}^*\) are the projection of the label vector onto the subspace spanned by the features (<a href="part-10.html">Part 10</a>).</li>
+        <li><b>Computation.</b> Gradient descent and stochastic gradient descent avoid the expensive inverse (<a href="part-10.html">Part 10</a>).</li>
+        <li><b>Non-linear relationships.</b> Kernel regression, from this lecture.</li>
+      </ul>
+      <p>Everything so far is deterministic. The next aspect brings in probability, and it leads to several interesting variants of linear regression <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=u9ir3yQynpE&amp;t=1094s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:14</a>.</p>
+    </section>
+
+    <!-- ============ LECTURE 33 ============ -->
+    <section id="noise-model">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=0s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 0:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=65s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 1:05 the model</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=169s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 2:49 Gaussian noise</a>
+        </div>
+        <h2>A probabilistic model for the labels</h2>
+      </div>
+      <p>In <a href="part-08.html">Part 8</a> we estimated parameters in an unsupervised setting with maximum likelihood and Bayesian methods. Now linear regression itself is treated as an estimation problem. That needs a probabilistic mechanism that we assume generated the data we see.</p>
+      <p>The data set is \(\{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}\) with \(\mathbf{x}_i \in \mathbb{R}^d\) and \(y_i \in \mathbb{R}\). The model:</p>
+      <div class="eq">\[ y \mid \mathbf{x} \;=\; \underbrace{\mathbf{w}^\top\mathbf{x}}_{\text{structure}} \;+\; \underbrace{\epsilon}_{\text{noise}}, \qquad \epsilon \sim \mathcal{N}(0, \sigma^2) \]</div>
+      <ul>
+        <li>We do not model how the features are generated, only how a label arises once a feature vector is given.</li>
+        <li>\(\mathbf{w} \in \mathbb{R}^d\) is <b>unknown but fixed</b>. It is the parameter of the problem, and \(\mathbf{w}^\top\mathbf{x}\) is the structure part.</li>
+        <li>The label is not exactly \(\mathbf{w}^\top\mathbf{x}\): noise \(\epsilon\) is added explicitly. It is Gaussian with mean 0 and a <b>known</b> variance \(\sigma^2\).</li>
+      </ul>
+      <p>So each \(y_i\) arose like this: someone gave us \(\mathbf{x}_i\), the unknown \(\mathbf{w}\) produced \(\mathbf{w}^\top\mathbf{x}_i\), noise was added, and we see only the noisy result. The noise statistics are known and only \(\mathbf{w}\) is not, so finding \(\mathbf{w}\) is an estimation problem <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=234s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:54</a>. The simplest method we know is maximum likelihood.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 620 280" role="img" aria-label="Synthetic points scattered around the line y equals w transpose x. At three x values a Gaussian bell is drawn sideways, centred on the line, showing the density of y given x. One point's vertical gap to the line is marked epsilon i.">
+            <line class="d-rule" x1="60" y1="250" x2="584" y2="250"/>
+            <line class="d-rule" x1="60" y1="250" x2="60" y2="26"/>
+            <text class="d-al" x="590" y="254">x</text>
+            <text class="d-al" x="54" y="32" text-anchor="end">y</text>
+            <line class="d-ln d-dash" x1="185" y1="250.0" x2="185" y2="159.0" style="stroke-width:1"/>
+            <path class="d-ln-acc" d="M186.8 250.0 L188.3 245.4 L190.7 240.9 L194.1 236.3 L198.6 231.8 L204.2 227.3 L210.5 222.7 L216.7 218.2 L222.1 213.6 L225.7 209.1 L227.0 204.5 L225.7 199.9 L222.1 195.4 L216.7 190.8 L210.5 186.3 L204.2 181.8 L198.6 177.2 L194.1 172.6 L190.7 168.1 L188.3 163.6 L186.8 159.0"/>
+            <line class="d-ln d-dash" x1="335" y1="195.4" x2="335" y2="104.4" style="stroke-width:1"/>
+            <path class="d-ln-acc" d="M336.8 195.4 L338.3 190.9 L340.7 186.3 L344.1 181.8 L348.6 177.2 L354.2 172.7 L360.5 168.1 L366.7 163.6 L372.1 159.0 L375.7 154.4 L377.0 149.9 L375.7 145.4 L372.1 140.8 L366.7 136.3 L360.5 131.7 L354.2 127.2 L348.6 122.6 L344.1 118.1 L340.7 113.5 L338.3 109.0 L336.8 104.4"/>
+            <line class="d-ln d-dash" x1="485" y1="140.8" x2="485" y2="49.8" style="stroke-width:1"/>
+            <path class="d-ln-acc" d="M486.8 140.8 L488.3 136.3 L490.7 131.7 L494.1 127.2 L498.6 122.6 L504.2 118.1 L510.5 113.5 L516.7 109.0 L522.1 104.4 L525.7 99.9 L527.0 95.3 L525.7 90.8 L522.1 86.2 L516.7 81.7 L510.5 77.1 L504.2 72.6 L498.6 68.0 L494.1 63.5 L490.7 58.9 L488.3 54.4 L486.8 49.8"/>
+            <line class="d-ln" x1="60" y1="250" x2="560" y2="68" style="stroke-width:2"/>
+            <circle class="pt-plain" cx="112.3" cy="248.9" r="3.8"/><circle class="pt-plain" cx="130.8" cy="208.6" r="3.8"/><circle class="pt-plain" cx="166.1" cy="183.9" r="3.8"/><circle class="pt-plain" cx="168.8" cy="191.5" r="3.8"/><circle class="pt-plain" cx="189.3" cy="191.5" r="3.8"/><circle class="pt-plain" cx="213.6" cy="171.6" r="3.8"/><circle class="pt-plain" cx="235.1" cy="179.5" r="3.8"/><circle class="pt-plain" cx="266.8" cy="159.3" r="3.8"/><circle class="pt-plain" cx="291.1" cy="171.9" r="3.8"/><circle class="pt-plain" cx="317.0" cy="171.8" r="3.8"/>
+            <circle class="pt-plain" cx="329.7" cy="155.3" r="3.8"/><circle class="pt-plain" cx="355.4" cy="152.2" r="3.8"/><circle class="pt-plain" cx="375.1" cy="139.8" r="3.8"/><circle class="pt-plain" cx="402.9" cy="93.4" r="3.8"/><circle class="pt-plain" cx="428.7" cy="151.2" r="3.8"/><circle class="pt-plain" cx="443.5" cy="119.7" r="3.8"/><circle class="pt-plain" cx="463.4" cy="119.4" r="3.8"/><circle class="pt-plain" cx="485.2" cy="72.0" r="3.8"/><circle class="pt-plain" cx="522.5" cy="86.6" r="3.8"/><circle class="pt-plain" cx="524.5" cy="81.3" r="3.8"/>
+            <line class="d-ln d-dash" x1="402.9" y1="125.2" x2="402.9" y2="98"/>
+            <text class="d-t" x="409" y="117">εᵢ</text>
+            <text class="d-t" x="566" y="72">wᵀx</text>
+            <text class="d-s" x="380" y="222">each bell: density of y given x,</text>
+            <text class="d-s" x="380" y="238">y | x ~ N(wᵀx, σ²)</text>
+          </svg>
+        </div>
+        <figcaption><b>Structure plus noise.</b> Synthetic points (seeded, generated for this page) from \(y = 0.7x + \epsilon\) with \(\sigma = 0.7\). At every \(x\) the label is a Gaussian centred on the line \(\mathbf{w}^\top\mathbf{x}\) with the same spread \(\sigma\); each point's vertical gap to the line is its noise \(\epsilon_i\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="mle">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=268s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 4:28</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=426s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 7:06 log-likelihood</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=519s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 8:39 least squares</a>
+        </div>
+        <h2>Maximum likelihood gives back least squares</h2>
+      </div>
+      <p>The likelihood is a function of the parameter \(\mathbf{w}\). It also depends on the observed data, but we treat the data as fixed and look for the \(\mathbf{w}\) that makes it most likely. The usual i.i.d. assumption holds: each \(y_i\) is generated independently given its \(\mathbf{x}_i\), with the same noise distribution. So the likelihood is a product:</p>
+      <div class="eq">\[ \mathcal{L}(\mathbf{w};\ \mathbf{x}_1, \dots, \mathbf{x}_n, y_1, \dots, y_n) = \prod_{i=1}^n p(y_i \mid \mathbf{x}_i;\ \mathbf{w}) \]</div>
+      <p>What is the density of \(y_i\) given \(\mathbf{x}_i\)? \(\mathbf{w}^\top\mathbf{x}_i\) is a fixed number, nothing random. Adding a constant to a zero-mean Gaussian moves the mean and leaves the spread unchanged: add 5 to a zero-mean Gaussian and you get a Gaussian with mean 5 and the same variance. So \(y_i \mid \mathbf{x}_i \sim \mathcal{N}(\mathbf{w}^\top\mathbf{x}_i, \sigma^2)\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=364s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:04</a>, and</p>
+      <div class="eq">\[ \mathcal{L}(\mathbf{w}) = \prod_{i=1}^n \frac{1}{\sqrt{2\pi}\,\sigma}\exp\!\left(-\frac{(\mathbf{w}^\top\mathbf{x}_i - y_i)^2}{2\sigma^2}\right) \]</div>
+      <p>Take the logarithm, since sums are easier to handle than products. The log cancels the exponential:</p>
+      <div class="eq">\[ \log\mathcal{L}(\mathbf{w}) = \sum_{i=1}^n \left[ -\frac{(\mathbf{w}^\top\mathbf{x}_i - y_i)^2}{2\sigma^2} + \log\frac{1}{\sqrt{2\pi}\,\sigma} \right] \]</div>
+      <p>Only \(\mathbf{w}\) varies; the \(\mathbf{x}_i\), \(y_i\) and the known \(\sigma\) are constants. The second term does not involve \(\mathbf{w}\), and \(1/(2\sigma^2)\) is a positive scaling. Dropping both does not move the maximizer:</p>
+      <div class="eq">\[ \max_{\mathbf{w}} \log\mathcal{L}(\mathbf{w}) \;\Longleftrightarrow\; \max_{\mathbf{w}} \sum_{i=1}^n -(\mathbf{w}^\top\mathbf{x}_i - y_i)^2 \;\Longleftrightarrow\; \min_{\mathbf{w}} \sum_{i=1}^n (\mathbf{w}^\top\mathbf{x}_i - y_i)^2 \]</div>
+      <p>The last problem is exactly linear regression with squared error, whose solution we already know <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=555s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>9:15</a>:</p>
+      <div class="result">
+        <span class="lbl">Result</span>
+        \[ \hat{\mathbf{w}}_{\text{ML}} = \mathbf{w}^* = (XX^\top)^{\dagger}X\mathbf{y} \]
+        <p>A completely different starting point (a generative story for \(y\) given \(\mathbf{x}\), then the most natural estimator) lands on the same answer as least squares.</p>
+      </div>
+    </section>
+
+    <section id="noise-loss">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=589s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 9:49</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=728s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 12:08 other noise</a>
+        </div>
+        <h2>Choosing a noise model is choosing a loss</h2>
+      </div>
+      <div class="result">
+        <span class="lbl">Conclusion</span>
+        <p>The maximum likelihood estimator under <b>zero-mean Gaussian noise</b> is exactly linear regression with <b>squared error</b>.</p>
+      </div>
+      <p>Both qualifiers matter. When squared error was introduced in <a href="part-10.html">Part 10</a> it was justified mainly as the intuitive thing to do. Now it has a probabilistic backing. Choosing squared error is implicitly assuming that zero-mean Gaussian noise corrupts the labels.</p>
+      <p>The converse holds too. If there is reason to believe the noise is not Gaussian, least squares is no longer the maximum likelihood answer. The density assumed for the noise determines the error function.</p>
+      <h3>Example: Laplacian noise <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=759s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 12:39</a></h3>
+      <p>The lecture mentions this case only for completeness; here are the steps. The Laplace density has an absolute value in the exponent instead of a square. With a scale \(b > 0\) (the lecture writes it without one):</p>
+      <div class="eq">\[ p(y_i \mid \mathbf{x}_i;\ \mathbf{w}) = \frac{1}{2b}\exp\!\left(-\frac{|\mathbf{w}^\top\mathbf{x}_i - y_i|}{b}\right) \quad\Longrightarrow\quad \log\mathcal{L}(\mathbf{w}) = -\frac1b\sum_{i=1}^n |\mathbf{w}^\top\mathbf{x}_i - y_i| + \text{const} \]</div>
+      <p>So maximum likelihood under Laplacian noise minimizes \(\sum_i |\mathbf{w}^\top\mathbf{x}_i - y_i|\), the sum of absolute errors, and the two problems are no longer the same.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 270" role="img" aria-label="Left: the standard Gaussian density and the Laplace density with scale 1, the Laplace one with a sharp peak at zero. Right: their negative logarithms, a parabola epsilon squared over 2 and a V shape absolute epsilon, which are the squared and absolute errors.">
+            <text class="d-h" x="40" y="22">Noise density p(ε)</text>
+            <line class="d-rule" x1="40" y1="220" x2="292" y2="220"/>
+            <line class="d-rule" x1="40" y1="220" x2="40" y2="38"/>
+            <line class="d-rule" x1="40" y1="156" x2="45" y2="156"/><text class="d-al" x="35" y="159" text-anchor="end">0.2</text>
+            <line class="d-rule" x1="40" y1="92" x2="45" y2="92"/><text class="d-al" x="35" y="95" text-anchor="end">0.4</text>
+            <text class="d-al" x="85" y="236" text-anchor="middle">−2</text><text class="d-al" x="165" y="236" text-anchor="middle">0</text><text class="d-al" x="245" y="236" text-anchor="middle">2</text>
+            <text class="d-al" x="296" y="224">ε</text>
+            <path class="d-ln d-dash" d="M45.0 212.0 L49.0 211.2 L53.0 210.3 L57.0 209.2 L61.0 208.1 L65.0 206.9 L69.0 205.5 L73.0 204.0 L77.0 202.3 L81.0 200.4 L85.0 198.3 L89.0 196.1 L93.0 193.6 L97.0 190.8 L101.0 187.7 L105.0 184.3 L109.0 180.5 L113.0 176.4 L117.0 171.8 L121.0 166.7 L125.0 161.1 L129.0 154.9 L133.0 148.1 L137.0 140.5 L141.0 132.2 L145.0 123.0 L149.0 112.7 L153.0 101.5 L157.0 89.0 L161.0 75.2 L165.0 60.0 L169.0 75.2 L173.0 89.0 L177.0 101.5 L181.0 112.7 L185.0 123.0 L189.0 132.2 L193.0 140.5 L197.0 148.1 L201.0 154.9 L205.0 161.1 L209.0 166.7 L213.0 171.8 L217.0 176.4 L221.0 180.5 L225.0 184.3 L229.0 187.7 L233.0 190.8 L237.0 193.6 L241.0 196.1 L245.0 198.3 L249.0 200.4 L253.0 202.3 L257.0 204.0 L261.0 205.5 L265.0 206.9 L269.0 208.1 L273.0 209.2 L277.0 210.3 L281.0 211.2 L285.0 212.0"/>
+            <path class="d-ln-acc" style="stroke-width:2" d="M45.0 218.6 L49.0 218.1 L53.0 217.5 L57.0 216.7 L61.0 215.7 L65.0 214.4 L69.0 212.8 L73.0 210.9 L77.0 208.6 L81.0 205.9 L85.0 202.7 L89.0 199.0 L93.0 194.7 L97.0 189.9 L101.0 184.5 L105.0 178.6 L109.0 172.1 L113.0 165.2 L117.0 157.9 L121.0 150.3 L125.0 142.6 L129.0 134.9 L133.0 127.3 L137.0 120.1 L141.0 113.4 L145.0 107.3 L149.0 102.2 L153.0 98.0 L157.0 94.9 L161.0 93.0 L165.0 92.3 L169.0 93.0 L173.0 94.9 L177.0 98.0 L181.0 102.2 L185.0 107.3 L189.0 113.4 L193.0 120.1 L197.0 127.3 L201.0 134.9 L205.0 142.6 L209.0 150.3 L213.0 157.9 L217.0 165.2 L221.0 172.1 L225.0 178.6 L229.0 184.5 L233.0 189.9 L237.0 194.7 L241.0 199.0 L245.0 202.7 L249.0 205.9 L253.0 208.6 L257.0 210.9 L261.0 212.8 L265.0 214.4 L269.0 215.7 L273.0 216.7 L277.0 217.5 L281.0 218.1 L285.0 218.6"/>
+
+            <line class="d-rule" x1="330" y1="10" x2="330" y2="236"/>
+
+            <text class="d-h" x="380" y="22">Loss: −log p(ε) + constant</text>
+            <line class="d-rule" x1="380" y1="220" x2="632" y2="220"/>
+            <line class="d-rule" x1="380" y1="220" x2="380" y2="38"/>
+            <line class="d-rule" x1="380" y1="144" x2="385" y2="144"/><text class="d-al" x="375" y="147" text-anchor="end">2</text>
+            <line class="d-rule" x1="380" y1="68" x2="385" y2="68"/><text class="d-al" x="375" y="71" text-anchor="end">4</text>
+            <text class="d-al" x="425" y="236" text-anchor="middle">−2</text><text class="d-al" x="505" y="236" text-anchor="middle">0</text><text class="d-al" x="585" y="236" text-anchor="middle">2</text>
+            <text class="d-al" x="636" y="224">ε</text>
+            <path class="d-ln d-dash" d="M385 106 L505 220 L625 106"/>
+            <path class="d-ln-acc" style="stroke-width:2" d="M385.0 49.0 L389.0 60.2 L393.0 71.0 L397.0 81.5 L401.0 91.6 L405.0 101.3 L409.0 110.6 L413.0 119.5 L417.0 128.0 L421.0 136.2 L425.0 144.0 L429.0 151.4 L433.0 158.4 L437.0 165.1 L441.0 171.4 L445.0 177.3 L449.0 182.8 L453.0 187.9 L457.0 192.6 L461.0 197.0 L465.0 201.0 L469.0 204.6 L473.0 207.8 L477.0 210.7 L481.0 213.2 L485.0 215.3 L489.0 217.0 L493.0 218.3 L497.0 219.2 L501.0 219.8 L505.0 220.0 L509.0 219.8 L513.0 219.2 L517.0 218.3 L521.0 217.0 L525.0 215.3 L529.0 213.2 L533.0 210.7 L537.0 207.8 L541.0 204.6 L545.0 201.0 L549.0 197.0 L553.0 192.6 L557.0 187.9 L561.0 182.8 L565.0 177.3 L569.0 171.4 L573.0 165.1 L577.0 158.4 L581.0 151.4 L585.0 144.0 L589.0 136.2 L593.0 128.0 L597.0 119.5 L601.0 110.6 L605.0 101.3 L609.0 91.6 L613.0 81.5 L617.0 71.0 L621.0 60.2 L625.0 49.0"/>
+
+            <line class="d-ln-acc" x1="40" y1="254" x2="70" y2="254" style="stroke-width:2"/><text class="d-s" x="78" y="258">Gaussian noise (σ = 1) ↔ squared error ε²/2</text>
+            <line class="d-ln d-dash" x1="380" y1="254" x2="410" y2="254"/><text class="d-s" x="418" y="258">Laplace noise (b = 1) ↔ absolute error |ε|</text>
+          </svg>
+        </div>
+        <figcaption><b>Noise model in, loss function out.</b> Taking the negative log of the noise density gives the error each residual \(\epsilon = y_i - \mathbf{w}^\top\mathbf{x}_i\) costs. The Gaussian's square in the exponent becomes the squared error; the Laplace density's absolute value becomes the absolute error.</figcaption>
+      </figure>
+      <p class="rule-of-thumb">Choosing a noise model implicitly chooses an error function, and choosing an error function implicitly chooses a noise model.</p>
+
+      <h3>What else does the probabilistic view buy? <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=gLGQokSrtDI&amp;t=825s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L33 · 13:45</a></h3>
+      <p>The link between noise and loss is one gain. The bigger one is that \(\hat{\mathbf{w}}_{\text{ML}}\) is now an <b>estimator</b>. Once learning is viewed as estimation, all the machinery for judging estimators applies, and we can ask what makes an estimator good. Lecture 34 does exactly that.</p>
+    </section>
+
+    <!-- ============ LECTURE 34 ============ -->
+    <section id="random-estimator">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;t=68s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L34 · 1:08</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;t=168s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L34 · 2:48 why it is random</a>
+        </div>
+        <h2>\(\hat{\mathbf{w}}_{\text{ML}}\) is a random variable</h2>
+      </div>
+      <p>The setting is unchanged: there is a true \(\mathbf{w}\) with \(y \mid \mathbf{x} \sim \mathcal{N}(\mathbf{w}^\top\mathbf{x}, \sigma^2)\), and \(\hat{\mathbf{w}}_{\text{ML}} \in \mathbb{R}^d\) is our guess for it. One property of this estimator will suggest a way to extend linear regression. The question is how good a guess it is.</p>
+      <p>\(\hat{\mathbf{w}}_{\text{ML}}\) is the solution of an optimization problem built from the data \(\mathbf{x}\) and \(\mathbf{y}\). Nothing is assumed about how \(\mathbf{x}\) arises, but \(\mathbf{y}\) has a random component, the noise. So \(\hat{\mathbf{w}}_{\text{ML}}\), a function of \(\mathbf{y}\), is random as well.</p>
+      <p>That is why one data set cannot settle the question <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;t=232s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:52</a>. On an unlucky day the noise values are large (\(y_1 = \mathbf{w}^\top\mathbf{x}_1 + \epsilon_1\) with \(\epsilon_1\) far from 0, and so on), the labels carry little information about \(\mathbf{w}\), and the estimate is poor. So we ask how \(\hat{\mathbf{w}}_{\text{ML}}\) performs <b>on average</b>.</p>
+    </section>
+
+    <section id="mse">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;t=302s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L34 · 5:02</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;t=373s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L34 · 6:13 the thought experiment</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;t=474s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L34 · 7:54 the value</a>
+        </div>
+        <h2>Average squared distance from the truth</h2>
+      </div>
+      <p>Both \(\hat{\mathbf{w}}_{\text{ML}}\) and \(\mathbf{w}\) are vectors in \(\mathbb{R}^d\), so measure one estimate's error by the squared Euclidean distance \(\lVert\hat{\mathbf{w}}_{\text{ML}} - \mathbf{w}\rVert^2\), and average over the randomness in \(\mathbf{y}\):</p>
+      <div class="eq">\[ \mathbb{E}\Big[\,\lVert \hat{\mathbf{w}}_{\text{ML}} - \mathbf{w} \rVert^2\,\Big] \]</div>
+      <p>One way to picture the expectation: create a data set whose labels are drawn as \(\mathbf{w}^\top\mathbf{x}_i\) plus fresh zero-mean Gaussian noise, compute \(\hat{\mathbf{w}}_{\text{ML}}\), and record its squared distance to \(\mathbf{w}\). Repeat many times. The average of the recorded distances converges to the expectation: the average deviation over all data sets you could have received.</p>
+      <p>The lecture does not derive the value. It notes that, given \(\hat{\mathbf{w}}_{\text{ML}} = (XX^\top)^{-1}X\mathbf{y}\) and the properties of the random \(\mathbf{y}\), it is a short algebraic exercise, and states the answer:</p>
+      <div class="result">
+        <span class="lbl">Result</span>
+        \[ \mathbb{E}\Big[\,\lVert \hat{\mathbf{w}}_{\text{ML}} - \mathbf{w} \rVert^2\,\Big] = \sigma^2\;\mathrm{tr}\big((XX^\top)^{-1}\big) \]
+        <p>Use the pseudo-inverse if \(XX^\top\) is singular. This average squared deviation is the <dfn>mean squared error</dfn> (MSE) of the estimator, the name L35 uses.</p>
+      </div>
+      <h3>The derivation (the lecture leaves it as an exercise)</h3>
+      <p>Assume \((XX^\top)^{-1}\) exists. Stack the labels: \(\mathbf{y} = X^\top\mathbf{w} + \boldsymbol{\epsilon}\), where \(\boldsymbol{\epsilon} \in \mathbb{R}^n\) has independent \(\mathcal{N}(0, \sigma^2)\) entries, so \(\mathbb{E}[\boldsymbol{\epsilon}] = \mathbf{0}\) and \(\mathbb{E}[\boldsymbol{\epsilon}\boldsymbol{\epsilon}^\top] = \sigma^2 I\). Then</p>
+      <div class="eq">\[ \hat{\mathbf{w}}_{\text{ML}} = (XX^\top)^{-1}X(X^\top\mathbf{w} + \boldsymbol{\epsilon}) = \mathbf{w} + A\boldsymbol{\epsilon}, \qquad A = (XX^\top)^{-1}X \]</div>
+      <div class="eq">\[ \mathbb{E}\lVert A\boldsymbol{\epsilon}\rVert^2 = \mathbb{E}\big[\boldsymbol{\epsilon}^\top A^\top A\,\boldsymbol{\epsilon}\big] = \mathrm{tr}\big(A^\top A\;\mathbb{E}[\boldsymbol{\epsilon}\boldsymbol{\epsilon}^\top]\big) = \sigma^2\,\mathrm{tr}(AA^\top) = \sigma^2\,\mathrm{tr}\big((XX^\top)^{-1}XX^\top(XX^\top)^{-1}\big) = \sigma^2\,\mathrm{tr}\big((XX^\top)^{-1}\big) \]</div>
+      <p class="note">A by-product of the first line: \(\mathbb{E}[\hat{\mathbf{w}}_{\text{ML}}] = \mathbf{w}\), so on average the estimate is centred on the truth. Standard name: \(\hat{\mathbf{w}}_{\text{ML}}\) is <i>unbiased</i>. Its whole error is spread around \(\mathbf{w}\), which is what the formula measures.</p>
+
+      <figure id="spread-fig">
+        <div class="readouts">
+          <div><span class="k">Spread out · σ² tr((XXᵀ)⁻¹)</span><span class="v mine" id="sp-a-f">–</span></div>
+          <div><span class="k">Spread out · simulated</span><span class="v" id="sp-a-s">–</span></div>
+          <div><span class="k">Collinear · σ² tr((XXᵀ)⁻¹)</span><span class="v mine" id="sp-b-f">–</span></div>
+          <div><span class="k">Collinear · simulated</span><span class="v" id="sp-b-s">–</span></div>
+        </div>
+        <div class="chart-wrap"><svg id="spread-svg" viewBox="0 0 640 330" role="img" aria-label="Two scatter plots of 200 maximum likelihood estimates each, around the true w equal to (1, 1). Left, features spread out: a tight round cloud. Right, nearly collinear features: a long cloud stretched along the direction (1, minus 1)."></svg></div>
+        <figcaption><b>The thought experiment, run 200 times on synthetic data</b> (seeded, generated for this page). True \(\mathbf{w} = (1, 1)\), \(\sigma = 1\), \(n = 20\); the features stay fixed and only the noise is redrawn each time. Each dot is one \(\hat{\mathbf{w}}_{\text{ML}}\). The noise level is the same in both panels, but with nearly collinear features one eigenvalue of \(XX^\top\) is small and the estimates scatter far more. The simulated averages of \(\lVert\hat{\mathbf{w}}_{\text{ML}} - \mathbf{w}\rVert^2\) match the formula.</figcaption>
+      </figure>
+    </section>
+
+    <section id="what-to-change">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;t=504s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L34 · 8:24</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;t=634s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L34 · 10:34 what we control</a>
+        </div>
+        <h2>Two factors, and only one we can touch</h2>
+      </div>
+      <p>The mean squared error is a product of two terms.</p>
+      <ul>
+        <li><b>\(\sigma^2\), the noise variance.</b> More noise confuses \(\mathbf{w}^\top\mathbf{x}\) more, so the estimate gets worse. That is expected.</li>
+        <li><b>\(\mathrm{tr}\big((XX^\top)^{-1}\big)\), a property of the features alone.</b> \(XX^\top\) behaves like a covariance matrix, so this is like the trace of an inverse covariance. How the features relate to each other also decides how good the estimator is. That is the interesting part.</li>
+      </ul>
+      <p class="note">\(XX^\top = \sum_i \mathbf{x}_i\mathbf{x}_i^\top\) is \(n\) times the matrix \(C\) of <a href="part-02.html">Part 2</a>, which is the covariance matrix when the data is centred.</p>
+      <p>The data-generating process is not ours to change, so \(\sigma^2\) is out of our hands: it is noise we have to suffer. The features, though, are given to us, and they enter through the trace term. Could we tweak something there and get an estimator with a smaller mean squared error? It is not obvious that this is possible. If it is, it has to work on the trace term <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_CNCiGfwdQs&amp;t=667s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:07</a>.</p>
+    </section>
+
+    <!-- ============ LECTURE 35 ============ -->
+    <section id="trace-eig">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=13s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 0:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=151s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 2:31 eigenvalues of the inverse</a>
+        </div>
+        <h2>The trace as a sum of eigenvalues</h2>
+      </div>
+      <p>The trace of a square matrix is the sum of its diagonal entries. It is also the sum of its eigenvalues, a standard fact (it follows from the characteristic polynomial) that the lecture uses without proof:</p>
+      <div class="eq">\[ \mathrm{tr}(A) = \sum_{i=1}^d a_{ii} = \sum_{i=1}^d \lambda_i, \qquad \lambda_i = \text{the } i\text{th eigenvalue of } A \]</div>
+      <p>Let \(\lambda_1, \dots, \lambda_d\) be the eigenvalues of \(XX^\top\). The lecture pauses here with a question: what are the eigenvalues of \((XX^\top)^{-1}\)? They are the reciprocals \(1/\lambda_1, \dots, 1/\lambda_d\). (If \(XX^\top\mathbf{v} = \lambda\mathbf{v}\), multiply both sides by \((XX^\top)^{-1}\) and divide by \(\lambda\) to get \((XX^\top)^{-1}\mathbf{v} = \tfrac{1}{\lambda}\mathbf{v}\).) Therefore</p>
+      <div class="result">
+        <span class="lbl">Mean squared error of the ML estimator</span>
+        \[ \mathrm{MSE}(\hat{\mathbf{w}}_{\text{ML}}) = \mathbb{E}\lVert\hat{\mathbf{w}}_{\text{ML}} - \mathbf{w}\rVert^2 = \sigma^2 \sum_{i=1}^d \frac{1}{\lambda_i}, \qquad \lambda_i = \text{eigenvalues of } XX^\top \]
+      </div>
+      <p>A single small eigenvalue has a huge reciprocal and drags the whole error up with it. That is what happened in the collinear panel above.</p>
+    </section>
+
+    <section id="new-estimator">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=218s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 3:38</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=327s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 5:27 shifting eigenvalues</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=498s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 8:18 the intuition</a>
+        </div>
+        <h2>A new estimator: add \(\lambda I\)</h2>
+      </div>
+      <p>The lecturer says he will "pull a new estimator out of the hat" and postpones where it comes from. It is not the maximum likelihood estimator:</p>
+      <div class="eq">\[ \hat{\mathbf{w}}_{\text{new}} = (XX^\top + \lambda I)^{-1}X\mathbf{y}, \qquad \lambda > 0, \quad I = d\times d \text{ identity} \]</div>
+      <p>Compared with \(\hat{\mathbf{w}}_{\text{ML}} = (XX^\top)^{-1}X\mathbf{y}\), the only change is the extra \(\lambda I\) inside the inverse. The lecture uses \(\lambda\) both for this number and for eigenvalues; the eigenvalues always carry a subscript.</p>
+      <h3>Adding \(\lambda I\) shifts every eigenvalue by \(\lambda\)</h3>
+      <p>Take any matrix \(A\) with eigenvalues \(\lambda_1, \dots, \lambda_d\), and an eigenvector \(\mathbf{v}_1\) with \(A\mathbf{v}_1 = \lambda_1\mathbf{v}_1\). Then</p>
+      <div class="eq">\[ (A + \lambda I)\,\mathbf{v}_1 = A\mathbf{v}_1 + \lambda\mathbf{v}_1 = \lambda_1\mathbf{v}_1 + \lambda\mathbf{v}_1 = (\lambda_1 + \lambda)\,\mathbf{v}_1 \]</div>
+      <p>So \(\mathbf{v}_1\) is still an eigenvector, now with eigenvalue \(\lambda_1 + \lambda\). The eigenvalues of \(A + \lambda I\) are \(\lambda_1 + \lambda, \dots, \lambda_d + \lambda\). With \(A = XX^\top\):</p>
+      <div class="eq">\[ \mathrm{tr}\big((XX^\top + \lambda I)^{-1}\big) = \sum_{i=1}^d \frac{1}{\lambda_i + \lambda} \;<\; \sum_{i=1}^d \frac{1}{\lambda_i} = \mathrm{tr}\big((XX^\top)^{-1}\big) \]</div>
+      <h3>Why this might help</h3>
+      <p>The MSE of \(\hat{\mathbf{w}}_{\text{ML}}\) can be large for two reasons: \(\sigma^2\) is large, which we cannot fix, or \(\mathrm{tr}\big((XX^\top)^{-1}\big)\) is large, which means some eigenvalues \(\lambda_i\) are small and their reciprocals large. The new estimator should be governed by \(\mathrm{tr}\big((XX^\top + \lambda I)^{-1}\big)\) instead. Each denominator has grown by \(\lambda\), so each term has shrunk, and the small eigenvalues shrink the most. The hope is that the overall MSE goes down.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Eigenvalue of \(XX^\top\)</th><th class="num">\(1/\lambda_i\)</th><th class="num">\(1/(\lambda_i + 1)\)</th></tr></thead>
+          <tbody>
+            <tr><td>\(\lambda_1 = 10\)</td><td class="num">0.100</td><td class="num">0.091</td></tr>
+            <tr><td>\(\lambda_2 = 2\)</td><td class="num">0.500</td><td class="num">0.333</td></tr>
+            <tr><td>\(\lambda_3 = 0.05\)</td><td class="num">20.000</td><td class="num">0.952</td></tr>
+            <tr><td><b>Trace</b> (sum)</td><td class="num"><b>20.600</b></td><td class="num"><b>1.377</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Illustrative eigenvalues, with \(\lambda = 1\). Almost all of the original trace comes from the one small eigenvalue, and that is the term the shift tames.</p>
+      <p class="callout">The lecture stresses that this is only an intuitive argument for why \(\lambda I\) might lower the MSE. (Standard context, not covered in the lecture: \(\hat{\mathbf{w}}_{\text{new}}\) is shrunk toward \(\mathbf{0}\), so on average it no longer equals \(\mathbf{w}\). Its MSE gains a bias part that grows with \(\lambda\), which is why \(\lambda\) cannot simply be made huge.)</p>
+    </section>
+
+    <section id="existence">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=596s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 9:56</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=679s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 11:19 but which λ?</a>
+        </div>
+        <h2>Some \(\lambda\) is always better, but which?</h2>
+      </div>
+      <p>Does the hope always come true? The lecture states an existence theorem, informally and without proof:</p>
+      <div class="result">
+        <span class="lbl">Existence theorem (informal)</span>
+        \[ \exists\,\lambda > 0 \;\text{ such that }\; \hat{\mathbf{w}}_{\text{new}} = (XX^\top + \lambda I)^{-1}X\mathbf{y} \;\text{ satisfies }\; \mathbb{E}\lVert\hat{\mathbf{w}}_{\text{new}} - \mathbf{w}\rVert^2 < \mathbb{E}\lVert\hat{\mathbf{w}}_{\text{ML}} - \mathbf{w}\rVert^2 \]
+        <p>For a suitable \(\lambda\), the new estimator is better on average than the maximum likelihood estimator.</p>
+      </div>
+      <p>The catch is in the word "exists". The theorem says a good \(\lambda\) is out there; it does not say how to find it. The right \(\lambda\) depends on the data, so in general there may be no automatic formula for it. In practice \(\lambda\) is found by a procedure called <dfn>cross-validation</dfn>, which comes up again and again in the rest of the course.</p>
+    </section>
+
+    <section id="validation">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=710s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 11:50</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=848s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 14:08 why "validation"</a>
+        </div>
+        <h2>Validation: hold data back to choose \(\lambda\)</h2>
+      </div>
+      <p>We do not know which \(\lambda\) performs well, so we measure it. Say the training data has 10,000 points. Split it into a <dfn>training set</dfn> (say 80%) and a <dfn>validation set</dfn> (the other 20%).</p>
+      <ol class="algo">
+        <li class="algo-title">Choosing λ with a validation set</li>
+        <li>Split the data into a training set and a validation set.</li>
+        <li>For each candidate \(\lambda\), compute \(\hat{\mathbf{w}}_{\text{new}} = (XX^\top + \lambda I)^{-1}X\mathbf{y}\) using the training set only.</li>
+        <li>Predict the label of every validation point and compare with its actual \(y\) to get the validation error. (With finitely many possible labels one would speak of accuracy; for regression it is an error.)</li>
+        <li>Pick the \(\lambda\) with the least validation error.</li>
+      </ol>
+      <p>The name comes from the role of the held-out part: it is a proxy for test data. The goal is to do well on test data we will meet later but do not have now, so we mimic it with a part of the training data that we never train on.</p>
+    </section>
+
+    <section id="k-fold">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=881s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 14:41</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=923s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 15:23 the folds</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=1031s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 17:11 choosing K</a>
+        </div>
+        <h2>K-fold cross-validation</h2>
+      </div>
+      <p>Which 80% should go to training and which 20% to validation? A random split is possible, but it can be unlucky: the validation 20% may not represent what was learnt from the training 80%, and then the error measured for a \(\lambda\) does not reflect its true error. To avoid this, the validation is repeated over several splits.</p>
+      <ol class="algo">
+        <li class="algo-title">K-fold cross-validation</li>
+        <li>Divide the data into \(K\) equal parts, the folds \(F_1, \dots, F_K\). With 10,000 points and \(K = 10\), each fold has 1,000 points.</li>
+        <li>For every candidate \(\lambda\) and every \(i = 1, \dots, K\): train on all folds except \(F_i\), that is on \(F_1, \dots, F_{i-1}, F_{i+1}, \dots, F_K\), and compute the error on \(F_i\).</li>
+        <li>Average the \(K\) errors for each \(\lambda\).</li>
+        <li>Pick the \(\lambda\) with the least average error.</li>
+      </ol>
+      <p>The lecture's example with \(K = 3\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=959s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:59</a>: train on \(F_1, F_2\) and validate on \(F_3\); train on \(F_1, F_3\) and validate on \(F_2\); train on \(F_2, F_3\) and validate on \(F_1\). (This \(K\), the number of folds, has nothing to do with the kernel matrix \(K\) of L32.)</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 290" role="img" aria-label="Top: one bar split into an 80 percent training part and a 20 percent validation part. Below: three rows for 3-fold cross-validation; in each row a different fold is the validation fold. Each row produces an error, and the three errors are averaged to pick lambda.">
+            <defs><marker id="p11f-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="20" y="22">Train / validation split</text>
+            <rect class="d-box" x="20" y="34" width="400" height="32" rx="5"/><text x="220" y="55" text-anchor="middle">train · 80% (8,000 of 10,000 points)</text>
+            <rect class="d-box-acc" x="420" y="34" width="100" height="32" rx="5"/><text class="d-s" x="470" y="54" text-anchor="middle">validate · 20%</text>
+            <text class="d-s" x="536" y="47">one split:</text><text class="d-s" x="536" y="62">may be unlucky</text>
+
+            <text class="d-h" x="20" y="102">K-fold cross-validation, K = 3</text>
+            <rect class="d-box" x="20" y="114" width="130" height="30" rx="5"/><text x="85" y="134" text-anchor="middle">F1 · train</text>
+            <rect class="d-box" x="155" y="114" width="130" height="30" rx="5"/><text x="220" y="134" text-anchor="middle">F2 · train</text>
+            <rect class="d-box-acc" x="290" y="114" width="130" height="30" rx="5"/><text class="d-t" x="355" y="134" text-anchor="middle">F3 · validate</text>
+            <line class="d-ln" x1="428" y1="129" x2="460" y2="129" marker-end="url(#p11f-ah)"/><text class="d-t" x="468" y="134">e₁(λ)</text>
+
+            <rect class="d-box" x="20" y="152" width="130" height="30" rx="5"/><text x="85" y="172" text-anchor="middle">F1 · train</text>
+            <rect class="d-box-acc" x="155" y="152" width="130" height="30" rx="5"/><text class="d-t" x="220" y="172" text-anchor="middle">F2 · validate</text>
+            <rect class="d-box" x="290" y="152" width="130" height="30" rx="5"/><text x="355" y="172" text-anchor="middle">F3 · train</text>
+            <line class="d-ln" x1="428" y1="167" x2="460" y2="167" marker-end="url(#p11f-ah)"/><text class="d-t" x="468" y="172">e₂(λ)</text>
+
+            <rect class="d-box-acc" x="20" y="190" width="130" height="30" rx="5"/><text class="d-t" x="85" y="210" text-anchor="middle">F1 · validate</text>
+            <rect class="d-box" x="155" y="190" width="130" height="30" rx="5"/><text x="220" y="210" text-anchor="middle">F2 · train</text>
+            <rect class="d-box" x="290" y="190" width="130" height="30" rx="5"/><text x="355" y="210" text-anchor="middle">F3 · train</text>
+            <line class="d-ln" x1="428" y1="205" x2="460" y2="205" marker-end="url(#p11f-ah)"/><text class="d-t" x="468" y="210">e₃(λ)</text>
+
+            <path class="d-ln" d="M512 120 L520 120 L520 214 L512 214"/>
+            <line class="d-ln" x1="520" y1="167" x2="540" y2="167" marker-end="url(#p11f-ah)"/>
+            <text class="d-t" x="548" y="152">CV(λ) = average</text>
+            <text class="d-s" x="548" y="170">of e₁, e₂, e₃</text>
+            <text class="d-s" x="548" y="192">pick the λ with</text>
+            <text class="d-s" x="548" y="208">the least CV(λ)</text>
+
+            <text class="d-s" x="20" y="250">Every fold is held out exactly once, so every point is used for validation exactly once.</text>
+            <text class="d-s" x="20" y="270">Leave-one-out is the extreme case K = n: each fold is a single point.</text>
+          </svg>
+        </div>
+        <figcaption><b>One split versus K splits.</b> A single validation set gives one, possibly unrepresentative, error per \(\lambda\). K-fold cross-validation trains \(K\) times per \(\lambda\), each time leaving out a different fold, and averages the \(K\) validation errors before choosing.</figcaption>
+      </figure>
+
+      <h3>How large should K be?</h3>
+      <p>In general, the larger \(K\) the better, because the average runs over more possibilities. The extreme is <dfn>leave-one-out cross-validation</dfn>: with \(n\) points, train on \(n - 1\) of them and check the model on the one left out, for each of the \(n\) points in turn. With a billion data points that means a billion train/validation splits, which is computationally a nightmare. In practice \(K\) is chosen according to the time and resources available <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=1068s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>17:48</a>. The hope is that the \(\lambda\) found this way also does well on the test data with the new estimator.</p>
+
+      <figure id="cv-fig">
+        <div class="controls">
+          <label for="cv-lam">λ (log scale)</label>
+          <input type="range" id="cv-lam" min="-6" max="2" step="0.05" value="-5">
+          <output id="cv-lam-out" for="cv-lam">λ = 1.0×10⁻⁵</output>
+          <label for="cv-k">Folds</label>
+          <input type="range" id="cv-k" min="0" max="4" step="1" value="2">
+          <output id="cv-k-out" for="cv-k">K = 5</output>
+          <button class="btn" id="cv-next" type="button">Next fold</button>
+          <button class="btn" id="cv-best" type="button">Jump to the best λ</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">This fold's validation error</span><span class="v" id="cv-fold-err">–</span></div>
+          <div><span class="k">K-fold CV error (average)</span><span class="v mine" id="cv-cv">–</span></div>
+          <div><span class="k">Training error (average)</span><span class="v" id="cv-tr">–</span></div>
+          <div><span class="k">Best λ for this K</span><span class="v" id="cv-best-l">–</span></div>
+        </div>
+        <div class="status" id="cv-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="cv-svg" viewBox="0 0 720 340" role="img" aria-label="Left: twenty synthetic points, the current held-out fold highlighted, and the curve fitted on the other folds with dashed errors to the held-out points. Right: average training error and average validation error against lambda on log scales; the validation error is U-shaped and its lowest point is marked."></svg></div>
+        <figcaption><b>Choosing \(\lambda\) for \(\hat{\mathbf{w}}_{\text{new}}\) by K-fold cross-validation</b>, on synthetic data (20 points generated for this page from \(y = \sin(\pi x)\) plus noise). Each point's features are \(1, x, x^2, \dots, x^9\) (\(d = 10\)), so with tiny \(\lambda\) the estimator chases the noise. Left: the current held-out fold (highlighted) and the fit trained on the other folds. Right: both errors averaged over the \(K\) splits. Training error only falls as \(\lambda\) shrinks; validation error is lowest in between, and that is the \(\lambda\) cross-validation picks. \(K = 20\) is leave-one-out.</figcaption>
+      </figure>
+    </section>
+
+    <section id="principled">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=1099s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 18:19</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_hmPiYKlRTQ&amp;t=1171s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L35 · 19:31 the hint</a>
+        </div>
+        <h2>Is there a principled route to \(\hat{\mathbf{w}}_{\text{new}}\)?</h2>
+      </div>
+      <p>So far \(\hat{\mathbf{w}}_{\text{new}}\) has been justified by the eigenvalue argument and the existence theorem. One question lingers: how could we have started thinking about the problem so that this estimator came out naturally?</p>
+      <p>The lecture says the answer is yes, and that the tool is one we have already used to get alternative estimators, though only in an unsupervised setting. It leaves the guess to the student: which alternative to maximum likelihood did we use for probabilistic models? In <a href="part-08.html">Part 8</a> that alternative was Bayesian estimation. <a href="part-12.html">Part 12</a> follows this up with Bayesian modelling for linear regression, which leads to \(\hat{\mathbf{w}}_{\text{new}}\), known there as ridge regression.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Span of the data</dt><dd>All linear combinations of the data points. A least-squares minimizer can always be taken there: \(\mathbf{w}^* = X\boldsymbol{\alpha}^*\).</dd></div>
+        <div><dt>Coefficients \(\boldsymbol{\alpha}^*\)</dt><dd>One weight per training point; \(\alpha^*_i\) says how much \(\mathbf{x}_i\) (or \(\phi(\mathbf{x}_i)\)) contributes to \(\mathbf{w}^*\).</dd></div>
+        <div><dt>Kernel matrix \(K\)</dt><dd>The \(n\times n\) matrix \(K_{ij} = k(\mathbf{x}_i, \mathbf{x}_j)\); \(X^\top X\) for the linear kernel.</dd></div>
+        <div><dt>Kernel regression</dt><dd>\(\boldsymbol{\alpha}^* = K^{-1}\mathbf{y}\), then predict \(\sum_i\alpha^*_i k(\mathbf{x}_i, \mathbf{x}_{\text{test}})\): linear regression in feature space without computing \(\phi\).</dd></div>
+        <div><dt>Probabilistic model of labels</dt><dd>\(y \mid \mathbf{x} = \mathbf{w}^\top\mathbf{x} + \epsilon\): an unknown fixed \(\mathbf{w}\) (structure) plus noise.</dd></div>
+        <div><dt>Gaussian noise</dt><dd>\(\epsilon \sim \mathcal{N}(0, \sigma^2)\) with \(\sigma^2\) known; then \(y \mid \mathbf{x} \sim \mathcal{N}(\mathbf{w}^\top\mathbf{x}, \sigma^2)\).</dd></div>
+        <div><dt>\(\hat{\mathbf{w}}_{\text{ML}}\)</dt><dd>The maximum likelihood estimate of \(\mathbf{w}\); under Gaussian noise it equals the least-squares \(\mathbf{w}^* = (XX^\top)^{\dagger}X\mathbf{y}\).</dd></div>
+        <div><dt>Laplacian noise</dt><dd>Noise with density \(\propto e^{-|\epsilon|/b}\); maximum likelihood then minimizes the sum of absolute errors.</dd></div>
+        <div><dt>Mean squared error of an estimator</dt><dd>\(\mathbb{E}\lVert\hat{\mathbf{w}} - \mathbf{w}\rVert^2\), averaged over the noise; \(\sigma^2\,\mathrm{tr}((XX^\top)^{-1})\) for \(\hat{\mathbf{w}}_{\text{ML}}\).</dd></div>
+        <div><dt>Trace</dt><dd>Sum of the diagonal entries of a square matrix, which equals the sum of its eigenvalues.</dd></div>
+        <div><dt>\(\hat{\mathbf{w}}_{\text{new}}\)</dt><dd>\((XX^\top + \lambda I)^{-1}X\mathbf{y}\): adds \(\lambda\) to every eigenvalue of \(XX^\top\). Called ridge regression in Part 12.</dd></div>
+        <div><dt>Validation set</dt><dd>Training data held out from fitting and used as a stand-in for test data to compare choices such as \(\lambda\).</dd></div>
+        <div><dt>K-fold cross-validation</dt><dd>Split into \(K\) folds, validate on each fold after training on the rest, average the \(K\) errors, pick the best \(\lambda\).</dd></div>
+        <div><dt>Leave-one-out cross-validation</dt><dd>K-fold with \(K = n\): each point is held out alone. Accurate but needs \(n\) training runs per \(\lambda\).</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Why can we assume the least-squares solution \(\mathbf{w}^*\) is a linear combination of the data points?</span><span class="tog"></span></summary>
+          <p>Split any minimizer into its projection \(\tilde{\mathbf{w}}\) onto the span of the data and a part \(\tilde{\mathbf{w}}_\perp\) orthogonal to every \(\mathbf{x}_i\). Then \(\mathbf{w}^{*\top}\mathbf{x}_i = \tilde{\mathbf{w}}^\top\mathbf{x}_i\) for all \(i\): same predictions, same error. So \(\tilde{\mathbf{w}} = X\boldsymbol{\alpha}\) is also a minimizer.</p></details>
+        <details><summary><span class="q">Q2</span><span>You have \(n = 500\) points with \(d = 10{,}000\) features. What are the sizes of \(XX^\top\) and of the kernel matrix \(K\)?</span><span class="tog"></span></summary>
+          <p>\(XX^\top\) is \(10{,}000 \times 10{,}000\). \(K = X^\top X\) is \(500 \times 500\), and \(\boldsymbol{\alpha}^* \in \mathbb{R}^{500}\). Kernel regression works with the \(n \times n\) matrix, whatever the dimension of the feature space.</p></details>
+        <details><summary><span class="q">Q3</span><span>Kernel \(k(x, x') = (1 + xx')^2\), training points \(x_1 = 1\), \(x_2 = -1\), and \(\boldsymbol{\alpha}^* = (2, -1)\). Predict at \(x_{\text{test}} = 0.5\).</span><span class="tog"></span></summary>
+          <p>\(k(1, 0.5) = 1.5^2 = 2.25\) and \(k(-1, 0.5) = 0.5^2 = 0.25\). So \(\hat y = 2(2.25) + (-1)(0.25) = 4.25\).</p></details>
+        <details><summary><span class="q">Q4</span><span>Under the Gaussian noise model, why does the value of \(\sigma^2\) not change \(\hat{\mathbf{w}}_{\text{ML}}\)?</span><span class="tog"></span></summary>
+          <p>In the log-likelihood \(\sigma\) appears only as the positive factor \(1/(2\sigma^2)\) in front of the squared errors and inside the constant \(\log\frac{1}{\sqrt{2\pi}\sigma}\). Neither changes which \(\mathbf{w}\) minimizes \(\sum_i(\mathbf{w}^\top\mathbf{x}_i - y_i)^2\).</p></details>
+        <details><summary><span class="q">Q5</span><span>You believe the label noise is Laplacian, not Gaussian. Which error should the regression minimize?</span><span class="tog"></span></summary>
+          <p>The sum of absolute errors \(\sum_i |\mathbf{w}^\top\mathbf{x}_i - y_i|\). The log of the Laplace density is \(-|\epsilon|/b\) plus a constant, so maximizing the likelihood minimizes the absolute errors.</p></details>
+        <details><summary><span class="q">Q6</span><span>\(\sigma^2 = 2\) and \(XX^\top\) has eigenvalues 8, 2 and 0.1. What is the MSE of \(\hat{\mathbf{w}}_{\text{ML}}\)? What does \(\sigma^2\,\mathrm{tr}\big((XX^\top + I)^{-1}\big)\) come to?</span><span class="tog"></span></summary>
+          <p>\(2\,(1/8 + 1/2 + 1/0.1) = 2\,(0.125 + 0.5 + 10) = 21.25\). With \(\lambda = 1\): \(2\,(1/9 + 1/3 + 1/1.1) = 2\,(0.111 + 0.333 + 0.909) \approx 2.71\). Almost all of the drop comes from the eigenvalue 0.1. (This is the lecture's intuitive comparison, not the exact MSE of \(\hat{\mathbf{w}}_{\text{new}}\).)</p></details>
+        <details><summary><span class="q">Q7</span><span>A symmetric matrix \(A\) has eigenvalues 3 and 0.5. What are the eigenvalues of \(A + 2I\) and of \((A + 2I)^{-1}\)?</span><span class="tog"></span></summary>
+          <p>Adding \(2I\) adds 2 to each eigenvalue: 5 and 2.5. The inverse has the reciprocals: 0.2 and 0.4.</p></details>
+        <details><summary><span class="q">Q8</span><span>10,000 points, 10-fold cross-validation, 20 candidate values of \(\lambda\). How many times is \(\hat{\mathbf{w}}_{\text{new}}\) fitted, and on how many points each time? What changes with leave-one-out?</span><span class="tog"></span></summary>
+          <p>\(10 \times 20 = 200\) fits, each on 9,000 points and validated on the remaining 1,000. Leave-one-out needs \(10{,}000 \times 20 = 200{,}000\) fits on 9,999 points each, which is why it is reserved for small data sets.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-10.html"><span class="dir">← Part 10</span><span class="nm">Linear regression and gradient descent</span></a><a class="next" href="index.html"><span class="dir">Part 12 · coming</span><span class="nm">Ridge and LASSO</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const seeded = s => { let seed = s; const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); }; return { rand, normal }; };
+  const solve = (A, b) => { const m = b.length, M = A.map((r, i) => [...r, b[i]]); for (let c = 0; c < m; c++) { let p = c; for (let r = c + 1; r < m; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r; [M[c], M[p]] = [M[p], M[c]]; for (let r = c + 1; r < m; r++) { const f = M[r][c] / M[c][c]; for (let k = c; k <= m; k++) M[r][k] -= f * M[c][k]; } } const x = Array(m).fill(0); for (let r = m - 1; r >= 0; r--) { let s = M[r][m]; for (let k = r + 1; k < m; k++) s -= M[r][k] * x[k]; x[r] = s / M[r][r]; } return x; };
+  const path = pts => pts.map((p, j) => (j ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+
+  /* ---------- Kernel regression explorer (L32) ---------- */
+  (() => {
+    const svg = document.getElementById('kr-svg'); if (!svg) return;
+    const { rand, normal } = seeded(3201);
+    const n = 10, xs = [], ys = [];
+    for (let i = 0; i < n; i++) { const x = -1 + 2 * (i + 0.15 + 0.7 * rand()) / n; xs.push(x); ys.push(1.6 * x * x - 0.6 + 0.12 * normal()); }
+    const gauss = h => (a, b) => Math.exp(-((a - b) ** 2) / (2 * h * h));
+    const kernels = [
+      { name: 'linear, 1 + xx′', dim: '2', k: (a, b) => 1 + a * b },
+      { name: 'quadratic, (1 + xx′)²', dim: '3', k: (a, b) => (1 + a * b) ** 2 },
+      { name: 'cubic, (1 + xx′)³', dim: '4', k: (a, b) => (1 + a * b) ** 3 },
+      { name: 'Gaussian, width 0.2', dim: '∞', k: gauss(0.2) },
+      { name: 'Gaussian, width 0.1', dim: '∞', k: gauss(0.1) }
+    ];
+    /* Symmetric eigen-decomposition (Jacobi rotations), used for the pseudo-inverse of K. */
+    const eig = A0 => {
+      const m = A0.length, A = A0.map(r => r.slice()), V = A.map((r, i) => r.map((_, j) => (i === j ? 1 : 0)));
+      for (let sweep = 0; sweep < 60; sweep++) {
+        let off = 0;
+        for (let p = 0; p < m; p++) for (let q = p + 1; q < m; q++) off += A[p][q] * A[p][q];
+        if (off < 1e-24) break;
+        for (let p = 0; p < m; p++) for (let q = p + 1; q < m; q++) {
+          if (Math.abs(A[p][q]) < 1e-300) continue;
+          const th = (A[q][q] - A[p][p]) / (2 * A[p][q]);
+          const t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th * th + 1));
+          const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+          for (let k = 0; k < m; k++) { const a = A[k][p], b = A[k][q]; A[k][p] = c * a - s * b; A[k][q] = s * a + c * b; }
+          for (let k = 0; k < m; k++) { const a = A[p][k], b = A[q][k]; A[p][k] = c * a - s * b; A[q][k] = s * a + c * b; }
+          for (let k = 0; k < m; k++) { const a = V[k][p], b = V[k][q]; V[k][p] = c * a - s * b; V[k][q] = s * a + c * b; }
+        }
+      }
+      return { vals: A.map((r, i) => r[i]), V };
+    };
+    const pinvTimes = (M, v) => {
+      const { vals, V } = eig(M), m = v.length, top = Math.max(...vals.map(Math.abs)), out = Array(m).fill(0);
+      vals.forEach((l, k) => { if (Math.abs(l) <= 1e-10 * top) return; let c = 0; for (let i = 0; i < m; i++) c += V[i][k] * v[i]; c /= l; for (let i = 0; i < m; i++) out[i] += c * V[i][k]; });
+      return out;
+    };
+    const grid = []; for (let j = 0; j <= 200; j++) grid.push(-1 + j / 100);
+    kernels.forEach(K => {
+      const M = xs.map(a => xs.map(b => K.k(a, b)));
+      K.alpha = pinvTimes(M, ys);
+      K.pred = x => xs.reduce((s, xi, i) => s + K.alpha[i] * K.k(xi, x), 0);
+      K.mse = xs.reduce((s, x, i) => s + (K.pred(x) - ys[i]) ** 2, 0) / n;
+      K.d = path(grid.map(x => [330 + 280 * x, 30 + (1.2 - K.pred(x)) * 100]));
+    });
+
+    const sx = x => 330 + 280 * x, sy = y => 30 + (1.2 - y) * 100;
+    const by0 = 352, bh = 48;
+    const g = mk('g', { class: 'c-grid' }, svg);
+    [-1, -0.5, 0, 0.5, 1].forEach(v => {
+      mk('line', { x1: sx(v), x2: sx(v), y1: 30, y2: 250 }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: by0 - bh - 4, y2: by0 + bh + 4 }, g);
+      mk('text', { x: sx(v), y: 418, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+    });
+    [-1, -0.5, 0, 0.5, 1].forEach(v => { if (v) mk('line', { x1: 50, x2: 610, y1: sy(v), y2: sy(v) }, g); mk('text', { x: 44, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v; });
+    mk('line', { x1: 50, x2: 610, y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: 50, x2: 610, y1: by0, y2: by0, class: 'c-axis' }, svg);
+    mk('text', { x: 50, y: 18, class: 'c-title' }, svg).textContent = 'Training data and the kernel regression fit';
+    mk('text', { x: 50, y: 290, class: 'c-title' }, svg).textContent = 'Contribution of each training point to ŷ: α*ᵢ · k(xᵢ, x_test)';
+    const scaleT = mk('text', { x: 610, y: 290, 'text-anchor': 'end', class: 'c-tick' }, svg);
+    mk('text', { x: 622, y: 418, class: 'c-tick' }, svg).textContent = 'x';
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'kr-clip' }, defs); mk('rect', { x: 50, y: 30, width: 560, height: 220 }, cp);
+    const tl = mk('line', { y1: 30, y2: by0 + bh + 4, style: 'stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 4' }, svg);
+    const curve = mk('path', { class: 'c-user', fill: 'none', 'clip-path': 'url(#kr-clip)' }, svg);
+    const dots = mk('g', { class: 'c-dots' }, svg);
+    xs.forEach((x, i) => mk('circle', { cx: sx(x), cy: sy(ys[i]), r: 4.5 }, dots));
+    const bars = xs.map(x => mk('rect', { x: sx(x) - 6, width: 12 }, svg));
+    const pp = mk('circle', { r: 6, class: 'c-pt-hi' }, svg);
+    const lbl = mk('text', { class: 'c-lbl' }, svg);
+
+    const kS = document.getElementById('kr-kern'), kO = document.getElementById('kr-kern-out');
+    const xS = document.getElementById('kr-xt'), xO = document.getElementById('kr-xt-out');
+    const pOut = document.getElementById('kr-pred'), mOut = document.getElementById('kr-mse'), dOut = document.getElementById('kr-dim'), status = document.getElementById('kr-status');
+    let ki = parseInt(kS.value, 10), xt = parseFloat(xS.value);
+    const draw = () => {
+      const K = kernels[ki], yh = K.pred(xt);
+      curve.setAttribute('d', K.d);
+      tl.setAttribute('x1', sx(xt)); tl.setAttribute('x2', sx(xt));
+      const cy = sy(Math.max(-1, Math.min(1.2, yh)));
+      pp.setAttribute('cx', sx(xt)); pp.setAttribute('cy', cy);
+      const right = xt < 0.55;
+      lbl.setAttribute('x', sx(xt) + (right ? 10 : -10)); lbl.setAttribute('y', cy - 10); lbl.setAttribute('text-anchor', right ? 'start' : 'end');
+      lbl.textContent = 'ŷ = ' + yh.toFixed(2).replace('-', '−');
+      const cs = xs.map((x, i) => K.alpha[i] * K.k(x, xt)), cmax = Math.max(1e-9, ...cs.map(Math.abs));
+      bars.forEach((r, i) => { const c = cs[i], h = Math.max(0.6, Math.abs(c) / cmax * bh); r.setAttribute('y', c >= 0 ? by0 - h : by0); r.setAttribute('height', h); r.setAttribute('style', c >= 0 ? 'fill: var(--accent)' : 'fill: var(--ink-2)'); });
+      scaleT.textContent = 'tallest bar = ' + cmax.toFixed(2).replace('-', '−');
+      kO.textContent = K.name; xO.textContent = xt.toFixed(2);
+      pOut.textContent = yh.toFixed(3);
+      mOut.textContent = K.mse < 1e-9 ? '0.000' : K.mse.toFixed(3);
+      dOut.textContent = K.dim;
+      if (ki === 0) status.textContent = 'Features 1 and x only: the best straight line cannot follow the bend, so the training error stays high.';
+      else if (ki < 3) status.textContent = `Feature space of dimension ${K.dim}: the fit bends, and every training point contributes to every prediction.`;
+      else status.textContent = K.mse < 1e-9 ? 'K is invertible, so the fit passes through every training point (training error 0). Only points near x_test get sizeable bars.' : '';
+    };
+    draw();
+    kS.addEventListener('input', () => { ki = parseInt(kS.value, 10); draw(); });
+    xS.addEventListener('input', () => { xt = parseFloat(xS.value); draw(); });
+    document.getElementById('kr-next').addEventListener('click', () => { ki = (ki + 1) % kernels.length; kS.value = ki; draw(); });
+  })();
+
+  /* ---------- Spread of the ML estimate over repeated data sets (L34) ---------- */
+  (() => {
+    const svg = document.getElementById('spread-svg'); if (!svg) return;
+    const { normal } = seeded(3402);
+    const n = 20, w = [1, 1], sigma = 1, R = 200;
+    const XA = [], XB = [];
+    for (let i = 0; i < n; i++) { XA.push([normal(), normal()]); const a = normal(); XB.push([a, a + 0.3 * normal()]); }
+    const lo = -1.5, hi = 3.5, S = 50, top = 48;
+    [[XA, 50, 'Features spread out', 'sp-a'], [XB, 370, 'Features nearly collinear', 'sp-b']].forEach(([X, ox, title, id]) => {
+      let a = 0, b = 0, c = 0; X.forEach(x => { a += x[0] * x[0]; b += x[0] * x[1]; c += x[1] * x[1]; });
+      const det = a * c - b * b, inv = [[c / det, -b / det], [-b / det, a / det]], tr = inv[0][0] + inv[1][1];
+      const disc = Math.sqrt(((a - c) / 2) ** 2 + b * b), l1 = (a + c) / 2 + disc, l2 = (a + c) / 2 - disc;
+      const sx = v => ox + (v - lo) * S, sy = v => top + (hi - v) * S;
+      const g = mk('g', { class: 'c-grid' }, svg);
+      for (let v = -1; v <= 3; v++) {
+        mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+        mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+        mk('text', { x: sx(v), y: sy(lo) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(lo) - 5, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+      mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+      mk('text', { x: sx(hi) - 2, y: sy(0) - 6, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = 'ŵ₁';
+      mk('text', { x: sx(0) + 6, y: sy(hi) + 12, class: 'c-tick' }, svg).textContent = 'ŵ₂';
+      mk('text', { x: ox, y: 18, class: 'c-title' }, svg).textContent = title;
+      mk('text', { x: ox, y: 36, class: 'c-note' }, svg).textContent = `eigenvalues of XXᵀ: ${l1.toFixed(1)} and ${l2.toFixed(2)}`;
+      const gd = mk('g', { style: 'fill: var(--ink-2); fill-opacity: .55' }, svg);
+      let avg = 0;
+      for (let r = 0; r < R; r++) {
+        let s0 = 0, s1 = 0; X.forEach(x => { const y = x[0] * w[0] + x[1] * w[1] + sigma * normal(); s0 += x[0] * y; s1 += x[1] * y; });
+        const wh = [inv[0][0] * s0 + inv[0][1] * s1, inv[1][0] * s0 + inv[1][1] * s1];
+        avg += (wh[0] - w[0]) ** 2 + (wh[1] - w[1]) ** 2;
+        mk('circle', { cx: sx(wh[0]).toFixed(1), cy: sy(wh[1]).toFixed(1), r: 2.4 }, gd);
+      }
+      mk('circle', { cx: sx(w[0]), cy: sy(w[1]), r: 5.5, class: 'c-pt-hi' }, svg);
+      mk('line', { x1: sx(w[0]) + 5, y1: sy(w[1]) - 5, x2: sx(w[0]) + 38, y2: sy(w[1]) - 38, class: 'c-line', style: 'stroke-width: 1' }, svg);
+      mk('text', { x: sx(w[0]) + 41, y: sy(w[1]) - 41, class: 'c-lbl' }, svg).textContent = 'true w = (1, 1)';
+      document.getElementById(id + '-f').textContent = (sigma ** 2 * tr).toFixed(3);
+      document.getElementById(id + '-s').textContent = (avg / R).toFixed(3);
+    });
+  })();
+
+  /* ---------- Choosing λ by K-fold cross-validation (L35) ---------- */
+  (() => {
+    const svg = document.getElementById('cv-svg'); if (!svg) return;
+    const { rand, normal } = seeded(9);
+    const n = 20, D = 10, xs = [], ys = [];
+    for (let i = 0; i < n; i++) { const x = -1 + 2 * (i + rand()) / n; xs.push(x); ys.push(Math.sin(Math.PI * x) + 0.3 * normal()); }
+    const perm = [...Array(n).keys()];
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+    const phi = x => { const r = [1]; for (let k = 1; k < D; k++) r.push(r[k - 1] * x); return r; };
+    const fit = (idx, lam) => { const A = Array.from({ length: D }, () => Array(D).fill(0)), b = Array(D).fill(0); idx.forEach(i => { const f = phi(xs[i]); for (let p = 0; p < D; p++) { b[p] += f[p] * ys[i]; for (let q = 0; q < D; q++) A[p][q] += f[p] * f[q]; } }); for (let p = 0; p < D; p++) A[p][p] += lam; return solve(A, b); };
+    const pred = (w, x) => phi(x).reduce((s, v, k) => s + v * w[k], 0);
+    const mse = (w, idx) => idx.reduce((s, i) => s + (pred(w, xs[i]) - ys[i]) ** 2, 0) / idx.length;
+    const KS = [2, 4, 5, 10, 20];
+    const Ls = []; for (let j = 0; j <= 160; j++) Ls.push(-6 + j * 0.05);
+    const cache = {};
+    const curves = K => {
+      if (cache[K]) return cache[K];
+      const F = []; for (let f = 0; f < K; f++) F.push({ val: perm.filter((_, j) => j % K === f), tr: perm.filter((_, j) => j % K !== f) });
+      const tr = [], cv = [];
+      Ls.forEach(L => { let a = 0, b = 0; F.forEach(fd => { const w = fit(fd.tr, 10 ** L); a += mse(w, fd.tr); b += mse(w, fd.val); }); tr.push(a / K); cv.push(b / K); });
+      let bi = 0; cv.forEach((v, j) => { if (v < cv[bi]) bi = j; });
+      return (cache[K] = { F, tr, cv, bi });
+    };
+    const sup = e => String(e).replace(/-/g, '⁻').replace(/\d/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
+    const fmt = l => { const v = 10 ** l; if (v >= 0.01 && v < 100) return 'λ = ' + (+v.toPrecision(2)); const e = Math.floor(l + 1e-9); return 'λ = ' + (v / 10 ** e).toFixed(1) + '×10' + sup(e); };
+
+    /* left panel: data and the fit for the current fold */
+    const sx = x => 50 + (x + 1) * 135, sy = y => 165 - y * 60;
+    /* right panel: errors against λ, both on log scales */
+    const lx = L => 410 + (L + 6) * 36, ly = e => 45 + (1 - Math.log10(Math.min(10, Math.max(0.02, e)))) * (240 / (1 + Math.log10(50)));
+    const g = mk('g', { class: 'c-grid' }, svg);
+    [-1, -0.5, 0, 0.5, 1].forEach(v => { mk('line', { x1: sx(v), x2: sx(v), y1: 45, y2: 285 }, g); mk('text', { x: sx(v), y: 300, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v; });
+    [-2, -1, 0, 1, 2].forEach(v => { mk('line', { x1: 50, x2: 320, y1: sy(v), y2: sy(v) }, g); mk('text', { x: 44, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v; });
+    mk('line', { x1: 50, x2: 320, y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('text', { x: 320, y: 318, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = 'x';
+    [[-6, '10⁻⁶'], [-4, '10⁻⁴'], [-2, '10⁻²'], [0, '1'], [2, '10²']].forEach(([L, t]) => { mk('line', { x1: lx(L), x2: lx(L), y1: 45, y2: 285 }, g); mk('text', { x: lx(L), y: 300, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = t; });
+    [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10].forEach(e => { mk('line', { x1: 410, x2: 698, y1: ly(e), y2: ly(e) }, g); mk('text', { x: 404, y: ly(e) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = e; });
+    mk('line', { x1: 410, x2: 698, y1: 285, y2: 285, class: 'c-axis' }, svg);
+    mk('text', { x: 698, y: 318, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = 'λ (log scale)';
+    const leftT = mk('text', { x: 50, y: 30, class: 'c-title' }, svg);
+    mk('text', { x: 410, y: 30, class: 'c-title' }, svg).textContent = 'Mean squared error over the K splits (log scales)';
+    const legend = () => {
+      mk('rect', { x: 552, y: 50, width: 142, height: 62, rx: 6, style: 'fill: var(--surface); stroke: var(--rule)' }, svg);
+      mk('line', { x1: 562, x2: 586, y1: 64, y2: 64, class: 'c-user' }, svg); mk('text', { x: 592, y: 68, class: 'c-note' }, svg).textContent = 'validation (CV)';
+      mk('line', { x1: 562, x2: 586, y1: 81, y2: 81, class: 'c-line' }, svg); mk('text', { x: 592, y: 85, class: 'c-note' }, svg).textContent = 'training';
+      mk('circle', { cx: 574, cy: 98, r: 5, class: 'c-pt-hi' }, svg); mk('text', { x: 592, y: 102, class: 'c-note' }, svg).textContent = 'least CV error';
+    };
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'cv-clip' }, defs); mk('rect', { x: 50, y: 45, width: 270, height: 240 }, cp);
+    const gRes = mk('g', { 'clip-path': 'url(#cv-clip)' }, svg);
+    const res = xs.map(() => mk('line', { class: 'c-err' }, gRes));
+    const fitP = mk('path', { class: 'c-user', fill: 'none', 'clip-path': 'url(#cv-clip)' }, svg);
+    const dots = xs.map((x, i) => mk('circle', { cx: sx(x), cy: sy(ys[i]) }, svg));
+    const trP = mk('path', { class: 'c-line', fill: 'none' }, svg);
+    const cvP = mk('path', { class: 'c-user', fill: 'none' }, svg);
+    const vl = mk('line', { y1: 45, y2: 285, style: 'stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 4' }, svg);
+    const bestDot = mk('circle', { r: 5.5, class: 'c-pt-hi' }, svg);
+    const trDot = mk('circle', { r: 4, style: 'fill: var(--ink-2); stroke: var(--surface); stroke-width: 1.5' }, svg);
+    const cvDot = mk('circle', { r: 5, class: 'c-proxy' }, svg);
+    legend();
+
+    const lamS = document.getElementById('cv-lam'), lamO = document.getElementById('cv-lam-out');
+    const kS = document.getElementById('cv-k'), kO = document.getElementById('cv-k-out');
+    const fOut = document.getElementById('cv-fold-err'), cvOut = document.getElementById('cv-cv'), trOut = document.getElementById('cv-tr'), bOut = document.getElementById('cv-best-l'), status = document.getElementById('cv-status');
+    const xgrid = []; for (let j = 0; j <= 135; j++) xgrid.push(-1 + j / 67.5);
+    let L = parseFloat(lamS.value), K = KS[parseInt(kS.value, 10)], fold = 0, C = curves(K);
+    const drawCurves = () => {
+      C = curves(K);
+      trP.setAttribute('d', path(Ls.map((l, j) => [lx(l), ly(C.tr[j])])));
+      cvP.setAttribute('d', path(Ls.map((l, j) => [lx(l), ly(C.cv[j])])));
+      const bx = lx(Ls[C.bi]), byy = ly(C.cv[C.bi]);
+      bestDot.setAttribute('cx', bx); bestDot.setAttribute('cy', byy);
+      bOut.textContent = fmt(Ls[C.bi]).replace('λ = ', '');
+      kO.textContent = K === n ? `K = ${K} (leave-one-out)` : `K = ${K}`;
+    };
+    const draw = () => {
+      const lam = 10 ** L;
+      let tr = 0, cv = 0, fw = null, fe = 0;
+      C.F.forEach((fd, f) => { const w = fit(fd.tr, lam), a = mse(w, fd.tr), b = mse(w, fd.val); tr += a; cv += b; if (f === fold) { fw = w; fe = b; } });
+      tr /= K; cv /= K;
+      const val = new Set(C.F[fold].val);
+      fitP.setAttribute('d', path(xgrid.map(x => [sx(x), sy(Math.max(-4, Math.min(4, pred(fw, x))))])));
+      xs.forEach((x, i) => {
+        const on = val.has(i);
+        dots[i].setAttribute('r', on ? 5.5 : 4);
+        if (on) { dots[i].setAttribute('class', 'c-pt-hi'); dots[i].removeAttribute('style'); }
+        else { dots[i].removeAttribute('class'); dots[i].setAttribute('style', 'fill: var(--ink-2); stroke: var(--surface); stroke-width: 1.5'); }
+        if (on) { res[i].removeAttribute('display'); res[i].setAttribute('x1', sx(x)); res[i].setAttribute('x2', sx(x)); res[i].setAttribute('y1', sy(ys[i])); res[i].setAttribute('y2', sy(Math.max(-4, Math.min(4, pred(fw, x))))); }
+        else res[i].setAttribute('display', 'none');
+      });
+      leftT.textContent = K === n ? `Point ${fold + 1} of ${n} held out · fit on the other ${n - 1}` : `Fold ${fold + 1} of ${K} held out · fit on the other ${K - 1} folds`;
+      vl.setAttribute('x1', lx(L)); vl.setAttribute('x2', lx(L));
+      cvDot.setAttribute('cx', lx(L)); cvDot.setAttribute('cy', ly(cv));
+      trDot.setAttribute('cx', lx(L)); trDot.setAttribute('cy', ly(tr));
+      lamO.textContent = fmt(L);
+      fOut.textContent = fe.toFixed(3); cvOut.textContent = cv.toFixed(3); trOut.textContent = tr.toFixed(3);
+      const best = C.cv[C.bi], at = Math.abs(L - Ls[C.bi]) < 0.051;
+      if (at) status.textContent = `Least average validation error for K = ${K}: this is the λ cross-validation picks.`;
+      else if (cv > 1.5 * best && L < Ls[C.bi]) status.textContent = 'Small λ: low training error, but the fits miss the held-out points.';
+      else if (cv > 1.5 * best) status.textContent = 'Large λ: the fit flattens toward 0 and misses training and held-out points alike.';
+      else status.textContent = '';
+    };
+    drawCurves(); draw();
+    lamS.addEventListener('input', () => { L = parseFloat(lamS.value); draw(); });
+    kS.addEventListener('input', () => { K = KS[parseInt(kS.value, 10)]; fold = 0; drawCurves(); draw(); });
+    document.getElementById('cv-next').addEventListener('click', () => { fold = (fold + 1) % K; draw(); });
+    document.getElementById('cv-best').addEventListener('click', () => tween(L, Ls[C.bi], v => { L = v; lamS.value = v.toFixed(2); draw(); }));
+  })();
+})();
+</script>
+</body>
+</html>

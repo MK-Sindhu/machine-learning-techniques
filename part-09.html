@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 9 · Gaussian mixtures and EM · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 9: lectures 22–26 on Gaussian mixture models, their likelihood, convexity and Jensen's inequality, and the EM algorithm.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 9 of 18</span><span class="sep">·</span><a href="part-08.html">← Part 8</a><span class="sep">·</span><a href="part-10.html">Part 10 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Gaussian mixtures and the EM algorithm</h1>
+    <p class="lede">Lectures 22 to 26 model clustered data with a two-step story: roll a K-sided die to pick a Gaussian, then draw the point from that Gaussian. The likelihood has a sum inside a log, so Jensen's inequality turns it into a lower bound that the EM algorithm climbs by alternating two closed-form steps.</p>
+    <div class="meta">
+      <span><b>Part 9</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>104 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=dyRTVmtML-U&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L22 · 22:48</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=a-VVrP11ZIo&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L23 · 14:31</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=4s0aNldT02Y&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L24 · 15:26</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L25 · 31:07</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L26 · 20:07</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 22</h4>
+      <ul>
+        <li><a href="#one-gaussian">One Gaussian is not enough</a></li>
+        <li><a href="#generative-story">The two-step story</a></li>
+        <li><a href="#latent">Latent variables, parameters</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 23</h4>
+      <ul>
+        <li><a href="#likelihood">The GMM likelihood</a></li>
+        <li><a href="#which-component">Which component made x?</a></li>
+        <li><a href="#sum-in-log">A sum inside the log</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 24</h4>
+      <ul>
+        <li><a href="#convexity">Convex and concave</a></li>
+        <li><a href="#jensen">Jensen's inequality</a></li>
+        <li><a href="#log-concave">Log is concave</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 25</h4>
+      <ul>
+        <li><a href="#lower-bound">A lower bound via λ</a></li>
+        <li><a href="#fix-lambda">Fix λ, solve for θ</a></li>
+        <li><a href="#fix-theta">Fix θ, solve for λ</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 26</h4>
+      <ul>
+        <li><a href="#em">The EM algorithm</a></li>
+        <li><a href="#soft-clustering">EM vs K-means</a></li>
+        <li><a href="#local-max">Only a local maximum</a></li>
+        <li><a href="#initialization">Start from Lloyd's</a></li>
+        <li><a href="#wrap-up">Summary and beyond</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>Data with several dense regions needs a density with several peaks. A <b>Gaussian mixture model</b> generates each point in two steps: pick component \(k\) with probability \(\pi_k\), then draw \(x_i \sim \mathcal N(\mu_k, \sigma_k^2)\). The chosen component \(z_i\) is a <b>latent</b> variable.</li>
+        <li>The likelihood is \(\prod_i \sum_k \pi_k\,\mathcal N(x_i;\mu_k,\sigma_k^2)\). Its log has a sum inside the log, so setting derivatives to zero gives no closed form.</li>
+        <li>The log is concave, so <b>Jensen's inequality</b> applies: \(\log\sum_k \lambda_k a_k \ge \sum_k \lambda_k \log a_k\) for weights \(\lambda_k \ge 0\) that sum to 1.</li>
+        <li>Multiplying and dividing by new weights \(\lambda_{ik}\) and applying Jensen gives a <b>modified log-likelihood</b> that is a lower bound for every \(\lambda\). With \(\lambda\) fixed, the best \(\theta\) is a weighted mean, variance and fraction; with \(\theta\) fixed, the best \(\lambda_{ik}\) is \(P(z_i = k \mid x_i)\) from Bayes' theorem.</li>
+        <li><b>EM</b> alternates the two steps (E: update \(\lambda\); M: update \(\theta\)) until \(\theta\) stops changing. It is a soft version of Lloyd's algorithm that also learns variances, and it converges to a <b>local</b> maximum, so it is usually started from a K-means clustering.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 22 ============ -->
+    <section id="one-gaussian">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=dyRTVmtML-U&amp;t=95s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L22 · 1:35</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=dyRTVmtML-U&amp;t=259s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L22 · 4:19 one Gaussian</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=dyRTVmtML-U&amp;t=461s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L22 · 7:41 three modes</a>
+        </div>
+        <h2>One Gaussian is not enough</h2>
+      </div>
+      <p>The unsupervised half of the course has so far covered representation learning (PCA and kernel PCA, <a href="part-03.html">Parts 3</a> to <a href="part-05.html">5</a>), clustering with Lloyd's algorithm (<a href="part-06.html">Parts 6</a> and <a href="part-07.html">7</a>) and estimation by maximum likelihood and Bayesian methods (<a href="part-08.html">Part 8</a>). This part continues with estimation, for data that is a little more realistic. The examples are one-dimensional because that is easiest to draw; everything carries over to higher dimensions.</p>
+      <p>Take real numbers on a line that fall into three separate groups. Estimation means proposing a generative story for the data and fitting its parameters. The values are real numbers, not 0s and 1s, so a Bernoulli model is out. The obvious choice is a single Gaussian. Maximum likelihood puts its mean at the sample mean, \(\hat\mu_{\text{ML}}\) (<a href="part-08.html">Part 8</a>); take the variance as known, say 1.</p>
+      <p>Now look at the fitted density. Its peak sits in the middle of the data, and the two outer groups lie where the Gaussian has almost no probability. The model says data there should be rare, yet we saw plenty of it.</p>
+      <p class="callout">Maximum likelihood treats the assumed model as true and finds its best member. If no Gaussian can produce three separated groups, the best Gaussian is still a poor explanation, and maximum likelihood cannot do better than the family it searches.</p>
+      <p>What we want is a density with three modes, one high-density region for each group, so that the observed points come from places the model considers likely. A Gaussian has exactly one peak, so no single Gaussian will do. Each dense region on its own does look like a Gaussian, though. That suggests the new model: a <dfn>mixture of Gaussians</dfn>, in this example a mixture of three. The data clearly has a clustering behaviour, and the model will become a probabilistic way to describe it.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 304" role="img" aria-label="Twelve points in three groups on a line. Top: a single Gaussian centred at the sample mean with variance 1 puts almost no density on the left and right groups. Bottom: a mixture of three Gaussians has one mode over each group.">
+<text class="d-h" x="20" y="22">One Gaussian, fitted by maximum likelihood</text>
+<text class="d-s" x="20" y="40">mean = sample mean −0.03, variance known (σ² = 1)</text>
+<text class="d-h" x="20" y="172">A mixture of three Gaussians</text>
+<text class="d-s" x="20" y="190">one bump per dense region</text>
+<line class="d-rule" x1="26" y1="128" x2="614" y2="128"/>
+<path class="d-ln" d="M40 128 L42.2 128 L44.3 128 L46.5 128 L48.6 128 L50.8 128 L52.9 128 L55.1 128 L57.2 128 L59.4 128 L61.5 128 L63.7 128 L65.8 128 L68 128 L70.2 128 L72.3 128 L74.5 128 L76.6 128 L78.8 128 L80.9 128 L83.1 128 L85.2 128 L87.4 128 L89.5 128 L91.7 128 L93.8 128 L96 128 L98.2 128 L100.3 128 L102.5 128 L104.6 128 L106.8 128 L108.9 128 L111.1 128 L113.2 128 L115.4 128 L117.5 128 L119.7 128 L121.8 128 L124 128 L126.2 128 L128.3 128 L130.5 128 L132.6 128 L134.8 128 L136.9 128 L139.1 128 L141.2 128 L143.4 128 L145.5 128 L147.7 128 L149.8 128 L152 127.9 L154.2 127.9 L156.3 127.9 L158.5 127.9 L160.6 127.9 L162.8 127.9 L164.9 127.8 L167.1 127.8 L169.2 127.8 L171.4 127.7 L173.5 127.7 L175.7 127.6 L177.8 127.6 L180 127.5 L182.2 127.4 L184.3 127.3 L186.5 127.2 L188.6 127 L190.8 126.9 L192.9 126.7 L195.1 126.5 L197.2 126.3 L199.4 126 L201.5 125.7 L203.7 125.4 L205.8 125 L208 124.6 L210.2 124.1 L212.3 123.6 L214.5 123.1 L216.6 122.4 L218.8 121.7 L220.9 121 L223.1 120.1 L225.2 119.2 L227.4 118.2 L229.5 117.2 L231.7 116 L233.8 114.7 L236 113.4 L238.2 111.9 L240.3 110.4 L242.5 108.7 L244.6 107 L246.8 105.1 L248.9 103.2 L251.1 101.1 L253.2 99 L255.4 96.7 L257.5 94.4 L259.7 91.9 L261.8 89.4 L264 86.9 L266.2 84.2 L268.3 81.5 L270.5 78.8 L272.6 76.1 L274.8 73.3 L276.9 70.5 L279.1 67.7 L281.2 65 L283.4 62.3 L285.5 59.6 L287.7 57 L289.8 54.5 L292 52.1 L294.2 49.9 L296.3 47.7 L298.5 45.7 L300.6 43.9 L302.8 42.2 L304.9 40.7 L307.1 39.4 L309.2 38.4 L311.4 37.5 L313.5 36.9 L315.7 36.4 L317.8 36.3 L320 36.3 L322.2 36.6 L324.3 37.1 L326.5 37.8 L328.6 38.7 L330.8 39.9 L332.9 41.2 L335.1 42.7 L337.2 44.5 L339.4 46.4 L341.5 48.4 L343.7 50.6 L345.8 52.9 L348 55.3 L350.2 57.9 L352.3 60.5 L354.5 63.2 L356.6 65.9 L358.8 68.6 L360.9 71.4 L363.1 74.2 L365.2 77 L367.4 79.7 L369.5 82.4 L371.7 85.1 L373.8 87.7 L376 90.3 L378.2 92.8 L380.3 95.2 L382.5 97.5 L384.6 99.7 L386.8 101.8 L388.9 103.8 L391.1 105.8 L393.2 107.6 L395.4 109.3 L397.5 110.9 L399.7 112.4 L401.8 113.8 L404 115.2 L406.2 116.4 L408.3 117.5 L410.5 118.6 L412.6 119.5 L414.8 120.4 L416.9 121.2 L419.1 122 L421.2 122.6 L423.4 123.2 L425.5 123.8 L427.7 124.3 L429.8 124.7 L432 125.1 L434.2 125.5 L436.3 125.8 L438.5 126.1 L440.6 126.3 L442.8 126.6 L444.9 126.8 L447.1 126.9 L449.2 127.1 L451.4 127.2 L453.5 127.3 L455.7 127.4 L457.8 127.5 L460 127.6 L462.2 127.6 L464.3 127.7 L466.5 127.7 L468.6 127.8 L470.8 127.8 L472.9 127.9 L475.1 127.9 L477.2 127.9 L479.4 127.9 L481.5 127.9 L483.7 127.9 L485.8 128 L488 128 L490.2 128 L492.3 128 L494.5 128 L496.6 128 L498.8 128 L500.9 128 L503.1 128 L505.2 128 L507.4 128 L509.5 128 L511.7 128 L513.8 128 L516 128 L518.2 128 L520.3 128 L522.5 128 L524.6 128 L526.8 128 L528.9 128 L531.1 128 L533.2 128 L535.4 128 L537.5 128 L539.7 128 L541.8 128 L544 128 L546.2 128 L548.3 128 L550.5 128 L552.6 128 L554.8 128 L556.9 128 L559.1 128 L561.2 128 L563.4 128 L565.5 128 L567.7 128 L569.8 128 L572 128 L574.2 128 L576.3 128 L578.5 128 L580.6 128 L582.8 128 L584.9 128 L587.1 128 L589.2 128 L591.4 128 L593.5 128 L595.7 128 L597.8 128 L600 128" style="stroke-width:2"/>
+<circle class="pt-plain" cx="121.8" cy="128" r="4"/><circle class="pt-plain" cx="143.4" cy="128" r="4"/><circle class="pt-plain" cx="156.3" cy="128" r="4"/><circle class="pt-plain" cx="177.8" cy="128" r="4"/><circle class="pt-plain" cx="294.2" cy="128" r="4"/><circle class="pt-plain" cx="324.3" cy="128" r="4"/><circle class="pt-plain" cx="337.2" cy="128" r="4"/><circle class="pt-plain" cx="358.8" cy="128" r="4"/><circle class="pt-plain" cx="376" cy="128" r="4"/><circle class="pt-plain" cx="492.3" cy="128" r="4"/><circle class="pt-plain" cx="509.5" cy="128" r="4"/><circle class="pt-plain" cx="531.1" cy="128" r="4"/>
+<line class="d-rule" x1="26" y1="278" x2="614" y2="278"/>
+<path class="d-ln-acc" d="M40 278 L42.2 278 L44.3 278 L46.5 278 L48.6 278 L50.8 278 L52.9 278 L55.1 277.9 L57.2 277.9 L59.4 277.9 L61.5 277.9 L63.7 277.8 L65.8 277.7 L68 277.7 L70.2 277.6 L72.3 277.4 L74.5 277.3 L76.6 277.1 L78.8 276.8 L80.9 276.5 L83.1 276.2 L85.2 275.8 L87.4 275.3 L89.5 274.6 L91.7 273.9 L93.8 273.1 L96 272.2 L98.2 271.1 L100.3 269.9 L102.5 268.5 L104.6 267 L106.8 265.3 L108.9 263.4 L111.1 261.5 L113.2 259.3 L115.4 257 L117.5 254.7 L119.7 252.2 L121.8 249.7 L124 247.1 L126.2 244.5 L128.3 242 L130.5 239.5 L132.6 237.2 L134.8 235 L136.9 233 L139.1 231.3 L141.2 229.8 L143.4 228.6 L145.5 227.7 L147.7 227.2 L149.8 227 L152 227.2 L154.2 227.7 L156.3 228.6 L158.5 229.8 L160.6 231.3 L162.8 233 L164.9 235 L167.1 237.2 L169.2 239.5 L171.4 242 L173.5 244.5 L175.7 247.1 L177.8 249.7 L180 252.2 L182.2 254.7 L184.3 257 L186.5 259.3 L188.6 261.5 L190.8 263.4 L192.9 265.3 L195.1 267 L197.2 268.5 L199.4 269.9 L201.5 271.1 L203.7 272.2 L205.8 273.1 L208 273.9 L210.2 274.6 L212.3 275.3 L214.5 275.8 L216.6 276.2 L218.8 276.5 L220.9 276.8 L223.1 277.1 L225.2 277.3 L227.4 277.4 L229.5 277.6 L231.7 277.6 L233.8 277.7 L236 277.8 L238.2 277.8 L240.3 277.8 L242.5 277.8 L244.6 277.8 L246.8 277.8 L248.9 277.8 L251.1 277.8 L253.2 277.7 L255.4 277.6 L257.5 277.5 L259.7 277.4 L261.8 277.2 L264 277 L266.2 276.7 L268.3 276.3 L270.5 275.9 L272.6 275.4 L274.8 274.8 L276.9 274.1 L279.1 273.3 L281.2 272.3 L283.4 271.2 L285.5 269.9 L287.7 268.5 L289.8 266.8 L292 265 L294.2 263 L296.3 260.8 L298.5 258.3 L300.6 255.7 L302.8 253 L304.9 250 L307.1 247 L309.2 243.8 L311.4 240.6 L313.5 237.4 L315.7 234.2 L317.8 231.1 L320 228.1 L322.2 225.3 L324.3 222.7 L326.5 220.4 L328.6 218.4 L330.8 216.8 L332.9 215.5 L335.1 214.7 L337.2 214.3 L339.4 214.4 L341.5 214.8 L343.7 215.8 L345.8 217.1 L348 218.8 L350.2 220.9 L352.3 223.2 L354.5 225.9 L356.6 228.7 L358.8 231.7 L360.9 234.9 L363.1 238.1 L365.2 241.3 L367.4 244.5 L369.5 247.6 L371.7 250.6 L373.8 253.5 L376 256.3 L378.2 258.8 L380.3 261.2 L382.5 263.4 L384.6 265.4 L386.8 267.2 L388.9 268.8 L391.1 270.2 L393.2 271.5 L395.4 272.5 L397.5 273.5 L399.7 274.3 L401.8 275 L404 275.5 L406.2 276 L408.3 276.4 L410.5 276.7 L412.6 277 L414.8 277.2 L416.9 277.3 L419.1 277.5 L421.2 277.5 L423.4 277.6 L425.5 277.6 L427.7 277.6 L429.8 277.6 L432 277.6 L434.2 277.5 L436.3 277.4 L438.5 277.2 L440.6 277 L442.8 276.8 L444.9 276.5 L447.1 276.2 L449.2 275.8 L451.4 275.3 L453.5 274.8 L455.7 274.1 L457.8 273.4 L460 272.5 L462.2 271.6 L464.3 270.5 L466.5 269.3 L468.6 268 L470.8 266.6 L472.9 265.1 L475.1 263.4 L477.2 261.7 L479.4 259.9 L481.5 258 L483.7 256.1 L485.8 254.2 L488 252.2 L490.2 250.4 L492.3 248.5 L494.5 246.8 L496.6 245.2 L498.8 243.8 L500.9 242.6 L503.1 241.5 L505.2 240.7 L507.4 240.1 L509.5 239.8 L511.7 239.8 L513.8 240 L516 240.5 L518.2 241.2 L520.3 242.2 L522.5 243.4 L524.6 244.7 L526.8 246.3 L528.9 248 L531.1 249.7 L533.2 251.6 L535.4 253.5 L537.5 255.5 L539.7 257.4 L541.8 259.3 L544 261.1 L546.2 262.9 L548.3 264.5 L550.5 266.1 L552.6 267.6 L554.8 268.9 L556.9 270.1 L559.1 271.2 L561.2 272.2 L563.4 273.1 L565.5 273.9 L567.7 274.6 L569.8 275.1 L572 275.6 L574.2 276.1 L576.3 276.4 L578.5 276.7 L580.6 277 L582.8 277.2 L584.9 277.4 L587.1 277.5 L589.2 277.6 L591.4 277.7 L593.5 277.8 L595.7 277.8 L597.8 277.9 L600 277.9" style="stroke-width:2"/>
+<circle class="pt-plain" cx="121.8" cy="278" r="4"/><circle class="pt-plain" cx="143.4" cy="278" r="4"/><circle class="pt-plain" cx="156.3" cy="278" r="4"/><circle class="pt-plain" cx="177.8" cy="278" r="4"/><circle class="pt-plain" cx="294.2" cy="278" r="4"/><circle class="pt-plain" cx="324.3" cy="278" r="4"/><circle class="pt-plain" cx="337.2" cy="278" r="4"/><circle class="pt-plain" cx="358.8" cy="278" r="4"/><circle class="pt-plain" cx="376" cy="278" r="4"/><circle class="pt-plain" cx="492.3" cy="278" r="4"/><circle class="pt-plain" cx="509.5" cy="278" r="4"/><circle class="pt-plain" cx="531.1" cy="278" r="4"/>
+<line class="d-ln d-dash" x1="318.6" y1="128" x2="318.6" y2="36.2"/>
+<text class="d-al" x="318.6" y="146" text-anchor="middle">μ̂<tspan baseline-shift="sub" font-size="8">ML</tspan></text>
+<text class="d-s" x="149.8" y="108" text-anchor="middle">data here,</text><text class="d-s" x="149.8" y="121" text-anchor="middle">density ≈ 0</text>
+<text class="d-s" x="511" y="108" text-anchor="middle">data here,</text><text class="d-s" x="511" y="121" text-anchor="middle">density ≈ 0</text>
+<text class="d-s" x="149.8" y="219" text-anchor="middle" style="fill: var(--accent)">mode 1</text>
+<text class="d-s" x="338.1" y="206.3" text-anchor="middle" style="fill: var(--accent)">mode 2</text>
+<text class="d-s" x="511" y="231.8" text-anchor="middle" style="fill: var(--accent)">mode 3</text>
+<text class="d-al" x="61.5" y="296" text-anchor="middle">−6</text><text class="d-al" x="147.7" y="296" text-anchor="middle">−4</text><text class="d-al" x="233.8" y="296" text-anchor="middle">−2</text><text class="d-al" x="320" y="296" text-anchor="middle">0</text><text class="d-al" x="406.2" y="296" text-anchor="middle">2</text><text class="d-al" x="492.3" y="296" text-anchor="middle">4</text><text class="d-al" x="578.5" y="296" text-anchor="middle">6</text>
+          </svg>
+        </div>
+        <figcaption><b>Same data, two models.</b> Twelve illustrative points in three groups. Top: the maximum-likelihood Gaussian (mean at the sample mean, variance 1) gives the outer groups almost zero density. Bottom: a mixture of three Gaussians puts a mode on each group, so every point sits in a high-density region.</figcaption>
+      </figure>
+    </section>
+
+    <section id="generative-story">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=dyRTVmtML-U&amp;t=586s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L22 · 9:46</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=dyRTVmtML-U&amp;t=750s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L22 · 12:30 the die</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=dyRTVmtML-U&amp;t=948s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L22 · 15:48 step 2</a>
+        </div>
+        <h2>The generative story, in two steps</h2>
+      </div>
+      <p>A generative story is the probabilistic mechanism we imagine produced the data. The stories so far had one step: toss a coin, or sample from a Gaussian. That is too simple for clustered data, and the mixture story has two steps. For now assume the number of mixtures \(K\) is given. "Mixture" and "cluster" mean the same thing here; mixture is the usual word.</p>
+      <ol class="algo">
+        <li class="algo-title">Generating one data point \(x_i\)</li>
+        <li><b>Pick a mixture.</b> Roll a die with \(K\) faces; face \(k\) comes up with probability \(\pi_k\). Call the face \(z_i\), the mixture that point \(i\) comes from.</li>
+        <li><b>Draw from that mixture.</b> Every mixture has its own Gaussian with its own mean and variance. Draw \(x_i\) from the Gaussian of mixture \(z_i\).</li>
+        <li>To build a data set, repeat both steps for \(i = 1, \dots, n\). Each point gets its own roll of the die.</li>
+      </ol>
+      <div class="eq">\[ P(z_i = k) = \pi_k, \qquad \sum_{k=1}^K \pi_k = 1, \quad 0 \le \pi_k \le 1; \qquad\qquad x_i \mid z_i \sim \mathcal N\big(\mu_{z_i},\, \sigma_{z_i}^2\big) \]</div>
+      <p>Standard name: the \(\pi_k\) are the <dfn>mixing proportions</dfn>. The lecture's example: with three mixtures and \(\pi_1 = 0.5\), \(\pi_2 = 0.25\), \(\pi_3 = 0.25\), half the points come from the first mixture and a quarter from each of the other two.</p>
+      <p>Step 2 is pictured as doors. If the die shows 5, walk through the fifth door; behind it sit a mean \(\mu_5\) and a variance \(\sigma_5^2\), and you sample a point from that Gaussian. The indicator \(z_i\) plays the same role as the cluster indicator \(z_i\) of K-means in <a href="part-06.html">Part 6</a>, except that here it is drawn at random.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 266" role="img" aria-label="A box holding the mixing proportions outputs a face z_i, here 2. The face selects one of K Gaussian boxes, each with its own mean and variance, and that box outputs the point x_i. A dashed arrow loops back to show the two steps repeat for each point.">
+<defs><marker id="p09g-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="p09g-ahb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="d-row" x="20" y="20">Step 1 · pick a mixture</text>
+<text class="d-row" x="250" y="20">K Gaussians, one per face</text>
+<text class="d-row" x="470" y="20">Step 2 · draw the point</text>
+<rect class="d-box-acc" x="20" y="74" width="170" height="78" rx="8"/>
+<text class="d-t" x="105" y="98" text-anchor="middle">Die with K faces</text>
+<text class="d-s" x="105" y="118" text-anchor="middle">P(zᵢ = k) = πₖ</text>
+<text class="d-s" x="105" y="136" text-anchor="middle">π₁ + … + π<tspan baseline-shift="sub" font-size="9">K</tspan> = 1</text>
+<rect class="d-box" x="250" y="34" width="160" height="34" rx="6"/><text class="d-s" x="330" y="56" text-anchor="middle">k = 1 : μ₁, σ₁²</text>
+<rect class="d-box-acc" x="250" y="78" width="160" height="34" rx="6"/><text class="d-t" x="330" y="100" text-anchor="middle">k = 2 : μ₂, σ₂²</text>
+<text class="d-t" x="330" y="134" text-anchor="middle">⋮</text>
+<rect class="d-box" x="250" y="148" width="160" height="34" rx="6"/><text class="d-s" x="330" y="170" text-anchor="middle">k = K : μ<tspan baseline-shift="sub" font-size="9">K</tspan>, σ<tspan baseline-shift="sub" font-size="9">K</tspan>²</text>
+<path class="d-ln-acc" d="M190 108 C 215 108, 222 95, 248 95" marker-end="url(#p09g-ahb)"/>
+<text class="d-s" x="219" y="128" text-anchor="middle" style="fill: var(--accent)">zᵢ = 2</text>
+<path class="d-ln-acc" d="M410 95 L468 95" marker-end="url(#p09g-ahb)"/>
+<rect class="d-box" x="470" y="70" width="150" height="50" rx="8"/>
+<text class="d-t" x="545" y="92" text-anchor="middle">xᵢ ∼ N(μ₂, σ₂²)</text>
+<text class="d-s" x="545" y="110" text-anchor="middle">one real number</text>
+<line class="d-rule" x1="20" y1="200" x2="620" y2="200"/>
+<text class="d-s" x="105" y="222" text-anchor="middle">zᵢ is never seen: latent</text>
+<text class="d-s" x="545" y="222" text-anchor="middle">xᵢ is what we observe</text>
+<path class="d-ln d-dash" d="M545 122 C 545 170, 440 238, 330 238 C 220 238, 105 200, 105 156" marker-end="url(#p09g-ah)"/>
+<text class="d-s" x="330" y="256" text-anchor="middle">repeat independently for i = 1, …, n</text>
+          </svg>
+        </div>
+        <figcaption><b>The two-step story as boxes.</b> The first box holds \(\pi\) and outputs a face \(z_i\). The face selects one of the \(K\) Gaussian boxes, which outputs \(x_i\). Only \(x_i\) is recorded; the face stays hidden.</figcaption>
+      </figure>
+    </section>
+
+    <section id="latent">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=dyRTVmtML-U&amp;t=1120s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L22 · 18:40</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=dyRTVmtML-U&amp;t=1220s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L22 · 20:20 parameters</a>
+        </div>
+        <h2>Latent variables and the parameter count</h2>
+      </div>
+      <p>The data \(x_1, \dots, x_n\) are observed. The model also contains quantities we never see: the faces \(z_1, \dots, z_n\). Unobserved quantities that the observations depend on are called <dfn>latent</dfn> variables, and a model built on them is a <dfn>latent variable model</dfn>. The Gaussian mixture model (GMM) is one of the most commonly used. Its output depends on parameters we want to estimate and also on these hidden choices.</p>
+      <p>Which parameters pin the model down completely?</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Parameters</th><th>Meaning</th><th class="num">Count</th></tr></thead>
+          <tbody>
+            <tr><td>\(\pi_1, \dots, \pi_K\)</td><td>Mixing proportions. They sum to 1, so the last one follows from the others.</td><td class="num">K − 1 free</td></tr>
+            <tr><td>\(\mu_1, \dots, \mu_K\)</td><td>One mean per mixture</td><td class="num">K</td></tr>
+            <tr><td>\(\sigma_1^2, \dots, \sigma_K^2\)</td><td>One variance per mixture</td><td class="num">K</td></tr>
+            <tr><td><b>Total</b></td><td>Of order \(3K\)</td><td class="num"><b>3K − 1</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>In <a href="part-08.html">Part 8</a> we estimated a single number, the bias of a coin or the mean of a Gaussian. Now there is a whole host of parameters, and looking at the data gives no obvious guess for the \(\pi\)'s, \(\mu\)'s and \(\sigma^2\)'s. Maximum likelihood is a principled method that gives an answer for any well-specified probabilistic model, so it is the next thing to try.</p>
+    </section>
+
+    <!-- ============ LECTURE 23 ============ -->
+    <section id="likelihood">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=a-VVrP11ZIo&amp;t=13s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L23 · 0:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=a-VVrP11ZIo&amp;t=113s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L23 · 1:53 mixture density</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=a-VVrP11ZIo&amp;t=213s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L23 · 3:33 adding the cases</a>
+        </div>
+        <h2>The likelihood of a Gaussian mixture</h2>
+      </div>
+      <p>The likelihood depends on the unknowns \(\mu_1, \dots, \mu_K\), \(\sigma_1^2, \dots, \sigma_K^2\), \(\pi_1, \dots, \pi_K\) and on the observed data. As in <a href="part-08.html">Part 8</a>, the data are held fixed and we maximize over the parameters. Write \(\theta\) for all the parameters together.</p>
+      <p>The i.i.d. assumption still holds. Every point goes through the same two steps (identically distributed), and the outcome for one point does not change the probabilities for another (independent). So the likelihood is a product over points of one density, the mixture density \(f(x_i;\theta)\):</p>
+      <div class="eq">\[ L(\theta) = \prod_{i=1}^n f(x_i; \theta) \]</div>
+      <p class="note">The big \(\prod\) is an ordinary product. It has nothing to do with the mixing proportions \(\pi_k\).</p>
+      <p>What is the density of one point? We never saw which face the die showed for \(x_i\), so we account for every possibility.</p>
+      <ul>
+        <li>"\(x_i\) came from mixture 1", "from mixture 2", …, "from mixture \(K\)" are mutually exclusive events, so their chances add up.</li>
+        <li>Coming from mixture \(k\) needs two things to happen together: the die shows \(k\) (probability \(\pi_k\)), and mixture \(k\)'s Gaussian produces \(x_i\) (density \(\mathcal N(x_i;\mu_k,\sigma_k^2)\)). So these multiply.</li>
+      </ul>
+      <div class="result">
+        <span class="lbl">The GMM likelihood</span>
+        \[ L(\theta) = \prod_{i=1}^n \sum_{k=1}^K \pi_k\,\mathcal N(x_i;\mu_k,\sigma_k^2) = \prod_{i=1}^n \sum_{k=1}^K \pi_k\,\frac{1}{\sqrt{2\pi}\,\sigma_k}\exp\!\Big(-\frac{(x_i-\mu_k)^2}{2\sigma_k^2}\Big) \]
+        <p>The \(\pi\) inside \(\sqrt{2\pi}\) is the constant 3.14…, not a mixing proportion. Standard name: adding over the possible values of \(z_i\) like this is called marginalizing out the latent variable.</p>
+      </div>
+    </section>
+
+    <section id="which-component">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=a-VVrP11ZIo&amp;t=310s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L23 · 5:10</a>
+        <h2>Which component produced a point?</h2>
+      </div>
+      <p>The lecture's example has three mixtures with means \(-20\), \(0\) and \(15\), and an observed point \(x_1 = -15\). It is tempting to say \(x_1\) must have come from mixture 1, whose mean is closest. That does not follow. Mixture 2 could have been picked, in which case its Gaussian explains \(x_1\) with a smaller density. Mixture 3 gives an even smaller density, tiny but not zero, since a Gaussian is positive everywhere. None of the three can be dismissed.</p>
+      <p>Closeness to a mean is only half the story; the mixing proportions matter too. Suppose \(\pi_3 = 0.9\) and \(\pi_1 = \pi_2 = 0.05\). Then mixture 1 is picked only 5% of the time and mixture 3 90% of the time. The density of \(x_1\) weighs both effects: how often each mixture is chosen, and how well its Gaussian explains the point. That is exactly what each term \(\pi_k\,\mathcal N(x_1;\mu_k,\sigma_k^2)\) of the sum measures.</p>
+
+      <figure id="mix-fig">
+        <div class="controls">
+          <label for="mix-pi">Mixing proportion \(\pi_3\) (the other two split the rest)</label>
+          <input type="range" id="mix-pi" min="0.05" max="0.9" step="0.01" value="0.34">
+          <output id="mix-pi-out" for="mix-pi">0.34</output>
+        </div>
+        <div class="controls">
+          <label for="mix-sd">Common σ of the three Gaussians</label>
+          <input type="range" id="mix-sd" min="2" max="15" step="0.1" value="5">
+          <output id="mix-sd-out" for="mix-sd">5.0</output>
+        </div>
+        <div class="controls">
+          <label for="mix-x">Point x</label>
+          <input type="range" id="mix-x" min="-40" max="40" step="0.5" value="-15">
+          <output id="mix-x-out" for="mix-x">−15.0</output>
+          <button class="btn" id="mix-lec" type="button">Use the lecture's π = (0.05, 0.05, 0.9)</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Share from mixture 1</span><span class="v" id="mix-s1">–</span></div>
+          <div><span class="k">Share from 2</span><span class="v" id="mix-s2">–</span></div>
+          <div><span class="k">Share from 3</span><span class="v" id="mix-s3">–</span></div>
+          <div><span class="k">Mixture density p(x)</span><span class="v" id="mix-px">–</span></div>
+        </div>
+        <div class="status" id="mix-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="mix-svg" viewBox="0 0 640 300" role="img" aria-label="Three weighted Gaussian components with means minus 20, 0 and 15 drawn as dashed curves, their sum drawn as a solid curve, and a vertical line at the chosen point x with a dot where it meets each curve."></svg></div>
+        <figcaption><b>Three weighted components and their sum</b>, using the lecture's means \(-20\), \(0\) and \(15\). The lecture gives no variances, so here all three share one σ that you can set. Dashed curves are \(\pi_k\,\mathcal N(x;\mu_k,\sigma^2)\); the solid curve, their sum, is the mixture density \(p(x)\). The readouts give each component's share of \(p(x)\) at the chosen point. With the lecture's \(\pi\) and σ around 13 or more, mixture 3 contributes the most at \(x = -15\) despite its distant mean. Lecture 25 shows that this share is the quantity \(\lambda_{ik}\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="sum-in-log">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=a-VVrP11ZIo&amp;t=475s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L23 · 7:55</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=a-VVrP11ZIo&amp;t=577s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L23 · 9:37 the bottleneck</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=a-VVrP11ZIo&amp;t=745s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L23 · 12:25 use the structure</a>
+        </div>
+        <h2>The problem: a sum inside the log</h2>
+      </div>
+      <p>A product is harder to handle than a sum, so take logs as usual. The lecture labels the result ★:</p>
+      <div class="eq">\[ \log L(\theta) = \sum_{i=1}^n \log\Big( \sum_{k=1}^K \pi_k\,\frac{1}{\sqrt{2\pi}\,\sigma_k}\exp\!\Big(-\frac{(x_i-\mu_k)^2}{2\sigma_k^2}\Big) \Big) \qquad (\star) \]</div>
+      <p>In <a href="part-08.html">Part 8</a> the log did two useful jobs: it turned the product over points into a sum, and it cancelled the exponential in the Gaussian density. Here it only does the first. A sum now sits inside the log, and there is no nice rule for the log of a sum. (A product inside a log would split into a sum of logs.)</p>
+      <p>So how do we maximize ★ over all the \(\mu_k\), \(\sigma_k^2\) and \(\pi_k\)?</p>
+      <ul>
+        <li><b>No closed form.</b> Setting the derivative with respect to \(\mu_k\) to zero does not give a formula like "\(\hat\mu_{\text{ML}}\) is the average of the data points". In general the equations cannot be solved analytically.</li>
+        <li><b>A constraint.</b> The \(\pi_k\) are not free variables: they must be nonnegative and sum to 1. Maximizing over them is a constrained optimization problem, which is harder still.</li>
+        <li><b>General-purpose methods ignore the structure.</b> One could write down the gradient and run gradient ascent, since this is a maximization (gradient methods appear in <a href="part-10.html">Part 10</a>). It works for any function and would give some estimates. But it does not use what we know about this model: the data were generated in two well-defined steps, first a cluster indicator, then a Gaussian draw.</li>
+      </ul>
+      <p class="rule-of-thumb">Goal: an efficient way to maximize ★ that exploits its two-step structure. The lecture first takes a short detour through convex functions.</p>
+    </section>
+
+    <!-- ============ LECTURE 24 ============ -->
+    <section id="convexity">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=4s0aNldT02Y&amp;t=43s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L24 · 0:43</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4s0aNldT02Y&amp;t=215s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L24 · 3:35 concave</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4s0aNldT02Y&amp;t=281s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L24 · 4:41 both, or neither</a>
+        </div>
+        <h2>Convex and concave functions</h2>
+      </div>
+      <p>Convexity could fill a course of its own, and convex functions appear all over machine learning. Only the bare essentials are needed here. Pick two points \(a\) and \(b\) and their midpoint \(\frac{a+b}{2}\). Compare two heights above the midpoint. One is the function itself, \(f\big(\frac{a+b}{2}\big)\). The other is the straight line joining \((a, f(a))\) to \((b, f(b))\), the linear interpolation between them, whose height there is \(\frac{f(a)+f(b)}{2}\), exactly halfway between \(f(a)\) and \(f(b)\).</p>
+      <div class="result">
+        <span class="lbl">Definitions (midpoint form)</span>
+        \[ \begin{aligned} \text{convex:}&\quad f\Big(\frac{a+b}{2}\Big) \le \frac{f(a)+f(b)}{2} \\ \text{concave:}&\quad f\Big(\frac{a+b}{2}\Big) \ge \frac{f(a)+f(b)}{2} \end{aligned} \qquad \text{for every } a, b \]
+      </div>
+      <p>The inequality must hold for every choice of \(a\) and \(b\), not just one pair you happened to draw. The names match the convex and concave mirrors of school physics.</p>
+      <ul>
+        <li><b>Both convex and concave.</b> Both inequalities hold together only as an equality, \(f\big(\frac{a+b}{2}\big) = \frac{f(a)+f(b)}{2}\) for all \(a, b\). That is a straight line: interpolating linearly between two points of a line lands back on the line.</li>
+        <li><b>Neither.</b> A wavy function can have one pair of points whose chord lies above the curve, so it is not concave, and another pair whose chord lies below the curve, so it is not convex.</li>
+      </ul>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 246" role="img" aria-label="Four small plots. Convex: the curve at the midpoint is below the chord. Concave: the curve is above the chord. Linear: the curve and chord coincide. Neither: a wave with one chord above the curve and one below.">
+<text class="d-t" x="18" y="20">Convex</text>
+<line class="d-rule" x1="18" y1="158" x2="154" y2="158"/>
+<path class="d-ln" d="M18 111.8 L20.7 114.8 L23.4 117.6 L26.2 120.3 L28.9 122.8 L31.6 125.2 L34.3 127.4 L37 129.5 L39.8 131.4 L42.5 133.2 L45.2 134.9 L47.9 136.4 L50.6 137.8 L53.4 139 L56.1 140.1 L58.8 141 L61.5 141.8 L64.2 142.4 L67 143 L69.7 143.3 L72.4 143.5 L75.1 143.6 L77.8 143.5 L80.6 143.3 L83.3 143 L86 142.4 L88.7 141.8 L91.4 141 L94.2 140.1 L96.9 139 L99.6 137.8 L102.3 136.4 L105 134.9 L107.8 133.2 L110.5 131.4 L113.2 129.5 L115.9 127.4 L118.6 125.2 L121.4 122.8 L124.1 120.3 L126.8 117.6 L129.5 114.8 L132.2 111.8 L135 108.8 L137.7 105.5 L140.4 102.1 L143.1 98.6 L145.8 94.9 L148.6 91.1 L151.3 87.2 L154 83" style="stroke-width:2"/>
+<line class="d-ln-acc" x1="31.6" y1="125.2" x2="140.4" y2="102.1"/>
+<line class="d-ln d-dash" x1="86" y1="158" x2="86" y2="113.6" style="stroke-width:1"/>
+<circle class="pt-plain" cx="31.6" cy="125.2" r="3.5"/><circle class="pt-plain" cx="140.4" cy="102.1" r="3.5"/>
+<circle class="pt-new" cx="86" cy="142.4" r="4.5"/><circle class="pt-no" cx="86" cy="113.6" r="4.5"/>
+<text class="d-al" x="31.6" y="172" text-anchor="middle">a</text><text class="d-al" x="140.4" y="172" text-anchor="middle">b</text><text class="d-al" x="86" y="172" text-anchor="middle">(a+b)/2</text>
+<text class="d-s" x="18" y="192">f(mid) ≤ chord</text>
+<text class="d-s" x="18" y="208">curve below the chord</text>
+<text class="d-t" x="174" y="20">Concave</text>
+<line class="d-rule" x1="174" y1="158" x2="310" y2="158"/>
+<path class="d-ln" d="M174 113 L176.7 108.8 L179.4 104.9 L182.2 101.1 L184.9 97.4 L187.6 93.9 L190.3 90.5 L193 87.2 L195.8 84.2 L198.5 81.2 L201.2 78.4 L203.9 75.7 L206.6 73.2 L209.4 70.8 L212.1 68.6 L214.8 66.5 L217.5 64.6 L220.2 62.8 L223 61.1 L225.7 59.6 L228.4 58.2 L231.1 57 L233.8 55.9 L236.6 55 L239.3 54.2 L242 53.6 L244.7 53 L247.4 52.7 L250.2 52.5 L252.9 52.4 L255.6 52.5 L258.3 52.7 L261 53 L263.8 53.6 L266.5 54.2 L269.2 55 L271.9 55.9 L274.6 57 L277.4 58.2 L280.1 59.6 L282.8 61.1 L285.5 62.8 L288.2 64.6 L291 66.5 L293.7 68.6 L296.4 70.8 L299.1 73.2 L301.8 75.7 L304.6 78.4 L307.3 81.2 L310 84.2" style="stroke-width:2"/>
+<line class="d-ln-acc" x1="187.6" y1="93.9" x2="296.4" y2="70.8"/>
+<line class="d-ln d-dash" x1="242" y1="158" x2="242" y2="53.6" style="stroke-width:1"/>
+<circle class="pt-plain" cx="187.6" cy="93.9" r="3.5"/><circle class="pt-plain" cx="296.4" cy="70.8" r="3.5"/>
+<circle class="pt-new" cx="242" cy="53.6" r="4.5"/><circle class="pt-no" cx="242" cy="82.4" r="4.5"/>
+<text class="d-al" x="187.6" y="172" text-anchor="middle">a</text><text class="d-al" x="296.4" y="172" text-anchor="middle">b</text><text class="d-al" x="242" y="172" text-anchor="middle">(a+b)/2</text>
+<text class="d-s" x="174" y="192">f(mid) ≥ chord</text>
+<text class="d-s" x="174" y="208">curve above the chord</text>
+<text class="d-t" x="330" y="20">Linear: both</text>
+<line class="d-rule" x1="330" y1="158" x2="466" y2="158"/>
+<path class="d-ln" d="M330 134 L332.7 132.6 L335.4 131.1 L338.2 129.7 L340.9 128.2 L343.6 126.8 L346.3 125.4 L349 123.9 L351.8 122.5 L354.5 121 L357.2 119.6 L359.9 118.2 L362.6 116.7 L365.4 115.3 L368.1 113.8 L370.8 112.4 L373.5 111 L376.2 109.5 L379 108.1 L381.7 106.6 L384.4 105.2 L387.1 103.8 L389.8 102.3 L392.6 100.9 L395.3 99.4 L398 98 L400.7 96.6 L403.4 95.1 L406.2 93.7 L408.9 92.2 L411.6 90.8 L414.3 89.4 L417 87.9 L419.8 86.5 L422.5 85 L425.2 83.6 L427.9 82.2 L430.6 80.7 L433.4 79.3 L436.1 77.8 L438.8 76.4 L441.5 75 L444.2 73.5 L447 72.1 L449.7 70.6 L452.4 69.2 L455.1 67.8 L457.8 66.3 L460.6 64.9 L463.3 63.4 L466 62" style="stroke-width:2"/>
+<line class="d-ln-acc" x1="343.6" y1="126.8" x2="452.4" y2="69.2"/>
+<line class="d-ln d-dash" x1="398" y1="158" x2="398" y2="98" style="stroke-width:1"/>
+<circle class="pt-plain" cx="343.6" cy="126.8" r="3.5"/><circle class="pt-plain" cx="452.4" cy="69.2" r="3.5"/>
+<circle class="pt-new" cx="398" cy="98" r="4.5"/><circle class="pt-no" cx="398" cy="98" r="4.5"/>
+<text class="d-al" x="343.6" y="172" text-anchor="middle">a</text><text class="d-al" x="452.4" y="172" text-anchor="middle">b</text><text class="d-al" x="398" y="172" text-anchor="middle">(a+b)/2</text>
+<text class="d-s" x="330" y="192">f(mid) = chord</text>
+<text class="d-s" x="330" y="208">equality for all a, b</text>
+<text class="d-t" x="486" y="20">Neither</text>
+<line class="d-rule" x1="486" y1="158" x2="622" y2="158"/>
+<path class="d-ln" d="M486 98 L488.7 102.5 L491.4 107 L494.2 111.3 L496.9 115.3 L499.6 119.2 L502.3 122.6 L505 125.7 L507.8 128.4 L510.5 130.6 L513.2 132.2 L515.9 133.4 L518.6 133.9 L521.4 133.9 L524.1 133.4 L526.8 132.2 L529.5 130.6 L532.2 128.4 L535 125.7 L537.7 122.6 L540.4 119.2 L543.1 115.3 L545.8 111.3 L548.6 107 L551.3 102.5 L554 98 L556.7 93.5 L559.4 89 L562.2 84.7 L564.9 80.7 L567.6 76.8 L570.3 73.4 L573 70.3 L575.8 67.6 L578.5 65.4 L581.2 63.8 L583.9 62.6 L586.6 62.1 L589.4 62.1 L592.1 62.6 L594.8 63.8 L597.5 65.4 L600.2 67.6 L603 70.3 L605.7 73.4 L608.4 76.8 L611.1 80.7 L613.8 84.7 L616.6 89 L619.3 93.5 L622 98" style="stroke-width:2"/>
+<line class="d-ln-acc" x1="494.2" y1="111.3" x2="545.8" y2="111.3"/>
+<line class="d-ln d-dash" x1="520" y1="158" x2="520" y2="111.3" style="stroke-width:1"/>
+<circle class="pt-plain" cx="494.2" cy="111.3" r="3.5"/><circle class="pt-plain" cx="545.8" cy="111.3" r="3.5"/>
+<circle class="pt-new" cx="520" cy="134" r="4.5"/><circle class="pt-no" cx="520" cy="111.3" r="4.5"/>
+<line class="d-ln-acc" x1="562.2" y1="84.7" x2="613.8" y2="84.7"/>
+<line class="d-ln d-dash" x1="588" y1="158" x2="588" y2="62" style="stroke-width:1"/>
+<circle class="pt-plain" cx="562.2" cy="84.7" r="3.5"/><circle class="pt-plain" cx="613.8" cy="84.7" r="3.5"/>
+<circle class="pt-new" cx="588" cy="62" r="4.5"/><circle class="pt-no" cx="588" cy="84.7" r="4.5"/>
+<text class="d-s" x="486" y="192">left: curve below chord</text>
+<text class="d-s" x="486" y="208">right: curve above chord</text>
+<circle class="pt-new" cx="26" cy="232" r="4.5"/><text class="d-s" x="36" y="236">f((a+b)/2), on the curve</text><circle class="pt-no" cx="220" cy="232" r="4.5"/><text class="d-s" x="230" y="236">(f(a)+f(b))/2, midpoint of the chord</text>
+          </svg>
+        </div>
+        <figcaption><b>The midpoint test in four cases.</b> Yellow dot: the function at the midpoint. Ring: the chord at the midpoint. A convex curve lies below the chord, a concave one above it, and a straight line on it. The wave fails both tests, using one chord for each.</figcaption>
+      </figure>
+    </section>
+
+    <section id="jensen">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=4s0aNldT02Y&amp;t=412s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L24 · 6:52</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4s0aNldT02Y&amp;t=540s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L24 · 9:00 many points</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=4s0aNldT02Y&amp;t=647s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L24 · 10:47 convex hull</a>
+        </div>
+        <h2>From two points to many: Jensen's inequality</h2>
+      </div>
+      <p>Write the midpoint as \(\frac12 a + \frac12 b\). For a convex function the definition reads \(f(\frac12 a + \frac12 b) \le \frac12 f(a) + \frac12 f(b)\). If this holds for every \(a\) and \(b\), one can argue that it holds for any weight \(\lambda\) between 0 and 1:</p>
+      <div class="eq">\[ f\big(\lambda a + (1-\lambda) b\big) \;\le\; \lambda f(a) + (1-\lambda) f(b), \qquad 0 \le \lambda \le 1 \qquad (\text{convex}) \]</div>
+      <p>As \(\lambda\) goes from 1 to 0, the point \(\lambda a + (1-\lambda)b\) travels from \(a\) to \(b\), and at every stop along the way the function stays at or below the chord. For a concave function the inequality reverses.</p>
+      <p>The same idea extends to any number of points \(a_1, \dots, a_K\), with weights \(\lambda_1, \dots, \lambda_K\) that lie between 0 and 1 and sum to 1. Written for concave functions, the form used from here on:</p>
+      <div class="result">
+        <span class="lbl">Jensen's inequality (concave f)</span>
+        \[ f\Big(\sum_{k=1}^K \lambda_k a_k\Big) \;\ge\; \sum_{k=1}^K \lambda_k\, f(a_k), \qquad 0 \le \lambda_k \le 1, \quad \sum_{k=1}^K \lambda_k = 1 \]
+        <p>For a convex \(f\) the inequality points the other way. This is the only fact from convexity the rest of the part needs.</p>
+      </div>
+      <p>In one dimension this adds little intuition, so the lecture pictures a concave function on the plane. Take three points \(a_1, a_2, a_3\). Varying the weights moves \(\lambda_1 a_1 + \lambda_2 a_2 + \lambda_3 a_3\) around the triangle they span, called their <dfn>convex hull</dfn>; for example \(0.1a_1 + 0.5a_2 + 0.4a_3\) is one point inside it. Over every point of the hull, the concave surface lies above the flat triangle joining the three function values. Jensen says this for any number of points.</p>
+    </section>
+
+    <section id="log-concave">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=4s0aNldT02Y&amp;t=808s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L24 · 13:28</a>
+        <h2>The connection: log is concave</h2>
+      </div>
+      <p>Why convexity in a part about mixtures? The logarithm in the log-likelihood is a concave function, so Jensen's inequality applies to it. For positive \(a_k\) and valid weights:</p>
+      <div class="eq">\[ \log\Big(\sum_{k=1}^K \lambda_k a_k\Big) \;\ge\; \sum_{k=1}^K \lambda_k \log a_k \]</div>
+      <p>Read it left to right. The left side has a sum inside a log, the very thing that blocked us in ★. The right side has the sum outside the log. Jensen lets us pull the sum out, at a price: we get an inequality instead of an equality. Lecture 25 shows how to live with that price.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 300" role="img" aria-label="The curve log x with three points at x equals 1, 3 and 7 joined into a triangle. The weighted average of the three curve points lies inside the triangle at height 1.13, below the curve value log 3.8 equals 1.34 at the weighted average of the x values.">
+<line class="d-rule" x1="56" y1="188" x2="610" y2="188"/><line class="d-rule" x1="56" y1="24" x2="56" y2="270"/>
+<text class="d-al" x="121.2" y="202" text-anchor="middle">1</text><text class="d-al" x="186.4" y="202" text-anchor="middle">2</text><text class="d-al" x="251.5" y="202" text-anchor="middle">3</text><text class="d-al" x="316.7" y="202" text-anchor="middle">4</text><text class="d-al" x="381.9" y="202" text-anchor="middle">5</text><text class="d-al" x="447.1" y="202" text-anchor="middle">6</text><text class="d-al" x="512.2" y="202" text-anchor="middle">7</text><text class="d-al" x="577.4" y="202" text-anchor="middle">8</text><text class="d-al" x="50" y="260.3" text-anchor="end">−1</text><text class="d-al" x="50" y="123.7" text-anchor="end">1</text><text class="d-al" x="50" y="55.3" text-anchor="end">2</text>
+<path class="d-ln" d="M76.9 265.9 L79.5 257.8 L82.1 250.6 L84.7 244.1 L87.3 238.2 L89.9 232.7 L92.5 227.6 L95.1 222.9 L97.7 218.5 L100.3 214.4 L102.9 210.4 L105.5 206.8 L108.1 203.2 L110.7 199.9 L113.4 196.7 L116 193.7 L118.6 190.8 L121.2 188 L123.8 185.3 L126.4 182.7 L129 180.3 L131.6 177.9 L134.2 175.5 L136.8 173.3 L139.4 171.1 L142 169 L144.6 167 L147.2 165 L149.9 163.1 L152.5 161.2 L155.1 159.4 L157.7 157.6 L160.3 155.9 L162.9 154.2 L165.5 152.5 L168.1 150.9 L170.7 149.4 L173.3 147.8 L175.9 146.3 L178.5 144.9 L181.1 143.4 L183.7 142 L186.4 140.6 L189 139.3 L191.6 138 L194.2 136.7 L196.8 135.4 L199.4 134.1 L202 132.9 L204.6 131.7 L207.2 130.5 L209.8 129.3 L212.4 128.2 L215 127 L217.6 125.9 L220.2 124.8 L222.9 123.8 L225.5 122.7 L228.1 121.7 L230.7 120.6 L233.3 119.6 L235.9 118.6 L238.5 117.6 L241.1 116.7 L243.7 115.7 L246.3 114.8 L248.9 113.8 L251.5 112.9 L254.1 112 L256.7 111.1 L259.4 110.2 L262 109.4 L264.6 108.5 L267.2 107.7 L269.8 106.8 L272.4 106 L275 105.2 L277.6 104.4 L280.2 103.6 L282.8 102.8 L285.4 102 L288 101.2 L290.6 100.5 L293.2 99.7 L295.8 99 L298.5 98.2 L301.1 97.5 L303.7 96.8 L306.3 96.1 L308.9 95.4 L311.5 94.7 L314.1 94 L316.7 93.3 L319.3 92.6 L321.9 91.9 L324.5 91.3 L327.1 90.6 L329.7 89.9 L332.3 89.3 L335 88.6 L337.6 88 L340.2 87.4 L342.8 86.8 L345.4 86.1 L348 85.5 L350.6 84.9 L353.2 84.3 L355.8 83.7 L358.4 83.1 L361 82.5 L363.6 82 L366.2 81.4 L368.8 80.8 L371.5 80.2 L374.1 79.7 L376.7 79.1 L379.3 78.6 L381.9 78 L384.5 77.5 L387.1 76.9 L389.7 76.4 L392.3 75.9 L394.9 75.3 L397.5 74.8 L400.1 74.3 L402.7 73.8 L405.3 73.3 L408 72.8 L410.6 72.3 L413.2 71.8 L415.8 71.3 L418.4 70.8 L421 70.3 L423.6 69.8 L426.2 69.3 L428.8 68.8 L431.4 68.4 L434 67.9 L436.6 67.4 L439.2 66.9 L441.8 66.5 L444.5 66 L447.1 65.6 L449.7 65.1 L452.3 64.7 L454.9 64.2 L457.5 63.8 L460.1 63.3 L462.7 62.9 L465.3 62.4 L467.9 62 L470.5 61.6 L473.1 61.2 L475.7 60.7 L478.3 60.3 L481 59.9 L483.6 59.5 L486.2 59.1 L488.8 58.6 L491.4 58.2 L494 57.8 L496.6 57.4 L499.2 57 L501.8 56.6 L504.4 56.2 L507 55.8 L509.6 55.4 L512.2 55 L514.8 54.6 L517.4 54.3 L520.1 53.9 L522.7 53.5 L525.3 53.1 L527.9 52.7 L530.5 52.3 L533.1 52 L535.7 51.6 L538.3 51.2 L540.9 50.9 L543.5 50.5 L546.1 50.1 L548.7 49.8 L551.3 49.4 L553.9 49.1 L556.6 48.7 L559.2 48.3 L561.8 48 L564.4 47.6 L567 47.3 L569.6 46.9 L572.2 46.6 L574.8 46.2 L577.4 45.9 L580 45.6 L582.6 45.2 L585.2 44.9 L587.8 44.6 L590.4 44.2 L593.1 43.9 L595.7 43.6 L598.3 43.2 L600.9 42.9 L603.5 42.6" style="stroke-width:2"/>
+<text class="d-t" x="583.9" y="35.1" text-anchor="end">log x</text>
+<path class="d-ln-acc" d="M121.2 188 L251.5 112.9 L512.2 55 Z" style="fill: var(--accent-soft); fill-opacity:.7"/>
+<circle class="pt-tree" cx="121.2" cy="188" r="5"/><circle class="pt-tree" cx="251.5" cy="112.9" r="5"/><circle class="pt-tree" cx="512.2" cy="55" r="5"/>
+<text class="d-s" x="113.2" y="178" text-anchor="end">a₁ = 1, λ₁ = 0.2</text>
+<text class="d-s" x="239.5" y="116.9" text-anchor="end">a₂ = 3, λ₂ = 0.5</text>
+<text class="d-s" x="514.2" y="77" text-anchor="middle">a₃ = 7, λ₃ = 0.3</text>
+<line class="d-ln d-dash" x1="303.7" y1="188" x2="303.7" y2="96.8" style="stroke-width:1"/>
+<circle class="pt-new" cx="303.7" cy="96.8" r="5"/><circle class="pt-no" cx="303.7" cy="110.6" r="5"/>
+<line class="d-ln" x1="299.7" y1="90.8" x2="287.7" y2="66.8" style="stroke-width:1"/>
+<text class="d-s" x="285.7" y="62.8" text-anchor="end">log(Σ λₖaₖ) = log 3.8 = 1.34</text>
+<text class="d-s" x="313.7" y="126.6">Σ λₖ log aₖ = 1.13</text>
+<text class="d-al" x="303.7" y="216" text-anchor="middle">Σ λₖaₖ = 3.8</text>
+          </svg>
+        </div>
+        <figcaption><b>Jensen for the logarithm, with three points.</b> Here \(a = 1, 3, 7\) with weights \(0.2, 0.5, 0.3\), an example chosen for this page. The weighted average of the three curve points (ring) lies inside their triangle, which lies below the concave curve: \(\sum_k\lambda_k\log a_k = 1.13 \le \log\big(\sum_k\lambda_k a_k\big) = \log 3.8 = 1.34\).</figcaption>
+      </figure>
+
+      <p>The lecture leaves the concavity of the log as an exercise. One way, with the midpoint definition: for \(a, b > 0\),</p>
+      <div class="eq">\[ \log\frac{a+b}{2} \;\ge\; \frac{\log a + \log b}{2} = \log\sqrt{ab} \iff \frac{a+b}{2} \ge \sqrt{ab} \iff \big(\sqrt a - \sqrt b\big)^2 \ge 0, \]</div>
+      <p>and the last statement is always true. The first step is reversible because the log is increasing. (The middle inequality is the familiar fact that the arithmetic mean is at least the geometric mean.)</p>
+    </section>
+
+    <!-- ============ LECTURE 25 ============ -->
+    <section id="lower-bound">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=13s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 0:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=111s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 1:51 new parameters λ</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=288s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 4:48 apply Jensen</a>
+        </div>
+        <h2>Multiply and divide by λ: a lower bound</h2>
+      </div>
+      <p class="note">The video's YouTube title mentions supervised learning, but L25 is entirely about estimating the GMM's parameters.</p>
+      <p>Go back to ★. Inside each log is a plain sum of \(K\) numbers, but Jensen needs a weighted combination whose weights sum to 1. There are no such weights, so the lecture introduces them artificially, making the problem bigger on purpose. For every data point \(i\), add \(K\) new parameters \(\lambda_{i1}, \dots, \lambda_{iK}\) with</p>
+      <div class="eq">\[ \sum_{k=1}^K \lambda_{ik} = 1, \qquad 0 \le \lambda_{ik} \le 1 \qquad \text{for all } i, k \]</div>
+      <p>For each point they form a probability distribution over the \(K\) mixtures. Their meaning comes later; for now they are just extra parameters. Multiply and divide every term by \(\lambda_{ik}\), which changes nothing:</p>
+      <div class="eq">\[ \log L(\theta) = \sum_{i=1}^n \log \sum_{k=1}^K \lambda_{ik}\,\frac{\pi_k\,\mathcal N(x_i;\mu_k,\sigma_k^2)}{\lambda_{ik}} \]</div>
+      <p>Each log now holds a \(\lambda\)-weighted combination of the numbers \(\pi_k\mathcal N(x_i;\mu_k,\sigma_k^2)/\lambda_{ik}\), and the log is concave. Jensen moves the sum outside:</p>
+      <div class="result">
+        <span class="lbl">The modified log-likelihood: a lower bound for every λ</span>
+        \[ \log L(\theta) \;\ge\; \sum_{i=1}^n \sum_{k=1}^K \lambda_{ik}\,\log\frac{\pi_k\,\mathcal N(x_i;\mu_k,\sigma_k^2)}{\lambda_{ik}} \;=:\; \ell(\theta, \lambda), \qquad \mathcal N(x;\mu,\sigma^2) = \frac{1}{\sqrt{2\pi}\,\sigma}\,e^{-(x-\mu)^2/2\sigma^2} \]
+        <p>The lecture calls \(\ell(\theta,\lambda)\) the <dfn>modified log-likelihood</dfn>. It is a different function from \(\log L\), which is why we get an inequality. It depends on \(\theta = (\mu_1, \dots, \mu_K, \sigma_1^2, \dots, \sigma_K^2, \pi_1, \dots, \pi_K)\) and on \(\lambda = (\lambda_{11}, \dots, \lambda_{1K}, \dots, \lambda_{n1}, \dots, \lambda_{nK})\).</p>
+      </div>
+      <p class="note">Convention: a term with \(\lambda_{ik} = 0\) counts as 0, the limit of \(\lambda\log(c/\lambda)\) as \(\lambda \to 0\).</p>
+
+      <h3>Why accept a different function with more parameters? <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=466s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 7:46</a></h3>
+      <p>At first sight this is a bad trade. \(\ell\) is not the function we wanted to maximize, and it adds \(n \times K\) parameters. To be worth it, something must become very simple. Two things do.</p>
+      <ul>
+        <li><b>It is a lower bound for any valid λ.</b> Hand me any \(\theta\). I can choose any \(\lambda\) I like (nonnegative, summing to 1 for each point), evaluate \(\ell(\theta,\lambda)\), and the number will never exceed the true log-likelihood \(\log L(\theta)\). That is Jensen, nothing more.</li>
+        <li><b>Each half is easy when the other is fixed</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=610s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:10</a>. With \(\lambda\) fixed, maximizing \(\ell\) over \(\theta\) is easy. With \(\theta\) fixed, maximizing over \(\lambda\) is easy. The next two sections check both claims by writing down the closed-form answers.</li>
+      </ul>
+      <p class="rule-of-thumb">Key insight: one hard problem in θ becomes two easy problems, one in θ and one in λ.</p>
+    </section>
+
+    <section id="fix-lambda">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=723s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 12:03</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=872s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 14:32 closed forms</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=1085s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 18:05 the π's</a>
+        </div>
+        <h2>Fix λ, maximize over θ</h2>
+      </div>
+      <p>Treat every \(\lambda_{ik}\) as a constant. The log of a product splits into a sum of logs, and the log cancels the exponential:</p>
+      <div class="eq">\[ \ell(\theta,\lambda) = \sum_{i=1}^n \sum_{k=1}^K \Big[ \lambda_{ik}\log\pi_k \;-\; \lambda_{ik}\frac{(x_i-\mu_k)^2}{2\sigma_k^2} \;-\; \lambda_{ik}\log\big(\sqrt{2\pi}\,\sigma_k\big) \;-\; \lambda_{ik}\log\lambda_{ik} \Big] \]</div>
+      <p>The last term involves only \(\lambda\), so it is a constant here and can be ignored. The first three terms contain the real parameters, and each appears in a simple way. Taking derivatives gives closed forms for all of them. The lecture states the results and recommends deriving them as an exercise; the steps are short.</p>
+      <ul>
+        <li><b>Means.</b> \(\dfrac{\partial\ell}{\partial\mu_k} = \sum_i \lambda_{ik}\,\dfrac{x_i-\mu_k}{\sigma_k^2} = 0\) gives \(\mu_k = \sum_i\lambda_{ik}x_i \big/ \sum_i\lambda_{ik}\).</li>
+        <li><b>Variances.</b> Write \(v = \sigma_k^2\), so \(\log(\sqrt{2\pi}\,\sigma_k) = \frac12\log 2\pi + \frac12\log v\). Then \(\dfrac{\partial\ell}{\partial v} = \sum_i \lambda_{ik}\Big(\dfrac{(x_i-\mu_k)^2}{2v^2} - \dfrac{1}{2v}\Big) = 0\) gives \(v = \sum_i\lambda_{ik}(x_i-\mu_k)^2 \big/ \sum_i\lambda_{ik}\).</li>
+        <li><b>Mixing proportions.</b> Only \(\sum_i\sum_k\lambda_{ik}\log\pi_k\) involves \(\pi\), and the \(\pi_k\) must be nonnegative and sum to 1. The lecture solves this constrained problem with the method of Lagrange multipliers (constrained optimization comes back in <a href="part-16.html">Part 16</a>). With \(N_k = \sum_i\lambda_{ik}\), set the derivative of \(\sum_k N_k\log\pi_k + \nu\big(1 - \sum_k\pi_k\big)\) to zero: \(N_k/\pi_k = \nu\), so \(\pi_k = N_k/\nu\). Summing over \(k\) fixes \(\nu = \sum_k N_k = \sum_i\sum_k\lambda_{ik} = n\).</li>
+      </ul>
+      <div class="result">
+        <span class="lbl">With λ fixed (modified maximum likelihood, MML)</span>
+        \[ \hat\mu_k^{\text{MML}} = \frac{\sum_{i=1}^n \lambda_{ik}\,x_i}{\sum_{i=1}^n \lambda_{ik}}, \qquad \hat\sigma_k^{2,\text{MML}} = \frac{\sum_{i=1}^n \lambda_{ik}\,\big(x_i-\hat\mu_k^{\text{MML}}\big)^2}{\sum_{i=1}^n \lambda_{ik}}, \qquad \hat\pi_k^{\text{MML}} = \frac{\sum_{i=1}^n \lambda_{ik}}{n} \]
+        <p>A weighted mean, a weighted sample variance and an averaged weight, where point \(i\) counts towards mixture \(k\) with weight \(\lambda_{ik}\). The lecture calls these modified maximum likelihood estimates because they maximize \(\ell\), not the original likelihood.</p>
+      </div>
+
+      <h3>Reading λ as a clustering <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=982s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 16:22</a></h3>
+      <p>Think of \(\lambda_{ik}\) as the probability that point \(i\) belongs to cluster \(k\).</p>
+      <ul>
+        <li><b>Hard clustering.</b> Put each point entirely into one cluster: \(\lambda_{ik} = 1\) for its cluster and 0 for the rest. Then \(\hat\mu_k\) is the mean of the points assigned to cluster \(k\), \(\hat\sigma_k^2\) their sample variance, and \(\hat\pi_k\) the fraction of points assigned to \(k\).</li>
+        <li><b>Soft clustering.</b> With \(\lambda_{ik}\) between 0 and 1, every point tells each cluster how much it belongs there, and is weighted by that importance. The estimates become weighted means and variances, and \(\hat\pi_k\) is the average chance that a point belongs to cluster \(k\).</li>
+      </ul>
+    </section>
+
+    <section id="fix-theta">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=1388s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 23:08</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=1516s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 25:16 one point at a time</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=1686s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 28:06 Bayes' theorem</a>
+        </div>
+        <h2>Fix θ, maximize over λ</h2>
+      </div>
+      <p>Now hold all the \(\mu_k\), \(\sigma_k^2\) and \(\pi_k\) fixed. Write \(a_{ik} = \pi_k\,\mathcal N(x_i;\mu_k,\sigma_k^2)\), the weighted Gaussian density, which is a constant now. Splitting the log of the ratio leaves</p>
+      <div class="eq">\[ \ell(\theta,\lambda) = \sum_{i=1}^n \sum_{k=1}^K \big( \lambda_{ik}\log a_{ik} - \lambda_{ik}\log\lambda_{ik} \big) \]</div>
+      <p>No term mixes the \(\lambda\)'s of two different points. The function is a sum of separate pieces, one per data point, that share no variables, so maximizing each piece on its own maximizes the whole. Fix any point \(i\) and solve</p>
+      <div class="eq">\[ \max_{\lambda_{i1},\dots,\lambda_{iK}} \; \sum_{k=1}^K \big(\lambda_{ik}\log a_{ik} - \lambda_{ik}\log\lambda_{ik}\big) \quad\text{subject to}\quad \sum_{k=1}^K\lambda_{ik} = 1,\;\; 0 \le \lambda_{ik} \le 1 \]</div>
+      <p>This is a constrained problem again, and again not a hard one; Lagrange multipliers solve it analytically. The lecture skips the step, which goes like this: the derivative of \(\sum_k(\lambda_{ik}\log a_{ik} - \lambda_{ik}\log\lambda_{ik}) + \nu_i\big(1-\sum_k\lambda_{ik}\big)\) with respect to \(\lambda_{ik}\) is \(\log a_{ik} - \log\lambda_{ik} - 1 - \nu_i\). Setting it to zero makes \(\lambda_{ik}\) proportional to \(a_{ik}\), and the constraint fixes the scale.</p>
+      <div class="result">
+        <span class="lbl">With θ fixed</span>
+        \[ \hat\lambda_{ik}^{\text{MML}} = \frac{a_{ik}}{\sum_{l=1}^K a_{il}} = \frac{\pi_k\,\sigma_k^{-1}\exp\!\big(-(x_i-\mu_k)^2/2\sigma_k^2\big)}{\sum_{l=1}^K \pi_l\,\sigma_l^{-1}\exp\!\big(-(x_i-\mu_l)^2/2\sigma_l^2\big)} \]
+        <p>In the second form the common factor \(1/\sqrt{2\pi}\) of the Gaussian densities has cancelled.</p>
+      </div>
+
+      <h3>It is Bayes' theorem <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=idWmaE39OIk&amp;t=1655s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L25 · 27:35</a></h3>
+      <p>The formula looks complicated, but its meaning is plain. \(\lambda_{ik}\) was meant to be the chance that point \(i\) comes from cluster \(k\). If all the parameters are known and we are shown \(x_i\), that chance is \(P(z_i = k \mid x_i)\), and Bayes' theorem gives</p>
+      <div class="eq">\[ P(z_i = k \mid x_i) = \frac{P(x_i \mid z_i = k)\,P(z_i = k)}{P(x_i)} = \frac{\mathcal N(x_i;\mu_k,\sigma_k^2)\,\pi_k}{\sum_{l=1}^K \mathcal N(x_i;\mu_l,\sigma_l^2)\,\pi_l} \]</div>
+      <p>Here \(P(x_i \mid z_i = k)\) is the density of \(x_i\) under mixture \(k\), \(P(z_i = k) = \pi_k\) is the chance from step 1 of the story, and the denominator adds up every way of generating \(x_i\), which is \(P(x_i)\). So maximizing the modified likelihood over \(\lambda\) gives exactly what Bayes' theorem gives. Standard name: \(\lambda_{ik}\) is often called the <dfn>responsibility</dfn> of mixture \(k\) for point \(i\).</p>
+      <p class="rule-of-thumb">Both halves are now simple formulas. Fix λ: weighted mean, weighted variance and weighted fraction. Fix θ: the posterior P(zᵢ = k | xᵢ) by Bayes' theorem.</p>
+    </section>
+
+    <!-- ============ LECTURE 26 ============ -->
+    <section id="em">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=13s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 0:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=50s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 0:50 stopping rule</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=176s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 2:56 the name</a>
+        </div>
+        <h2>The EM algorithm</h2>
+      </div>
+      <p>Going back and forth between the two easy maximizations gives an iterative algorithm. The superscript \(t\) counts iterations.</p>
+      <ol class="algo">
+        <li class="algo-title">EM for a Gaussian mixture</li>
+        <li><b>Initialize</b> \(\theta^0\): some means \(\mu_1, \dots, \mu_K\), variances \(\sigma_1^2, \dots, \sigma_K^2\) and proportions \(\pi_1, \dots, \pi_K\).</li>
+        <li><b>E step.</b> \(\lambda^{t+1} = \arg\max_\lambda \ell(\theta^t, \lambda)\): for every \(i\) and \(k\), \(\lambda_{ik}^{t+1} = \pi_k\mathcal N(x_i;\mu_k,\sigma_k^2) \big/ \sum_l \pi_l\mathcal N(x_i;\mu_l,\sigma_l^2)\), with the parameters taken from \(\theta^t\).</li>
+        <li><b>M step.</b> \(\theta^{t+1} = \arg\max_\theta \ell(\theta, \lambda^{t+1})\): the weighted means, variances and proportions, with weights \(\lambda^{t+1}\).</li>
+        <li><b>Repeat</b> the E and M steps until \(\lVert\theta^{t+1} - \theta^t\rVert \le \epsilon\), a tolerance such as \(10^{-3}\) or \(10^{-2}\): stop once the estimates barely change.</li>
+      </ol>
+      <p>By introducing the \(\lambda\)'s and using Jensen, the problem splits into two parts, each easy when the other is held fixed, and we go back and forth between them. This is an instance of a famous algorithm, the <dfn>EM algorithm</dfn>. E stands for <b>expectation</b> and M for <b>maximization</b>. The first step is called the expectation step because the modified log-likelihood, and the \(\lambda^{t+1}\) it produces, can be written as an expectation of some quantity. (For instance, \(\sum_k\lambda_{ik}\log\frac{a_{ik}}{\lambda_{ik}}\) is an average of \(\log\frac{a_{ik}}{\lambda_{ik}}\) with weights \(\lambda_{i1},\dots,\lambda_{iK}\).) The course does not develop the general version.</p>
+      <p>The algorithm was developed in the 1970s. It was known in other forms before, but Dempster's paper set it down and gave it the name EM (standard reference: Dempster, Laird and Rubin, 1977), and it has been widely used ever since. The lecture also says one can argue that it converges, without giving a proof.</p>
+
+      <h3>Why the log-likelihood never decreases</h3>
+      <p>This standard argument is not in the lecture, but it shows what EM achieves and explains the widget below. It needs one more fact: after an E step, the bound is <b>tight</b>. Put \(\lambda_{ik} = a_{ik}/\sum_l a_{il}\) into \(\ell\). Then \(a_{ik}/\lambda_{ik} = \sum_l a_{il} = f(x_i;\theta)\), the mixture density of \(x_i\), for every \(k\). So</p>
+      <div class="eq">\[ \ell(\theta^t, \lambda^{t+1}) = \sum_{i=1}^n \sum_{k=1}^K \lambda_{ik}^{t+1}\,\log f(x_i;\theta^t) = \sum_{i=1}^n \log f(x_i;\theta^t) = \log L(\theta^t) \]</div>
+      <p>since the \(\lambda_{ik}^{t+1}\) sum to 1 over \(k\). Now chain the three facts:</p>
+      <div class="eq">\[ \log L(\theta^{t+1}) \;\underset{\text{Jensen}}{\ge}\; \ell(\theta^{t+1}, \lambda^{t+1}) \;\underset{\text{M step}}{\ge}\; \ell(\theta^t, \lambda^{t+1}) \;\underset{\text{tight}}{=}\; \log L(\theta^t) \]</div>
+      <p>The M step can only raise \(\ell\), because \(\theta^{t+1}\) maximizes it and \(\theta^t\) was one of the candidates. So every iteration keeps or raises the true log-likelihood.</p>
+
+      <figure id="em-fig">
+        <div class="controls">
+          <label for="em-step">Steps taken</label>
+          <input type="range" id="em-step" min="0" max="16" step="1" value="0">
+          <output id="em-step-out" for="em-step">start</output>
+          <button class="btn" id="em-next" type="button">Next: E step</button>
+          <button class="btn" id="em-run" type="button">Run to convergence</button>
+          <button class="btn" id="em-start" type="button" aria-pressed="false">Try a poor start</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Iteration t</span><span class="v" id="em-t">–</span></div>
+          <div><span class="k">log L(θ)</span><span class="v mine" id="em-ll">–</span></div>
+          <div><span class="k">Bound ℓ(θ, λ)</span><span class="v" id="em-bd">–</span></div>
+          <div><span class="k">Gap</span><span class="v" id="em-gap">–</span></div>
+        </div>
+        <div class="status" id="em-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="em-svg" viewBox="0 0 640 470" role="img" aria-label="EM on 90 synthetic one-dimensional points. Top: a histogram with three dashed weighted components and their solid sum. Middle: a band showing the probability of each component for every x, from the last E step, and the points coloured by their most likely component. Bottom: the log-likelihood after each iteration for this start and, faintly, for the other start."></svg></div>
+        <figcaption><b>EM on 90 synthetic points</b>, drawn for this page from three Gaussians with a seeded generator. Each press of Next runs one E step or one M step; the default start is built from a Lloyd's clustering. Top: histogram, the weighted components \(\pi_k\mathcal N(x;\mu_k,\sigma_k^2)\) (dashed) and their sum (solid). Middle: the soft assignment \(P(z = k \mid x)\) from the last E step, stacked to 1; at each data point it equals \(\lambda_{ik}\), and the dots show each point's most likely mixture. Bottom: \(\log L\) after each iteration for this start (bold) and the other start (faint); the ring is the bound \(\ell(\theta,\lambda)\). After an E step the ring sits on the dot; after an M step \(\log L\) has risen above it. The poor start ends on a lower peak.</figcaption>
+      </figure>
+    </section>
+
+    <section id="soft-clustering">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=282s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 4:42</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=410s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 6:50 variances</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=504s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 8:24 hard clusters from EM</a>
+        </div>
+        <h2>EM as soft clustering, compared with K-means</h2>
+      </div>
+      <p>EM is closely related to Lloyd's algorithm (<a href="part-06.html">Part 6</a>). The \(\lambda_{ik}\) it ends with can be read as the chance that point \(i\) belongs to cluster \(k\), so EM produces a <dfn>soft clustering</dfn> where Lloyd's produces a hard one. At the end you have the estimates of \(\mu\), \(\sigma^2\) and \(\pi\), and also the optimal \(\lambda\)'s, which you can use as a clustering. Lloyd's algorithm also alternated two steps, and they line up with EM's:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>Lloyd's (K-means)</th><th>EM for a GMM</th></tr></thead>
+          <tbody>
+            <tr><td>Assignments</td><td>Hard: each \(z_i\) is one cluster</td><td>Soft: \(\lambda_{ik} \in [0,1]\), \(\sum_k\lambda_{ik} = 1\)</td></tr>
+            <tr><td>Assignments fixed</td><td>Compute the means</td><td>M step: means, variances and mixing proportions</td></tr>
+            <tr><td>Parameters fixed</td><td>Reassign each point to its nearest mean</td><td>E step: update how likely each point is to come from each cluster</td></tr>
+            <tr><td>Spread of a cluster</td><td>Not estimated</td><td>Estimated (a covariance matrix in higher dimensions)</td></tr>
+            <tr><td>Cluster regions</td><td>Voronoi regions (<a href="part-07.html">Part 7</a>)</td><td>Need not be Voronoi regions</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Estimating variances matters. In higher dimensions they become covariance matrices, so each cluster gets its own shape. If the points of one cluster spread along one direction and those of a neighbouring cluster along another, Lloyd's algorithm may do poorly where the two overlap. EM can pick up that each cluster has its own direction of spread, simply because it estimates more parameters.</p>
+      <p>To turn EM's output into a hard clustering, run the algorithm, then put each point \(i\) in the cluster with the largest of \(\lambda_{i1}, \lambda_{i2}, \dots, \lambda_{iK}\). Because the variances shape these clusters, they need not be Voronoi regions <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=535s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:55</a>. Especially where clusters overlap, the lecture argues EM assigns points better than Lloyd's, even after this conversion to hard clusters.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 348" role="img" aria-label="Two synthetic two-dimensional clusters, one stretched at about 60 degrees and one nearly horizontal. A dashed straight line is the Voronoi boundary between their means. A solid curved boundary, with two branches, marks where the two Gaussians are equally likely. Points where the two rules disagree are ringed.">
+<rect class="d-plot" x="20" y="20" width="420" height="308"/>
+<line class="d-ln d-dash" x1="268.4" y1="327.4" x2="191.6" y2="20.6" style="stroke-width:1.6"/>
+<path class="d-ln-acc" d="M156 20 L156.3 21 L156.5 21.9 L157 23.7 L157.4 25.6 L157.9 27.5 L158.1 28.5 L158.3 29.3 L158.8 31.2 L159.3 33.1 L159.7 34.9 L160 36.2 L160.2 36.8 L160.6 38.7 L161.1 40.5 L161.5 42.4 L161.9 44 L161.9 44.3 L162.4 46.1 L162.8 48 L163.2 49.9 L163.7 51.7 L163.7 52 L164.1 53.6 L164.5 55.5 L164.9 57.3 L165.3 59.2 L165.6 60.4 L165.8 61.1 L166.2 62.9 L166.6 64.8 L167 66.7 L167.3 68.5 L167.5 69.2 L167.7 70.4 L168.1 72.3 L168.5 74.1 L168.8 76 L169.2 77.9 L169.3 78.8 L169.5 79.7 L169.8 81.6 L170.2 83.5 L170.5 85.3 L170.8 87.2 L171.1 89.1 L171.2 90.1 L171.3 90.9 L171.6 92.8 L171.8 94.7 L172 96.5 L172.2 98.4 L172.4 100.3 L172.5 102.1 L172.7 104 L172.8 105.9 L172.8 107.7 L172.8 109.6 L172.8 111.5 L172.7 113.3 L172.6 115.2 L172.5 117.1 L172.2 118.9 L171.9 120.8 L171.6 122.7 L171.2 124.3 L171.1 124.5 L170.6 126.4 L170 128.3 L169.3 130 L169.3 130.1 L168.5 132 L167.6 133.9 L167.5 134.1 L166.6 135.7 L165.6 137.3 L165.4 137.6 L164.2 139.5 L163.7 140.1 L162.8 141.3 L161.9 142.5 L161.4 143.2 L160 144.8 L159.8 145.1 L158.1 146.9 L158.1 146.9 L156.3 148.8 L156.3 148.9 L154.5 150.7 L154.4 150.7 L152.5 152.5 L152.5 152.5 L150.7 154.2 L150.5 154.4 L148.8 155.9 L148.4 156.3 L146.9 157.5 L146.2 158.1 L145.1 159.1 L144 160 L143.2 160.6 L141.7 161.9 L141.3 162.1 L139.5 163.6 L139.3 163.7 L137.6 165.1 L137 165.6 L135.7 166.5 L134.5 167.5 L133.9 168 L132.1 169.3 L132 169.4 L130.1 170.8 L129.6 171.2 L128.3 172.1 L127 173.1 L126.4 173.5 L124.5 174.9 L124.4 174.9 L122.7 176.2 L121.9 176.8 L120.8 177.6 L119.2 178.7 L118.9 178.9 L117.1 180.2 L116.6 180.5 L115.2 181.5 L114 182.4 L113.3 182.8 L111.5 184.1 L111.3 184.3 L109.6 185.4 L108.6 186.1 L107.7 186.7 L105.9 188 L105.9 188 L104 189.3 L103.2 189.9 L102.1 190.6 L100.4 191.7 L100.3 191.8 L98.4 193.1 L97.7 193.6 L96.5 194.4 L94.9 195.5 L94.7 195.6 L92.8 196.9 L92.2 197.3 L90.9 198.1 L89.4 199.2 L89.1 199.4 L87.2 200.7 L86.6 201.1 L85.3 201.9 L83.8 202.9 L83.5 203.1 L81.6 204.4 L81 204.8 L79.7 205.6 L78.2 206.7 L77.9 206.9 L76 208.1 L75.4 208.5 L74.1 209.4 L72.6 210.4 L72.3 210.6 L70.4 211.8 L69.7 212.3 L68.5 213.1 L66.9 214.1 L66.7 214.3 L64.8 215.5 L64.1 216 L62.9 216.7 L61.2 217.9 L61.1 218 L59.2 219.2 L58.4 219.7 L57.3 220.4 L55.5 221.6 L55.5 221.6 L53.6 222.9 L52.7 223.5 L51.7 224.1 L49.9 225.3 L49.8 225.3 L48 226.5 L47 227.2 L46.1 227.7 L44.3 228.9 L44.1 229.1 L42.4 230.2 L41.2 230.9 L40.5 231.4 L38.7 232.6 L38.4 232.8 L36.8 233.8 L35.5 234.7 L34.9 235 L33.1 236.2 L32.6 236.5 L31.2 237.4 L29.7 238.4 L29.3 238.7 L27.5 239.9 L26.8 240.3 L25.6 241.1 L24 242.1 L23.7 242.3 L21.9 243.5 L21.1 244 L20 244.7" style="stroke-width:2.2"/>
+<path class="d-ln-acc" d="M246.5 328 L246 326.1 L245.9 325.7 L245.5 324.3 L245 322.4 L244.5 320.5 L244 318.7 L244 318.7 L243.5 316.8 L243 314.9 L242.5 313.1 L242.1 311.6 L242 311.2 L241.5 309.3 L241 307.5 L240.5 305.6 L240.3 304.5 L240.1 303.7 L239.6 301.9 L239.1 300 L238.6 298.1 L238.4 297.4 L238.1 296.3 L237.6 294.4 L237.1 292.5 L236.6 290.7 L236.5 290.3 L236.1 288.8 L235.7 286.9 L235.2 285.1 L234.7 283.2 L234.7 283.1 L234.2 281.3 L233.7 279.5 L233.2 277.6 L232.8 275.8 L232.8 275.7 L232.3 273.9 L231.8 272 L231.3 270.1 L230.9 268.5 L230.9 268.3 L230.4 266.4 L229.9 264.5 L229.4 262.7 L229.1 261.2 L229 260.8 L228.5 258.9 L228 257.1 L227.6 255.2 L227.2 253.7 L227.1 253.3 L226.6 251.5 L226.2 249.6 L225.7 247.7 L225.3 246.2 L225.3 245.9 L224.8 244 L224.3 242.1 L223.9 240.3 L223.5 238.5 L223.4 238.4 L223 236.5 L222.5 234.7 L222.1 232.8 L221.7 230.9 L221.6 230.6 L221.2 229.1 L220.8 227.2 L220.4 225.3 L219.9 223.5 L219.7 222.6 L219.5 221.6 L219.1 219.7 L218.7 217.9 L218.3 216 L217.9 214.1 L217.9 214.1 L217.5 212.3 L217.1 210.4 L216.7 208.5 L216.3 206.7 L216 205.2 L215.9 204.8 L215.5 202.9 L215.2 201.1 L214.8 199.2 L214.5 197.3 L214.1 195.5 L214.1 195.4 L213.8 193.6 L213.5 191.7 L213.2 189.9 L212.9 188 L212.6 186.1 L212.4 184.3 L212.3 183.5 L212.1 182.4 L211.9 180.5 L211.7 178.7 L211.5 176.8 L211.3 174.9 L211.2 173.1 L211.1 171.2 L211 169.3 L211 167.5 L211 165.6 L211 163.7 L211.1 161.9 L211.2 160 L211.4 158.1 L211.7 156.3 L212 154.4 L212.3 153.3 L212.4 152.5 L212.9 150.7 L213.5 148.8 L214.1 147 L214.1 146.9 L214.9 145.1 L215.7 143.2 L216 142.7 L216.7 141.3 L217.8 139.5 L217.9 139.4 L219 137.6 L219.7 136.5 L220.3 135.7 L221.6 134 L221.7 133.9 L223.2 132 L223.5 131.7 L224.8 130.1 L225.3 129.6 L226.5 128.3 L227.2 127.6 L228.4 126.4 L229.1 125.7 L230.3 124.5 L230.9 123.9 L232.2 122.7 L232.8 122.2 L234.3 120.8 L234.7 120.5 L236.5 118.9 L236.5 118.9 L238.4 117.3 L238.7 117.1 L240.3 115.7 L240.9 115.2 L242.1 114.2 L243.2 113.3 L244 112.7 L245.6 111.5 L245.9 111.3 L247.7 109.8 L248 109.6 L249.6 108.4 L250.5 107.7 L251.5 107 L252.9 105.9 L253.3 105.6 L255.2 104.2 L255.5 104 L257.1 102.8 L258 102.1 L258.9 101.5 L260.6 100.3 L260.8 100.1 L262.7 98.8 L263.2 98.4 L264.5 97.5 L265.8 96.5 L266.4 96.1 L268.3 94.8 L268.5 94.7 L270.1 93.5 L271.1 92.8 L272 92.2 L273.8 90.9 L273.9 90.9 L275.7 89.6 L276.5 89.1 L277.6 88.3 L279.2 87.2 L279.5 87 L281.3 85.8 L282 85.3 L283.2 84.5 L284.7 83.5 L285.1 83.2 L286.9 82 L287.5 81.6 L288.8 80.7 L290.2 79.7 L290.7 79.4 L292.5 78.2 L293 77.9 L294.4 76.9 L295.8 76 L296.3 75.7 L298.1 74.4 L298.6 74.1 L300 73.2 L301.4 72.3 L301.9 71.9 L303.7 70.7 L304.2 70.4 L305.6 69.4 L307 68.5 L307.5 68.2 L309.3 67 L309.8 66.7 L311.2 65.7 L312.6 64.8 L313.1 64.5 L314.9 63.3 L315.4 62.9 L316.8 62 L318.3 61.1 L318.7 60.8 L320.5 59.6 L321.1 59.2 L322.4 58.4 L324 57.3 L324.3 57.1 L326.1 55.9 L326.8 55.5 L328 54.7 L329.7 53.6 L329.9 53.5 L331.7 52.2 L332.5 51.7 L333.6 51 L335.4 49.9 L335.5 49.8 L337.3 48.6 L338.2 48 L339.2 47.4 L341.1 46.2 L341.1 46.1 L342.9 44.9 L344 44.3 L344.8 43.7 L346.7 42.5 L346.8 42.4 L348.5 41.3 L349.7 40.5 L350.4 40.1 L352.3 38.9 L352.6 38.7 L354.1 37.7 L355.5 36.8 L356 36.5 L357.9 35.2 L358.3 34.9 L359.7 34 L361.2 33.1 L361.6 32.8 L363.5 31.6 L364.1 31.2 L365.3 30.4 L367 29.3 L367.2 29.2 L369.1 28 L369.9 27.5 L370.9 26.8 L372.8 25.6 L372.8 25.6 L374.7 24.4 L375.7 23.7 L376.5 23.2 L378.4 22 L378.6 21.9 L380.3 20.8 L381.5 20" style="stroke-width:2.2"/>
+<circle class="pt-tree" cx="180.2" cy="175.9" r="4"/><circle class="pt-tree" cx="153.5" cy="183.1" r="4"/><circle class="pt-tree" cx="128.1" cy="322.9" r="4"/><circle class="pt-tree" cx="143.9" cy="219.7" r="4"/><circle class="pt-tree" cx="226.8" cy="111" r="4"/><circle cx="226.8" cy="111" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-tree" cx="173.5" cy="194.9" r="4"/><circle class="pt-tree" cx="173.3" cy="119.6" r="4"/><circle class="pt-tree" cx="189.5" cy="189.3" r="4"/><circle class="pt-tree" cx="227.7" cy="97.5" r="4"/><circle cx="227.7" cy="97.5" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-tree" cx="145.2" cy="247.9" r="4"/><circle class="pt-tree" cx="250.1" cy="130.8" r="4"/><circle class="pt-tree" cx="134.8" cy="240.2" r="4"/><circle class="pt-tree" cx="218.2" cy="170.1" r="4"/><circle cx="218.2" cy="170.1" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-tree" cx="166.6" cy="215.3" r="4"/><circle class="pt-tree" cx="93.6" cy="283.3" r="4"/><circle class="pt-tree" cx="158.9" cy="226.4" r="4"/><circle class="pt-tree" cx="160.6" cy="244.2" r="4"/><circle class="pt-tree" cx="195.9" cy="140.6" r="4"/><circle class="pt-tree" cx="184.5" cy="135.1" r="4"/><circle class="pt-tree" cx="184.2" cy="139" r="4"/><circle class="pt-tree" cx="149.2" cy="229.8" r="4"/><circle class="pt-tree" cx="243.3" cy="90.6" r="4"/><circle cx="243.3" cy="90.6" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-tree" cx="230.1" cy="127.9" r="4"/><circle class="pt-tree" cx="195.2" cy="170.5" r="4"/><circle class="pt-tree" cx="151.5" cy="196.2" r="4"/><circle class="pt-tree" cx="197.2" cy="139.6" r="4"/><circle class="pt-tree" cx="136.7" cy="248.2" r="4"/><circle class="pt-tree" cx="156.9" cy="216.3" r="4"/><circle class="pt-tree" cx="244.7" cy="103.6" r="4"/><circle cx="244.7" cy="103.6" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-tree" cx="205.9" cy="155.4" r="4"/><circle class="pt-tree" cx="219.8" cy="93.3" r="4"/><circle cx="219.8" cy="93.3" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-tree" cx="215.6" cy="171.5" r="4"/><circle cx="215.6" cy="171.5" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-tree" cx="190.3" cy="170" r="4"/><circle class="pt-tree" cx="158.6" cy="252.6" r="4"/><circle class="pt-tree" cx="204" cy="152.5" r="4"/><circle class="pt-tree" cx="199.1" cy="124.7" r="4"/><circle class="pt-tree" cx="189.2" cy="134.4" r="4"/><circle class="pt-tree" cx="144.6" cy="200.7" r="4"/><circle class="pt-tree" cx="179.5" cy="202" r="4"/><circle class="pt-tree" cx="249" cy="66.6" r="4"/><circle cx="249" cy="66.6" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-tree" cx="147.2" cy="246.5" r="4"/><circle class="pt-tree" cx="205.9" cy="169.6" r="4"/><circle class="pt-tree" cx="185.4" cy="239.1" r="4"/><circle class="pt-tree" cx="180.5" cy="206.3" r="4"/><circle class="pt-tree" cx="189.3" cy="143.6" r="4"/><circle class="pt-tree" cx="185.2" cy="191.5" r="4"/><circle class="pt-tree" cx="148.3" cy="233.1" r="4"/><circle class="pt-tree" cx="150.7" cy="255.2" r="4"/><circle class="pt-tree" cx="164.2" cy="229" r="4"/><circle class="pt-tree" cx="166.7" cy="196.8" r="4"/><circle class="pt-tree" cx="144.5" cy="214.4" r="4"/><circle class="pt-tree" cx="159" cy="239.3" r="4"/><circle class="pt-tree" cx="221.8" cy="79.7" r="4"/><circle cx="221.8" cy="79.7" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-tree" cx="161.3" cy="224.4" r="4"/><circle class="pt-no" cx="275.3" cy="173.6" r="3.6"/><circle class="pt-no" cx="283" cy="176.7" r="3.6"/><circle class="pt-no" cx="374.5" cy="174.6" r="3.6"/><circle class="pt-no" cx="422.8" cy="185.7" r="3.6"/><circle class="pt-no" cx="257.4" cy="161" r="3.6"/><circle class="pt-no" cx="243" cy="190.7" r="3.6"/><circle class="pt-no" cx="255.9" cy="151.6" r="3.6"/><circle class="pt-no" cx="359.9" cy="172.2" r="3.6"/><circle class="pt-no" cx="256.2" cy="130.5" r="3.6"/><circle class="pt-no" cx="309.1" cy="176.1" r="3.6"/><circle class="pt-no" cx="330.7" cy="175.3" r="3.6"/><circle class="pt-no" cx="347.4" cy="168.7" r="3.6"/><circle class="pt-no" cx="296.1" cy="153.3" r="3.6"/><circle class="pt-no" cx="312.9" cy="145.9" r="3.6"/><circle class="pt-no" cx="328.3" cy="151" r="3.6"/><circle class="pt-no" cx="279.3" cy="124" r="3.6"/><circle class="pt-no" cx="230.8" cy="111.1" r="3.6"/><circle cx="230.8" cy="111.1" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-no" cx="276.8" cy="180.2" r="3.6"/><circle class="pt-no" cx="315.3" cy="115.6" r="3.6"/><circle class="pt-no" cx="199.2" cy="149.6" r="3.6"/><circle class="pt-no" cx="277.4" cy="162.1" r="3.6"/><circle class="pt-no" cx="280.1" cy="167.2" r="3.6"/><circle class="pt-no" cx="271.8" cy="203.4" r="3.6"/><circle class="pt-no" cx="340.5" cy="160.1" r="3.6"/><circle class="pt-no" cx="251.2" cy="174.2" r="3.6"/><circle class="pt-no" cx="131.5" cy="147.1" r="3.6"/><circle cx="131.5" cy="147.1" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-no" cx="393.4" cy="193" r="3.6"/><circle class="pt-no" cx="334.1" cy="148.3" r="3.6"/><circle class="pt-no" cx="108.8" cy="157" r="3.6"/><circle cx="108.8" cy="157" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-no" cx="301.5" cy="136.6" r="3.6"/><circle class="pt-no" cx="257.6" cy="156.1" r="3.6"/><circle class="pt-no" cx="328" cy="175.7" r="3.6"/><circle class="pt-no" cx="234.1" cy="166.2" r="3.6"/><circle class="pt-no" cx="417.4" cy="188.2" r="3.6"/><circle class="pt-no" cx="278.8" cy="179.1" r="3.6"/><circle class="pt-no" cx="270" cy="184.6" r="3.6"/><circle class="pt-no" cx="210.5" cy="153.2" r="3.6"/><circle class="pt-no" cx="358.8" cy="149.6" r="3.6"/><circle class="pt-no" cx="271.8" cy="179.8" r="3.6"/><circle class="pt-no" cx="315.2" cy="134" r="3.6"/><circle class="pt-no" cx="266.4" cy="139" r="3.6"/><circle class="pt-no" cx="271.2" cy="154.9" r="3.6"/><circle class="pt-no" cx="206.1" cy="113.8" r="3.6"/><circle class="pt-no" cx="286.7" cy="166.2" r="3.6"/><circle class="pt-no" cx="163.4" cy="117.3" r="3.6"/><circle cx="163.4" cy="117.3" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><circle class="pt-no" cx="298" cy="164.9" r="3.6"/><circle class="pt-no" cx="308.7" cy="139.9" r="3.6"/><circle class="pt-no" cx="237" cy="134.2" r="3.6"/><circle class="pt-no" cx="212" cy="149.8" r="3.6"/><circle class="pt-no" cx="201.9" cy="139.6" r="3.6"/><circle class="pt-no" cx="314.6" cy="134.7" r="3.6"/><circle class="pt-no" cx="324.6" cy="174.6" r="3.6"/><circle class="pt-no" cx="361.2" cy="146.3" r="3.6"/><circle class="pt-no" cx="366" cy="188.5" r="3.6"/><circle class="pt-no" cx="246.1" cy="158.8" r="3.6"/>
+<circle class="pt-tree" cx="462" cy="40" r="4"/><text class="d-s" x="474" y="44">from Gaussian 1</text><circle class="pt-no" cx="462" cy="62" r="3.6"/><text class="d-s" x="474" y="66">from Gaussian 2</text><circle class="pt-new" cx="462" cy="84" r="5"/><text class="d-s" x="474" y="88">the two means</text><line class="d-ln d-dash" x1="454" y1="110" x2="470" y2="110" style="stroke-width:1.6"/><text class="d-s" x="476" y="114">Voronoi boundary</text><text class="d-s" x="476" y="129">(K-means rule)</text><line class="d-ln-acc" x1="454" y1="150" x2="470" y2="150" style="stroke-width:2.2"/><text class="d-s" x="476" y="154">GMM boundary</text><text class="d-s" x="476" y="169">(equal density)</text><circle cx="462" cy="192" r="8" style="fill:none; stroke: var(--ink); stroke-width:1.2"/><text class="d-s" x="476" y="196">the two rules</text><text class="d-s" x="476" y="211">disagree</text>
+<circle class="pt-new" cx="174" cy="188" r="5.5"/><circle class="pt-new" cx="286" cy="160" r="5.5"/>
+          </svg>
+        </div>
+        <figcaption><b>Clusters with different orientations.</b> 110 synthetic points from two equally weighted Gaussians, one stretched at about 60° and one nearly horizontal (one point falls outside the frame). The dashed line is the Voronoi boundary between the two means, the rule a K-means assignment uses. The solid curve, with two branches, is where the two generating Gaussians are equally likely: the boundary of the largest-\(\lambda\) rule. The rules disagree on the 13 ringed points, and the Gaussian rule matches the true source for 10 of them. Overall the straight boundary puts 17 points on the wrong side, the curved one 10.</figcaption>
+      </figure>
+    </section>
+
+    <section id="local-max">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=613s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 10:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=745s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 12:25 bounds below</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=907s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 15:07 local maximum</a>
+        </div>
+        <h2>What EM guarantees: a local maximum</h2>
+      </div>
+      <p>How does EM relate to the problem we started with, maximizing \(\log L(\theta)\)? We wrote down the log-likelihood and then worked entirely with the modified one instead. Picture the parameter space as a horizontal axis with \(\log L\) plotted above it. For simple models such as a single Gaussian or a Bernoulli, this curve is a nice concave function and easy to maximize. For a Gaussian mixture it is a complicated landscape, and we want the \(\theta^*\) at its highest point.</p>
+      <p>EM never climbs \(\log L\) directly. At \(\theta^t\), the E step picks \(\lambda^{t+1}\). As a function of \(\theta\), the bound \(\ell(\theta, \lambda^{t+1})\) is a nice function that, by Jensen, stays below \(\log L\) everywhere. The M step moves to its top, \(\theta^{t+1}\). The next E step builds a new bound there, its top gives \(\theta^{t+2}\), and so on. The guesses keep getting better, but they can settle on a peak that is not the highest one.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 300" role="img" aria-label="A curve log L of theta with a lower peak on the left and a higher peak on the right. Starting at theta t on the left, two concave lower bounds touch the curve at the current theta; their tops give theta t plus 1 and theta t plus 2, which approach the left peak. The higher peak theta star on the right is never reached.">
+<line class="d-rule" x1="40" y1="270" x2="620" y2="270"/>
+<path class="d-ln" d="M40 236.2 L42.3 235.5 L44.6 234.7 L47 233.9 L49.3 232.9 L51.6 231.8 L53.9 230.5 L56.2 229.1 L58.6 227.6 L60.9 225.9 L63.2 224 L65.5 222 L67.8 219.9 L70.2 217.5 L72.5 215.1 L74.8 212.5 L77.1 209.8 L79.4 206.9 L81.8 204 L84.1 201 L86.4 197.9 L88.7 194.7 L91 191.5 L93.4 188.3 L95.7 185 L98 181.7 L100.3 178.5 L102.6 175.2 L105 172 L107.3 168.9 L109.6 165.7 L111.9 162.6 L114.2 159.6 L116.6 156.7 L118.9 153.8 L121.2 151 L123.5 148.3 L125.8 145.7 L128.2 143.2 L130.5 140.7 L132.8 138.4 L135.1 136.2 L137.4 134 L139.8 132 L142.1 130.1 L144.4 128.3 L146.7 126.6 L149 125 L151.4 123.5 L153.7 122.2 L156 120.9 L158.3 119.8 L160.6 118.8 L163 117.9 L165.3 117.1 L167.6 116.5 L169.9 115.9 L172.2 115.5 L174.6 115.2 L176.9 115.1 L179.2 115 L181.5 115.1 L183.8 115.2 L186.2 115.5 L188.5 115.9 L190.8 116.5 L193.1 117.1 L195.4 117.9 L197.8 118.8 L200.1 119.8 L202.4 120.9 L204.7 122.2 L207 123.5 L209.4 125 L211.7 126.6 L214 128.3 L216.3 130.1 L218.6 132 L221 134 L223.3 136.1 L225.6 138.4 L227.9 140.7 L230.2 143.1 L232.6 145.6 L234.9 148.3 L237.2 151 L239.5 153.7 L241.8 156.6 L244.2 159.5 L246.5 162.5 L248.8 165.5 L251.1 168.6 L253.4 171.7 L255.8 174.9 L258.1 178 L260.4 181.1 L262.7 184.2 L265 187.3 L267.4 190.3 L269.7 193.2 L272 196 L274.3 198.7 L276.6 201.2 L279 203.6 L281.3 205.7 L283.6 207.6 L285.9 209.2 L288.2 210.5 L290.6 211.6 L292.9 212.3 L295.2 212.7 L297.5 212.8 L299.8 212.6 L302.2 212 L304.5 211.2 L306.8 210.1 L309.1 208.7 L311.4 207 L313.8 205.2 L316.1 203.2 L318.4 200.9 L320.7 198.6 L323 196.1 L325.4 193.4 L327.7 190.7 L330 187.9 L332.3 185.1 L334.6 182.2 L337 179.2 L339.3 176.2 L341.6 173.3 L343.9 170.3 L346.2 167.3 L348.6 164.3 L350.9 161.3 L353.2 158.4 L355.5 155.4 L357.8 152.6 L360.2 149.7 L362.5 146.9 L364.8 144.1 L367.1 141.4 L369.4 138.7 L371.8 136.1 L374.1 133.5 L376.4 131 L378.7 128.6 L381 126.2 L383.4 123.8 L385.7 121.6 L388 119.4 L390.3 117.2 L392.6 115.1 L395 113.1 L397.3 111.2 L399.6 109.3 L401.9 107.5 L404.2 105.8 L406.6 104.1 L408.9 102.5 L411.2 101 L413.5 99.6 L415.8 98.2 L418.2 96.9 L420.5 95.7 L422.8 94.5 L425.1 93.4 L427.4 92.4 L429.8 91.5 L432.1 90.6 L434.4 89.9 L436.7 89.1 L439 88.5 L441.4 87.9 L443.7 87.5 L446 87 L448.3 86.7 L450.6 86.4 L453 86.3 L455.3 86.1 L457.6 86.1 L459.9 86.1 L462.2 86.3 L464.6 86.4 L466.9 86.7 L469.2 87 L471.5 87.5 L473.8 87.9 L476.2 88.5 L478.5 89.1 L480.8 89.9 L483.1 90.6 L485.4 91.5 L487.8 92.4 L490.1 93.4 L492.4 94.5 L494.7 95.7 L497 96.9 L499.4 98.2 L501.7 99.6 L504 101 L506.3 102.5 L508.6 104.1 L511 105.8 L513.3 107.5 L515.6 109.3 L517.9 111.2 L520.2 113.1 L522.6 115.1 L524.9 117.2 L527.2 119.4 L529.5 121.6 L531.8 123.8 L534.2 126.2 L536.5 128.6 L538.8 131 L541.1 133.5 L543.4 136.1 L545.8 138.7 L548.1 141.4 L550.4 144.1 L552.7 146.9 L555 149.7 L557.4 152.6 L559.7 155.5 L562 158.4 L564.3 161.4 L566.6 164.3 L569 167.3 L571.3 170.4 L573.6 173.4 L575.9 176.4 L578.2 179.4 L580.6 182.4 L582.9 185.4 L585.2 188.4 L587.5 191.3 L589.8 194.2 L592.2 197.1 L594.5 199.8 L596.8 202.5 L599.1 205.2 L601.4 207.7 L603.8 210.2 L606.1 212.5 L608.4 214.8 L610.7 216.9 L613 219 L615.4 220.9 L617.7 222.7 L620 224.4" style="stroke-width:2.2"/>
+<path class="d-ln-acc" d="M40 239.4 L42.3 237.9 L44.6 236.3 L47 234.8 L49.3 233.3 L51.6 231.9 L53.9 230.5 L56.2 229.2 L58.6 227.9 L60.9 226.6 L63.2 225.4 L65.5 224.2 L67.8 223 L70.2 221.9 L72.5 220.9 L74.8 219.8 L77.1 218.9 L79.4 217.9 L81.8 217 L84.1 216.2 L86.4 215.3 L88.7 214.5 L91 213.8 L93.4 213.1 L95.7 212.4 L98 211.8 L100.3 211.2 L102.6 210.7 L105 210.2 L107.3 209.8 L109.6 209.3 L111.9 209 L114.2 208.6 L116.6 208.3 L118.9 208.1 L121.2 207.9 L123.5 207.7 L125.8 207.5 L128.2 207.4 L130.5 207.4 L132.8 207.4 L135.1 207.4 L137.4 207.5 L139.8 207.6 L142.1 207.7 L144.4 207.9 L146.7 208.1 L149 208.4 L151.4 208.7 L153.7 209.1 L156 209.5 L158.3 209.9 L160.6 210.4 L163 210.9 L165.3 211.4 L167.6 212 L169.9 212.6 L172.2 213.3 L174.6 214 L176.9 214.8 L179.2 215.6 L181.5 216.4 L183.8 217.3 L186.2 218.2 L188.5 219.2 L190.8 220.2 L193.1 221.2 L195.4 222.3 L197.8 223.4 L200.1 224.5 L202.4 225.7 L204.7 227 L207 228.3 L209.4 229.6 L211.7 230.9 L214 232.3 L216.3 233.8 L218.6 235.2 L221 236.8 L223.3 238.3 L225.6 239.9 L227.9 241.6 L230.2 243.3 L232.6 245 L234.9 246.7 L237.2 248.5 L239.5 250.4"/>
+<line class="d-ln-mut" x1="132.4" y1="270" x2="132.4" y2="138.7"/>
+<circle class="pt-no" cx="132.4" cy="207.4" r="4"/>
+<path class="d-ln-acc d-dash" d="M72.5 264.8 L74.8 257.4 L77.1 250.2 L79.4 243.3 L81.8 236.5 L84.1 230 L86.4 223.6 L88.7 217.5 L91 211.5 L93.4 205.8 L95.7 200.2 L98 194.9 L100.3 189.7 L102.6 184.7 L105 180 L107.3 175.4 L109.6 171.1 L111.9 166.9 L114.2 162.9 L116.6 159.2 L118.9 155.6 L121.2 152.2 L123.5 149.1 L125.8 146.1 L128.2 143.3 L130.5 140.8 L132.8 138.4 L135.1 136.2 L137.4 134.3 L139.8 132.5 L142.1 130.9 L144.4 129.5 L146.7 128.4 L149 127.4 L151.4 126.6 L153.7 126 L156 125.7 L158.3 125.5 L160.6 125.5 L163 125.7 L165.3 126.1 L167.6 126.8 L169.9 127.6 L172.2 128.6 L174.6 129.8 L176.9 131.2 L179.2 132.9 L181.5 134.7 L183.8 136.7 L186.2 138.9 L188.5 141.3 L190.8 143.9 L193.1 146.7 L195.4 149.7 L197.8 153 L200.1 156.4 L202.4 160 L204.7 163.8 L207 167.8 L209.4 172 L211.7 176.4 L214 181 L216.3 185.8 L218.6 190.8 L221 196 L223.3 201.4 L225.6 207 L227.9 212.8 L230.2 218.8 L232.6 225 L234.9 231.4 L237.2 238 L239.5 244.8 L241.8 251.8 L244.2 259 L246.5 266.4"/>
+<line class="d-ln-mut" x1="159.2" y1="270" x2="159.2" y2="119.4"/>
+<circle class="pt-no" cx="159.2" cy="125.5" r="4"/>
+<circle class="pt-tree" cx="54.5" cy="230.2" r="4.5"/><text class="d-al" x="54.5" y="285" text-anchor="middle">θₜ</text><circle class="pt-tree" cx="132.4" cy="138.7" r="4.5"/><text class="d-al" x="132.4" y="285" text-anchor="middle">θₜ₊₁</text><circle class="pt-tree" cx="159.2" cy="119.4" r="4.5"/><text class="d-al" x="159.2" y="285" text-anchor="middle">θₜ₊₂</text>
+<line class="d-ln-mut" x1="54.5" y1="270" x2="54.5" y2="230.2"/>
+<circle class="pt-new" cx="179.2" cy="115" r="5"/><circle class="pt-new" cx="457.6" cy="86.1" r="5"/>
+<line class="d-ln-mut" x1="457.6" y1="270" x2="457.6" y2="86.1"/><text class="d-al" x="457.6" y="285" text-anchor="middle">θ*</text>
+<text class="d-t" x="315.5" y="227.7" text-anchor="middle">log L(θ)</text>
+<line class="d-ln-acc" x1="44" y1="18" x2="70" y2="18"/><text class="d-s" x="78" y="22">bound with λ chosen at θₜ (touches log L there)</text>
+<line class="d-ln-acc d-dash" x1="44" y1="36" x2="70" y2="36"/><text class="d-s" x="78" y="40">next bound, λ chosen at θₜ₊₁</text>
+<circle class="pt-no" cx="57" cy="54" r="4"/><text class="d-s" x="78" y="58">top of a bound: the next θ</text>
+<text class="d-s" x="179.2" y="101" text-anchor="middle">EM stops: local max</text>
+<text class="d-s" x="457.6" y="72.1" text-anchor="middle">global max</text>
+          </svg>
+        </div>
+        <figcaption><b>EM climbs a ladder of lower bounds.</b> A schematic log-likelihood over one parameter, with two peaks. Each bound lies below \(\log L\) and touches it at the current \(\theta\); the M step moves to its top. Started on the left, the iterates settle on the left peak, a local maximum, and never reach the global maximum \(\theta^*\).</figcaption>
+      </figure>
+
+      <div class="result">
+        <span class="lbl">What EM guarantees</span>
+        <p>EM converges to a <b>local maximum</b> of the log-likelihood. It may not find \(\theta^*\); the lecture adds that, in general, no known algorithm can guarantee the global maximum of this log-likelihood.</p>
+      </div>
+      <p>Where EM ends up therefore depends on where it starts. A very bad initialization may only reach a peak much lower than the best one. The "poor start" in the EM widget shows this: it converges, but to a log-likelihood about 8 below what the Lloyd's start reaches on the same data.</p>
+    </section>
+
+    <section id="initialization">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=983s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 16:23</a>
+        <h2>Initialize EM with Lloyd's algorithm</h2>
+      </div>
+      <p>Since initialization decides which maximum EM reaches, the usual practice is to start EM from a K-means solution.</p>
+      <ol class="algo">
+        <li class="algo-title">Building θ⁰ from Lloyd's</li>
+        <li>Run Lloyd's algorithm with the same \(K\) to get a hard clustering (<a href="part-06.html">Part 6</a>; <a href="part-07.html">Part 7</a> covers its own initialization).</li>
+        <li>For each cluster, compute the sample mean and the sample variance of its points: these are \(\mu_k\) and \(\sigma_k^2\) in \(\theta^0\).</li>
+        <li>Set \(\pi_k\) to the fraction of data points in cluster \(k\).</li>
+        <li>Run EM from this \(\theta^0\).</li>
+      </ol>
+      <p class="note">These are the M-step formulas of Lecture 25 applied to hard (0 or 1) weights, so \(\theta^0\) is what one M step would produce from the K-means assignment.</p>
+    </section>
+
+    <section id="wrap-up">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=1048s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 17:28</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=1111s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 18:31 EM in general</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=1jSonYih_sM&amp;t=1145s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L26 · 19:05 end of unsupervised learning</a>
+        </div>
+        <h2>Summary, and EM beyond mixtures</h2>
+      </div>
+      <p>The thread of these five lectures: data with cluster structure called for a latent variable model whose latent variable is a cluster indicator. Maximizing its log-likelihood was hard. Jensen's inequality introduced new variables so that the problem could be solved by <dfn>alternate maximization</dfn>: fix one set of variables and maximize over the other, then swap. Initialize with Lloyd's, run EM, and use the estimates however the later task needs, for instance converting the \(\lambda\)'s into a clustering.</p>
+      <p>For estimation this is a very powerful technique. In practice EM converges fast and typically gives very good parameter estimates. The principle reaches far beyond Gaussian mixtures: it applies to any reasonable latent variable model whose log-likelihood has a similar structure that can be separated. The course writes down EM only for the Gaussian mixture.</p>
+      <p>This ends unsupervised learning in the course: representation learning (PCA and kernel PCA), clustering (K-means) and estimation (maximum likelihood, Bayesian estimation, and mixture models fitted by EM). <a href="part-10.html">Part 10</a> begins a different paradigm, supervised learning.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Gaussian mixture model (GMM)</dt><dd>A density \(\sum_k \pi_k\mathcal N(x;\mu_k,\sigma_k^2)\): pick a component with probability \(\pi_k\), then draw from its Gaussian.</dd></div>
+        <div><dt>Mixing proportions \(\pi_k\)</dt><dd>The probabilities of the \(K\) faces of the die; nonnegative and summing to 1.</dd></div>
+        <div><dt>Generative story</dt><dd>The probabilistic mechanism assumed to have produced the data; for a GMM it has two steps.</dd></div>
+        <div><dt>Latent variable</dt><dd>An unobserved quantity the data depend on; here the component label \(z_i\) of each point.</dd></div>
+        <div><dt>Multimodal density</dt><dd>A density with several peaks. A single Gaussian has only one, so it cannot fit clustered data.</dd></div>
+        <div><dt>Convex function</dt><dd>\(f(\frac{a+b}{2}) \le \frac{f(a)+f(b)}{2}\) for all \(a, b\): the curve lies below every chord.</dd></div>
+        <div><dt>Concave function</dt><dd>The reverse inequality: the curve lies above every chord. The logarithm is concave.</dd></div>
+        <div><dt>Jensen's inequality</dt><dd>For concave \(f\) and weights \(\lambda_k \ge 0\) summing to 1: \(f(\sum_k\lambda_k a_k) \ge \sum_k\lambda_k f(a_k)\).</dd></div>
+        <div><dt>Modified log-likelihood \(\ell(\theta,\lambda)\)</dt><dd>Jensen's lower bound on \(\log L(\theta)\), valid for every valid \(\lambda\) and easy to maximize in each argument.</dd></div>
+        <div><dt>Responsibility \(\lambda_{ik}\)</dt><dd>The weight of point \(i\) on mixture \(k\); after an E step it equals \(P(z_i = k \mid x_i)\).</dd></div>
+        <div><dt>Soft clustering</dt><dd>Each point gets a probability for every cluster instead of a single label; take the largest to get a hard clustering.</dd></div>
+        <div><dt>EM algorithm</dt><dd>Alternate the E step (best \(\lambda\) for the current \(\theta\)) and the M step (best \(\theta\) for that \(\lambda\)) until \(\theta\) stops changing.</dd></div>
+        <div><dt>Local maximum</dt><dd>A peak of \(\log L\) that need not be the highest; EM converges to one, chosen by its initialization.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>How many free parameters does a one-dimensional Gaussian mixture with \(K = 4\) have?</span><span class="tog"></span></summary>
+          <p>4 means, 4 variances and 3 free mixing proportions (the fourth is 1 minus the others): \(3K - 1 = 11\).</p></details>
+        <details><summary><span class="q">Q2</span><span>Data fall in three well-separated groups. Why does the maximum-likelihood Gaussian explain them badly, and why would more data not help?</span><span class="tog"></span></summary>
+          <p>Maximum likelihood only finds the best Gaussian, and every Gaussian has one peak. Its mean lands near the middle and the outer groups fall in low-density regions. More data from the same groups leaves the model family, and hence the mismatch, unchanged.</p></details>
+        <details><summary><span class="q">Q3</span><span>Two components with \(\pi = (0.5, 0.5)\), \(\mu = (0, 2)\) and \(\sigma_1 = \sigma_2 = 1\). Find \(\lambda_{i1}\) for the point \(x_i = 0\).</span><span class="tog"></span></summary>
+          <p>The \(\pi\)'s and the factors \(1/\sqrt{2\pi}\) cancel, leaving \(\lambda_{i1} = e^{0}/(e^{0} + e^{-2}) = 1/(1 + e^{-2}) \approx 0.88\), so \(\lambda_{i2} \approx 0.12\).</p></details>
+        <details><summary><span class="q">Q4</span><span>Three points \(x = 1, 2, 6\) have weights \(\lambda_{i1} = 1, 1, 0.5\) for component 1. Compute \(\hat\mu_1\), \(\hat\sigma_1^2\) and \(\hat\pi_1\) from the M step.</span><span class="tog"></span></summary>
+          <p>\(N_1 = 2.5\). \(\hat\mu_1 = (1 + 2 + 0.5 \cdot 6)/2.5 = 6/2.5 = 2.4\). \(\hat\sigma_1^2 = \big(1.4^2 + 0.4^2 + 0.5 \cdot 3.6^2\big)/2.5 = (1.96 + 0.16 + 6.48)/2.5 = 3.44\). \(\hat\pi_1 = 2.5/3 \approx 0.83\).</p></details>
+        <details><summary><span class="q">Q5</span><span>Check Jensen's inequality for \(\log\) with \(a = 1\), \(b = 4\) and equal weights.</span><span class="tog"></span></summary>
+          <p>\(\log 2.5 \approx 0.916\), while \(\frac12(\log 1 + \log 4) = \log 2 \approx 0.693\). The log of the average is larger, as concavity requires.</p></details>
+        <details><summary><span class="q">Q6</span><span>Why is \(\ell(\theta,\lambda)\) below \(\log L(\theta)\) for every valid \(\lambda\), and when are they equal?</span><span class="tog"></span></summary>
+          <p>Multiplying and dividing by \(\lambda_{ik}\) writes each term of \(\log L\) as the log of a \(\lambda\)-weighted combination; since log is concave, Jensen puts the weighted combination of logs, \(\ell\), below it. They are equal when \(\lambda_{ik} = P(z_i = k \mid x_i)\), the E-step choice, because then every ratio inside the log equals the same number \(f(x_i;\theta)\).</p></details>
+        <details><summary><span class="q">Q7</span><span>How is EM like Lloyd's algorithm, and how is it different?</span><span class="tog"></span></summary>
+          <p>Both alternate two steps: compute parameters from assignments (means, or in EM means, variances and proportions) and update assignments from parameters. Lloyd's assignments are hard and give Voronoi regions; EM's are probabilities \(\lambda_{ik}\), it models each cluster's spread, and its clusters need not be Voronoi regions.</p></details>
+        <details><summary><span class="q">Q8</span><span>Two EM runs on the same data stop at different log-likelihoods. Is one of them a bug?</span><span class="tog"></span></summary>
+          <p>Not necessarily. EM only guarantees a local maximum, and which one it reaches depends on the initialization. Starting from a Lloyd's clustering, or keeping the run with the higher log-likelihood, is the usual remedy.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-08.html"><span class="dir">← Part 8</span><span class="nm">Estimation: maximum likelihood and Bayesian</span></a><a class="next" href="part-10.html"><span class="dir">Part 10 →</span><span class="nm">Linear regression and gradient descent</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const phi = (x, m, s) => Math.exp(-((x - m) ** 2) / (2 * s * s)) / (Math.sqrt(2 * Math.PI) * s);
+  const fmt = (v, d) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+  const niceStep = r => { const e = Math.pow(10, Math.floor(Math.log10(r))), f = r / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e; };
+  const COL = ['var(--accent)', 'var(--ok)', 'var(--ink-2)'];
+  const linePath = pts => 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L');
+
+  /* ---------- Three weighted components and their sum (lecture 23 example) ---------- */
+  (() => {
+    const svg = document.getElementById('mix-svg'); if (!svg) return;
+    const MU = [-20, 0, 15], X0 = -40, X1 = 40, PX0 = 58, PX1 = 620, PY0 = 262, PY1 = 26;
+    const sx = x => PX0 + (x - X0) * (PX1 - PX0) / (X1 - X0);
+    const piIn = document.getElementById('mix-pi'), sdIn = document.getElementById('mix-sd'), xIn = document.getElementById('mix-x');
+    const piOut = document.getElementById('mix-pi-out'), sdOut = document.getElementById('mix-sd-out'), xOut = document.getElementById('mix-x-out');
+    const shareOut = [1, 2, 3].map(k => document.getElementById('mix-s' + k)), pxOut = document.getElementById('mix-px'), status = document.getElementById('mix-status');
+    const gY = mk('g', {}, svg);
+    mk('line', { x1: PX0, x2: PX1, y1: PY0, y2: PY0, class: 'c-axis' }, svg);
+    for (let v = X0; v <= X1; v += 10) mk('text', { x: sx(v), y: PY0 + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = fmt(v, 0);
+    mk('text', { x: PX1, y: PY0 + 32, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = 'x';
+    const comp = MU.map((m, k) => mk('path', { fill: 'none', style: `stroke: ${COL[k]}; stroke-width: 2; stroke-dasharray: 6 4` }, svg));
+    const mix = mk('path', { fill: 'none', style: 'stroke: var(--ink); stroke-width: 2.6' }, svg);
+    const lbls = MU.map((m, k) => { const t = mk('text', { 'text-anchor': 'middle', class: 'c-lbl', style: `fill: ${COL[k]}` }, svg); t.textContent = String(k + 1); return t; });
+    const probe = mk('line', { class: 'c-faint', style: 'stroke-dasharray: 4 3' }, svg);
+    const dots = MU.map((m, k) => mk('circle', { r: 4.5, style: `fill: ${COL[k]}; stroke: var(--surface); stroke-width: 1.5` }, svg));
+    const dotMix = mk('circle', { r: 6, class: 'c-pt-hi' }, svg);
+    const probeLbl = mk('text', { class: 'c-note' }, svg);
+    const draw = () => {
+      const p3 = parseFloat(piIn.value), s = parseFloat(sdIn.value), x = parseFloat(xIn.value);
+      const pi = [(1 - p3) / 2, (1 - p3) / 2, p3];
+      piOut.textContent = p3.toFixed(2); sdOut.textContent = s.toFixed(1); xOut.textContent = fmt(x, 1);
+      const grid = []; for (let u = X0; u <= X1 + 1e-9; u += 0.25) grid.push(u);
+      const cv = MU.map((m, k) => grid.map(u => pi[k] * phi(u, m, s)));
+      const mv = grid.map((u, j) => cv[0][j] + cv[1][j] + cv[2][j]);
+      const step = niceStep(Math.max(...mv) * 1.15 / 4), ymax = Math.max(step * Math.ceil(Math.max(...mv) * 1.15 / step), step);
+      const sy = y => PY0 - y / ymax * (PY0 - PY1);
+      while (gY.firstChild) gY.removeChild(gY.firstChild);
+      const dec = Math.max(0, -Math.floor(Math.log10(step)));
+      for (let v = step; v <= ymax + 1e-12; v += step) {
+        mk('line', { x1: PX0, x2: PX1, y1: sy(v), y2: sy(v), class: 'c-faint' }, gY);
+        mk('text', { x: PX0 - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, gY).textContent = v.toFixed(dec);
+      }
+      mk('text', { x: PX0 - 6, y: PY0 + 4, 'text-anchor': 'end', class: 'c-tick' }, gY).textContent = '0';
+      cv.forEach((c, k) => { comp[k].setAttribute('d', linePath(grid.map((u, j) => [sx(u), sy(c[j])]))); lbls[k].setAttribute('x', sx(MU[k])); lbls[k].setAttribute('y', sy(pi[k] * phi(0, 0, s)) - 8); });
+      mix.setAttribute('d', linePath(grid.map((u, j) => [sx(u), sy(mv[j])])));
+      const a = MU.map((m, k) => pi[k] * phi(x, m, s)), px = a[0] + a[1] + a[2];
+      probe.setAttribute('x1', sx(x)); probe.setAttribute('x2', sx(x)); probe.setAttribute('y1', PY0); probe.setAttribute('y2', PY1);
+      a.forEach((v, k) => { dots[k].setAttribute('cx', sx(x)); dots[k].setAttribute('cy', sy(v)); });
+      dotMix.setAttribute('cx', sx(x)); dotMix.setAttribute('cy', sy(px));
+      const right = x < 22; probeLbl.setAttribute('x', sx(x) + (right ? 10 : -10)); probeLbl.setAttribute('y', PY1 + 12); probeLbl.setAttribute('text-anchor', right ? 'start' : 'end'); probeLbl.textContent = 'x = ' + fmt(x, 1);
+      const sh = a.map(v => v / px);
+      let best = 0; sh.forEach((v, k) => { if (v > sh[best]) best = k; });
+      sh.forEach((v, k) => { shareOut[k].textContent = (100 * v).toFixed(1) + '%'; shareOut[k].classList.toggle('mine', k === best); });
+      pxOut.textContent = px < 1e-4 ? px.toExponential(2) : px.toFixed(4);
+      status.textContent = `At x = ${fmt(x, 1)}, mixture ${best + 1} contributes most of p(x): ${(100 * sh[best]).toFixed(1)}%.`;
+    };
+    draw();
+    [piIn, sdIn, xIn].forEach(el => el.addEventListener('input', draw));
+    document.getElementById('mix-lec').addEventListener('click', () => {
+      const p0 = parseFloat(piIn.value), x0 = parseFloat(xIn.value);
+      tween(0, 1, k => { piIn.value = (p0 + (0.9 - p0) * k).toFixed(2); xIn.value = (Math.round((x0 + (-15 - x0) * k) * 2) / 2).toFixed(1); draw(); });
+    });
+  })();
+
+  /* ---------- EM step by step on seeded 1-D data ---------- */
+  (() => {
+    const svg = document.getElementById('em-svg'); if (!svg) return;
+    let seed = 922;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const xs = [];
+    [[27, -4, 0.8], [39, 0.5, 1.0], [24, 4.5, 0.7]].forEach(([m, mu, s]) => { for (let i = 0; i < m; i++) xs.push(mu + s * normal()); });
+    const n = xs.length, K = 3;
+    const dens = (th, x) => th.p.map((p, k) => p * phi(x, th.m[k], th.s[k]));
+    const logL = th => xs.reduce((a, x) => a + Math.log(dens(th, x).reduce((s, v) => s + v, 0)), 0);
+    const post = (th, x) => { const a = dens(th, x), z = a.reduce((s, v) => s + v, 0); return a.map(v => v / z); };
+    const bound = (th, L) => xs.reduce((acc, x, i) => { const a = dens(th, x); return acc + L[i].reduce((s, l, k) => s + (l > 0 ? l * Math.log(a[k] / l) : 0), 0); }, 0);
+    const mstep = L => { const th = { p: [], m: [], s: [] }; for (let k = 0; k < K; k++) { const N = L.reduce((a, r) => a + r[k], 0), mu = L.reduce((a, r, i) => a + r[k] * xs[i], 0) / N, v = L.reduce((a, r, i) => a + r[k] * (xs[i] - mu) ** 2, 0) / N; th.p.push(N / n); th.m.push(mu); th.s.push(Math.max(Math.sqrt(v), 0.05)); } return th; };
+    const fromLloyd = () => {
+      const srt = xs.slice().sort((a, b) => a - b); let c = [srt[0], srt[Math.floor(n / 2)], srt[n - 1]], z = [];
+      for (let it = 0; it < 100; it++) { z = xs.map(x => { let b = 0; c.forEach((cc, k) => { if (Math.abs(x - cc) < Math.abs(x - c[b])) b = k; }); return b; }); c = c.map((cc, k) => { const g = xs.filter((_, i) => z[i] === k); return g.reduce((a, v) => a + v, 0) / g.length; }); }
+      return mstep(z.map(k => [0, 1, 2].map(j => (j === k ? 1 : 0))));
+    };
+    const runEM = th0 => {
+      const st = [{ th: th0, L: null }]; let th = th0;
+      for (let t = 1; t <= 300; t++) {
+        const L = xs.map(x => post(th, x)); st.push({ th, L, thE: th });
+        const nt = mstep(L); st.push({ th: nt, L, thE: th });
+        const a = th.p.concat(th.m, th.s), b = nt.p.concat(nt.m, nt.s);
+        const d = Math.sqrt(a.reduce((s, v, j) => s + (v - b[j]) ** 2, 0)); th = nt; if (d < 1e-3) break;
+      }
+      st.forEach(s => { s.ll = logL(s.th); s.bd = s.L ? bound(s.th, s.L) : null; });
+      return st;
+    };
+    const traj = { lloyd: runEM(fromLloyd()), poor: runEM({ p: [1 / 3, 1 / 3, 1 / 3], m: [-5, -4, 1], s: [2, 2, 2] }) };
+    const iters = key => traj[key].filter((s, j) => j % 2 === 0).map(s => s.ll);
+
+    /* layout */
+    const X0 = -7, X1 = 7.5, PX0 = 52, PX1 = 620, sx = x => PX0 + (x - X0) * (PX1 - PX0) / (X1 - X0);
+    const P1B = 214, P1T = 44, BT = 262, BB = 298, DOT = 311, L0 = 350, L1 = 444;
+    const grid = []; for (let u = X0; u <= X1 + 1e-9; u += 0.05) grid.push(u);
+    const BW = 0.5, bins = []; for (let b = X0; b < X1 - 1e-9; b += BW) bins.push(xs.filter(x => x >= b && x < b + BW).length / (n * BW));
+    let ymax = Math.max(...bins);
+    for (const key in traj) traj[key].forEach(s => grid.forEach(u => { ymax = Math.max(ymax, dens(s.th, u).reduce((a, v) => a + v, 0)); }));
+    ymax = Math.ceil(ymax * 1.08 / 0.05) * 0.05;
+    const sy = y => P1B - y / ymax * (P1B - P1T);
+    /* panel 1: histogram and curves */
+    for (let v = 0.1; v <= ymax + 1e-9; v += 0.1) { mk('line', { x1: PX0, x2: PX1, y1: sy(v), y2: sy(v), class: 'c-faint' }, svg); mk('text', { x: PX0 - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v.toFixed(1); }
+    bins.forEach((h, j) => { if (h > 0) mk('rect', { x: sx(X0 + j * BW) + 0.5, y: sy(h), width: sx(BW) - sx(0) - 1, height: P1B - sy(h), style: 'fill: var(--rule)' }, svg); });
+    mk('line', { x1: PX0, x2: PX1, y1: P1B, y2: P1B, class: 'c-axis' }, svg);
+    for (let v = -6; v <= 7; v += 2) mk('text', { x: sx(v), y: P1B + 24, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = fmt(v, 0);
+    xs.forEach(x => mk('line', { x1: sx(x), x2: sx(x), y1: P1B + 2, y2: P1B + 10, class: 'c-faint', style: 'stroke: var(--muted)' }, svg));
+    const comp = [0, 1, 2].map(k => mk('path', { fill: 'none', style: `stroke: ${COL[k]}; stroke-width: 2; stroke-dasharray: 6 4` }, svg));
+    const mixP = mk('path', { fill: 'none', style: 'stroke: var(--ink); stroke-width: 2.4' }, svg);
+    const leg = [0, 1, 2].map(k => { const x = PX0 + k * 190; mk('line', { x1: x, x2: x + 22, y1: 18, y2: 18, style: `stroke: ${COL[k]}; stroke-width: 2.4; stroke-dasharray: 6 4` }, svg); return mk('text', { x: x + 28, y: 22, class: 'c-note' }, svg); });
+    /* panel 2: responsibilities */
+    const bandT = mk('text', { x: PX0, y: BT - 8, class: 'c-title' }, svg);
+    mk('text', { x: PX0 - 6, y: BT + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = '1';
+    mk('text', { x: PX0 - 6, y: BB + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = '0';
+    mk('rect', { x: PX0, y: BT, width: PX1 - PX0, height: BB - BT, style: 'fill: none; stroke: var(--rule)' }, svg);
+    const band = [0, 1, 2].map(k => mk('path', { style: `fill: ${COL[k]}; fill-opacity: .5; stroke: none` }, svg));
+    const dotEls = xs.map(x => mk('circle', { cx: sx(x), cy: DOT, r: 3.2, style: 'stroke: var(--surface); stroke-width: 0.8' }, svg));
+    /* panel 3: log-likelihood per iteration */
+    const all = iters('lloyd').concat(iters('poor')), Tmax = Math.max(iters('lloyd').length, iters('poor').length) - 1;
+    const lo = Math.floor(Math.min(...all) / 10) * 10, hi = Math.ceil(Math.max(...all) / 5) * 5;
+    const lx = t => PX0 + t / Tmax * (PX1 - PX0 - 10), ly = v => L1 - (v - lo) / (hi - lo) * (L1 - L0);
+    mk('text', { x: PX0, y: L0 - 10, class: 'c-title' }, svg).textContent = 'log L(θ) after each iteration t';
+    const lstep = niceStep((hi - lo) / 3);
+    for (let v = Math.ceil(lo / lstep) * lstep; v <= hi; v += lstep) { mk('line', { x1: PX0, x2: PX1 - 10, y1: ly(v), y2: ly(v), class: 'c-faint' }, svg); mk('text', { x: PX0 - 6, y: ly(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = fmt(v, 0); }
+    mk('line', { x1: PX0, x2: PX1 - 10, y1: L1, y2: L1, class: 'c-axis' }, svg);
+    for (let t = 0; t <= Tmax; t += 10) mk('text', { x: lx(t), y: L1 + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = t;
+    const lines = {}, ends = {};
+    ['lloyd', 'poor'].forEach(key => { lines[key] = mk('path', { fill: 'none' }, svg); ends[key] = mk('text', { class: 'c-note' }, svg); });
+    const gDots = mk('g', {}, svg);
+    const ring = mk('circle', { r: 6, class: 'c-proxy' }, svg), cur = mk('circle', { r: 5, class: 'c-pt-hi' }, svg);
+
+    const slider = document.getElementById('em-step'), out = document.getElementById('em-step-out');
+    const nextB = document.getElementById('em-next'), runB = document.getElementById('em-run'), startB = document.getElementById('em-start');
+    const tOut = document.getElementById('em-t'), llOut = document.getElementById('em-ll'), bdOut = document.getElementById('em-bd'), gapOut = document.getElementById('em-gap'), status = document.getElementById('em-status');
+    const sup = v => String(v).split('').map(c => '⁰¹²³⁴⁵⁶⁷⁸⁹'[+c]).join('');
+    let key = 'lloyd', s = 0, timer = null;
+    const setStart = k => {
+      key = k; s = 0; slider.max = traj[key].length - 1; slider.value = 0;
+      startB.setAttribute('aria-pressed', String(key === 'poor')); startB.textContent = key === 'poor' ? "Back to the Lloyd's start" : 'Try a poor start';
+      ['lloyd', 'poor'].forEach(kk => {
+        const v = iters(kk), on = kk === key;
+        lines[kk].setAttribute('d', linePath(v.map((y, t) => [lx(t), ly(y)])));
+        lines[kk].setAttribute('style', on ? 'stroke: var(--accent); stroke-width: 2.2' : 'stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 3');
+        const last = v[v.length - 1], below = kk === 'poor';
+        ends[kk].setAttribute('x', lx(v.length - 1) + (below ? 0 : 6)); ends[kk].setAttribute('y', ly(last) + (below ? 16 : -6)); ends[kk].setAttribute('text-anchor', below ? 'end' : 'start');
+        ends[kk].textContent = (kk === 'poor' ? 'poor start ' : "Lloyd's start ") + fmt(last, 2);
+        ends[kk].setAttribute('style', on ? 'fill: var(--ink)' : 'fill: var(--muted)');
+      });
+      while (gDots.firstChild) gDots.removeChild(gDots.firstChild);
+      iters(key).forEach((y, t) => mk('circle', { cx: lx(t), cy: ly(y), r: 2.6, style: 'fill: var(--accent)' }, gDots));
+      draw();
+    };
+    const draw = () => {
+      const st = traj[key], S = st[s], th = S.th, last = st.length - 1, t = Math.floor(s / 2);
+      th.p.forEach((p, k) => { leg[k].textContent = `${k + 1}: π ${p.toFixed(2)}  μ ${fmt(th.m[k], 2)}  σ ${th.s[k].toFixed(2)}`; });
+      const cv = grid.map(u => dens(th, u));
+      comp.forEach((el, k) => el.setAttribute('d', linePath(grid.map((u, j) => [sx(u), sy(cv[j][k])]))));
+      mixP.setAttribute('d', linePath(grid.map((u, j) => [sx(u), sy(cv[j][0] + cv[j][1] + cv[j][2])])));
+      if (S.thE) {
+        const pr = grid.map(u => post(S.thE, u));
+        let lower = grid.map(() => 0);
+        band.forEach((el, k) => { const upper = lower.map((v, j) => v + pr[j][k]); const yy = v => BB - v * (BB - BT); el.setAttribute('d', linePath(grid.map((u, j) => [sx(u), yy(upper[j])]).concat(grid.map((u, j) => [sx(u), yy(lower[j])]).reverse())) + ' Z'); lower = upper; });
+        bandT.textContent = `P(z = k | x) from E step ${(s + 1) >> 1}, computed with θ${sup(t - (s % 2 ? 0 : 1))}`;
+        xs.forEach((x, i) => { const L = S.L[i]; let b = 0; L.forEach((v, k) => { if (v > L[b]) b = k; }); dotEls[i].style.fill = COL[b]; });
+      } else {
+        band.forEach(el => el.setAttribute('d', ''));
+        bandT.textContent = 'P(z = k | x): no E step yet';
+        dotEls.forEach(d => { d.style.fill = 'var(--muted)'; });
+      }
+      cur.setAttribute('cx', lx(t)); cur.setAttribute('cy', ly(S.ll));
+      if (S.bd !== null) { ring.setAttribute('cx', lx(t)); ring.setAttribute('cy', ly(Math.max(lo, S.bd))); ring.style.display = ''; } else ring.style.display = 'none';
+      tOut.textContent = t; llOut.textContent = fmt(S.ll, 2);
+      bdOut.textContent = S.bd === null ? '–' : fmt(S.bd, 2); gapOut.textContent = S.bd === null ? '–' : Math.max(0, S.ll - S.bd).toFixed(2);
+      out.textContent = s === 0 ? 'start' : (s % 2 ? 'E step ' : 'M step ') + ((s + 1) >> 1);
+      nextB.textContent = s === last ? 'Converged' : (s % 2 ? 'Next: M step' : 'Next: E step'); nextB.disabled = s === last;
+      let msg;
+      if (s === 0) msg = key === 'lloyd' ? "θ⁰ from a Lloyd's clustering: each cluster's mean, variance and fraction of points. Press Next for the first E step." : 'θ⁰: two means start inside the left group, one at 1, every σ = 2 and equal π. Press Next for the first E step.';
+      else if (s % 2) msg = `E step ${(s + 1) >> 1}: λ recomputed from θ${sup(t)} by Bayes' theorem. The bound now equals log L.`;
+      else msg = `M step ${s >> 1}: weighted means, variances and proportions. log L rose by ${(S.ll - st[s - 2].ll).toFixed(3)}.`;
+      if (s === last) msg += ` Converged after ${t} iterations (θ changed by less than 10⁻³).` + (key === 'poor' ? ` This is a local maximum: the Lloyd's start reaches ${fmt(traj.lloyd[traj.lloyd.length - 1].ll, 2)} on the same data.` : '');
+      status.textContent = msg;
+    };
+    const stop = () => { if (timer) { clearTimeout(timer); timer = null; } runB.textContent = 'Run to convergence'; };
+    slider.addEventListener('input', () => { stop(); s = parseInt(slider.value, 10); draw(); });
+    nextB.addEventListener('click', () => { stop(); if (s < traj[key].length - 1) { s++; slider.value = s; draw(); } });
+    runB.addEventListener('click', () => {
+      if (timer) { stop(); return; }
+      const last = traj[key].length - 1; if (s === last) s = 0;
+      if (reduce) { s = last; slider.value = s; draw(); return; }
+      runB.textContent = 'Pause';
+      const tick = () => { s++; slider.value = s; draw(); if (s < last) timer = setTimeout(tick, 160); else stop(); };
+      timer = setTimeout(tick, 60);
+    });
+    startB.addEventListener('click', () => { stop(); setStart(key === 'lloyd' ? 'poor' : 'lloyd'); });
+    setStart('lloyd');
+  })();
+})();
+</script>
+</body>
+</html>

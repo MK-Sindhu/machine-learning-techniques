@@ -1,0 +1,1122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 14 · Generative models and Naive Bayes · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 14: lectures 45–51 on generative and discriminative models, Naive Bayes for spam, Laplace smoothing, its linear decision function, and Gaussian class models.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<style>
+.controls select { font: 500 14px/1.3 var(--font-head); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px; }
+</style>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 14 of 18</span></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Generative models and Naive Bayes</h1>
+    <p class="lede">Notes for lectures 45 to 51. A generative model tells a story of how labelled data is produced; the lectures build one for spam email, shrink it to Naive Bayes with a class-conditional independence assumption, fix its pitfalls, and extend it to Gaussian classes for real-valued features. In each case Bayes' rule turns the model into a classifier, and its decision boundary comes out linear unless each class gets its own covariance.</p>
+    <div class="meta">
+      <span><b>Part 14</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>161 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L45 · 23:34</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L46 · 30:16</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L47 · 18:20</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L48 · 29:16</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=RuE8SQajgxY&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L49 · 12:03</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=ADXQaTI0Lpo&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L50 · 16:46</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L51 · 30:42</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 45</h4>
+      <ul>
+        <li><a href="#data-distribution">What links train and test</a></li>
+        <li><a href="#two-schools">Generative vs discriminative</a></li>
+        <li><a href="#knn-trees">k-NN and trees are discriminative</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 46</h4>
+      <ul>
+        <li><a href="#binary-features">Binary features for spam</a></li>
+        <li><a href="#factorizing">Two ways to split P(x, y)</a></li>
+        <li><a href="#dice-story">A coin and two dice</a></li>
+        <li><a href="#parameter-count">Too many parameters</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 47</h4>
+      <ul>
+        <li><a href="#coin-story">One coin per word</a></li>
+        <li><a href="#independence">Class-conditional independence</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 48</h4>
+      <ul>
+        <li><a href="#nb-estimates">Estimates by counting</a></li>
+        <li><a href="#nb-prediction">Predicting with Bayes' rule</a></li>
+        <li><a href="#nb-name">Why "Naive Bayes"</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 49</h4>
+      <ul>
+        <li><a href="#zero-frequency">An unseen word</a></li>
+        <li><a href="#laplace">Laplace smoothing</a></li>
+        <li><a href="#log-sums">Sums of logs</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 50</h4>
+      <ul>
+        <li><a href="#nb-linear">The decision function is linear</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 51</h4>
+      <ul>
+        <li><a href="#gaussian-story">A Gaussian per class</a></li>
+        <li><a href="#gaussian-linear">Linear again</a></li>
+        <li><a href="#boundary-shape">Shared vs separate covariance</a></li>
+        <li><a href="#next-discriminative">Toward discriminative models</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>Training and test pairs are assumed to come from one <b>unknown but fixed distribution</b> \(\mathcal{D}\) over features and labels. A <dfn>generative model</dfn> makes assumptions about the joint \(P(\mathbf{x}, y)\); a <dfn>discriminative model</dfn> only about \(P(y \mid \mathbf{x})\). k-NN and decision trees are (trivially) discriminative.</li>
+        <li>For spam with binary word features, the general story (a coin for the label, a \(2^d\)-faced die per class) needs \(2^{d+1} - 1\) parameters. <b>Class-conditional independence</b> (one coin per word per class) brings this down to \(2d + 1\).</li>
+        <li><b>Naive Bayes</b>: the maximum likelihood estimates are fractions (spam emails; spam emails containing word \(j\)), and prediction compares \(\hat p\,P(\mathbf{x}\mid 1)\) with \((1-\hat p)\,P(\mathbf{x}\mid 0)\) using Bayes' rule.</li>
+        <li>Pitfalls: a word never seen in training makes both class scores 0, fixed by <b>Laplace smoothing</b> (add pseudo-emails); products of many small numbers are replaced by sums of logs.</li>
+        <li>The Naive Bayes decision function is <b>linear</b>: predict 1 when \(\mathbf{w}^\top\mathbf{x} + b \ge 0\). Gaussian classes with a <b>shared covariance</b> also give a line; separate covariances give a quadratic boundary in general.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 45 ============ -->
+    <section id="data-distribution">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=61s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L45 · 1:01</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=193s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L45 · 3:13 the distribution \(\mathcal{D}\)</a>
+        </div>
+        <h2>What links the training data to the test data</h2>
+      </div>
+      <p>The two classifiers so far, k-NN and decision trees (<a href="part-13.html">Part 13</a>), came from intuition. This lecture steps back and asks how modelling is done in general.</p>
+      <p>A model is built from training data and then judged on test data, which need not contain the same points. Two extremes show that some assumption is needed. If the test points were exactly the training points, memorizing would be enough, and that is of no use in practice. If the test data had nothing to do with the training data (study for physics, get examined on chemistry), no algorithm could learn anything useful. Something has to tie the two sets together.</p>
+      <p>The standard assumption is a probability distribution \(\mathcal{D}\) over \(\mathcal{X}\times\mathcal{Y}\). Here \(\mathcal{X}\) is the feature space, for example \(\mathbb{R}^d\) with \(d\) features, and \(\mathcal{Y}\) is the label set: \(\{+1, -1\}\) (or \(\{0, 1\}\)) for classification, \(\mathbb{R}\) for regression. Every training pair is drawn from \(\mathcal{D}\), and so is the test pair.</p>
+      <div class="eq">\[ (\mathbf{x}_i, y_i) \sim \mathcal{D} \quad (i = 1, \dots, n), \qquad (\mathbf{x}_{\text{test}}, y_{\text{test}}) \sim \mathcal{D}, \ \text{ with only } \mathbf{x}_{\text{test}} \text{ shown} \]</div>
+      <p>This is the box from the estimation lectures (<a href="part-08.html">Part 8</a>), except that each press now produces a feature vector together with its label. The mechanism inside can be as complicated as it likes. The hope is that a model which captures \(\mathcal{D}\) well from the training data will predict well on the test data.</p>
+      <div class="result">
+        <span class="lbl">Assumption 1</span>
+        <p>\(\mathcal{D}\) is <b>unknown but fixed</b>. Nothing else is assumed yet: no Gaussian features, no Bernoulli labels. The only information about \(\mathcal{D}\) is the training set.</p>
+      </div>
+      <p>To get an actual algorithm, we add structural assumptions about \(\mathcal{D}\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=451s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:31</a>. Different assumptions lead to different algorithms, and there are two main schools of thought about which kind to make. The discussion uses classification, but the same ideas apply to other supervised problems.</p>
+    </section>
+
+    <section id="two-schools">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=550s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L45 · 9:10</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=636s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L45 · 10:36 P(x, y) vs P(y | x)</a>
+        </div>
+        <h2>Generative and discriminative models</h2>
+      </div>
+      <p>A distribution over features and labels attaches a number \(P(\mathbf{x}, y)\) to every feature vector and label: a probability when the features are discrete, a density when they are continuous (for continuous features every single point has probability 0, so a density is the useful object). The two schools differ in what they model.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>Generative model</th><th>Discriminative model</th></tr></thead>
+          <tbody>
+            <tr><td><b>Makes assumptions about</b></td><td>the joint \(P(\mathbf{x}, y)\)</td><td>only \(P(y \mid \mathbf{x})\)</td></tr>
+            <tr><td><b>Describes</b></td><td>how the features are generated and how the labels go with them</td><td>only how the label depends on given features</td></tr>
+            <tr><td><b>Seen so far</b></td><td>none yet (Naive Bayes is next)</td><td>k-NN, decision trees</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>The Bengali example <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=733s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L45 · 12:13</a></h3>
+      <p>The task is to listen to a spoken sentence and decide whether it is Bengali. The lecturer chose Bengali because he cannot speak or write it.</p>
+      <ul>
+        <li>A <b>generative</b> modeller says: model how Bengali sentences are produced (the features \(\mathbf{x}\)) together with the labels.</li>
+        <li>A <b>discriminative</b> modeller says: the goal is only to tell Bengali from non-Bengali, and that does not require knowing how to produce a Bengali sentence. Model \(P(y \mid \mathbf{x})\) and nothing else.</li>
+      </ul>
+      <p>The lecturer, with no Bengali, can still do reasonably well at telling the two apart. A native speaker has a mental model of how Bengali sentences are generated and will ace the same task <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=967s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:07</a>. Knowing the generative process makes discrimination easy. If the lecturer forced a made-up generative model of Bengali on himself, though, it would mislead him.</p>
+      <p class="rule-of-thumb">If you have good reason to believe you know how the features are generated, use a generative model. If you don't, a wrong generative model hurts even the discrimination task, so stick to a discriminative one.</p>
+      <p>There is no single answer. Both kinds are useful, and many of the algorithms in this course are discriminative <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=1028s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>17:08</a>.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 332" role="img" aria-label="Top panel: two weighted class densities along one feature, (1 minus p) times P(x given y = 0) peaking at x = -1 and p times P(x given y = 1) peaking at x = 1.5. Bottom panel: the posterior P(y = 1 given x), rising from 0 to 1, crossing one half at the boundary x about 0.41 where the two weighted densities are equal.">
+            <defs><marker id="p14a-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-t" x="70" y="16">Generative: models P(y) and P(x | y), so P(x, y)</text>
+            <line class="d-rule" x1="70" y1="150" x2="610" y2="150"/>
+            <path d="M70 148.8 79 148.2 88 147.2 97 145.9 106 144.1 115 141.6 124 138.4 133 134.3 142 129.2 151 123.0 160 115.8 169 107.7 178 98.7 187 89.3 196 79.8 205 70.5 214 62.0 223 54.8 232 49.3 241 45.9 250 44.7 259 45.9 268 49.3 277 54.8 286 62.0 295 70.5 304 79.8 313 89.3 322 98.7 331 107.7 340 115.8 349 123.0 358 129.2 367 134.3 376 138.4 385 141.6 394 144.1 403 145.9 412 147.2 421 148.2 430 148.8 439 149.3 448 149.5 457 149.7 466 149.8 475 149.9 484 149.9 493 150 502 150 511 150 520 150 529 150 538 150 547 150 556 150 565 150 574 150 583 150 592 150 601 150 610 150" class="d-ln" style="stroke-width:2"/>
+            <path d="M70 150 79 150 88 150 97 150 106 150 115 150 124 150 133 150 142 150 151 150 160 150 169 150 178 149.9 187 149.9 196 149.8 205 149.6 214 149.4 223 149.1 232 148.6 241 147.9 250 146.9 259 145.6 268 143.8 277 141.4 286 138.5 295 134.8 304 130.5 313 125.5 322 119.8 331 113.8 340 107.4 349 101.1 358 95.0 367 89.6 376 85.2 385 81.9 394 80.1 403 79.9 412 81.2 421 84.0 430 88.0 439 93.2 448 99.0 457 105.3 466 111.7 475 117.9 484 123.6 493 128.9 502 133.4 511 137.3 520 140.5 529 143.0 538 145.0 547 146.5 556 147.6 565 148.4 574 149.0 583 149.3 592 149.6 601 149.7 610 149.8" class="d-ln-acc" style="stroke-width:2"/>
+            <text class="d-s" x="250" y="34" text-anchor="middle">(1 − p) · P(x | y = 0)</text>
+            <text class="d-s" x="404" y="68" text-anchor="middle" style="fill: var(--accent)">p · P(x | y = 1)</text>
+
+            <text class="d-t" x="70" y="186">Discriminative: models only P(y = 1 | x)</text>
+            <line class="d-rule" x1="70" y1="200" x2="610" y2="200" style="stroke-dasharray: 3 4"/>
+            <line class="d-rule" x1="70" y1="245" x2="610" y2="245" style="stroke-dasharray: 3 4"/>
+            <line class="d-ln" x1="70" y1="290" x2="610" y2="290" style="stroke-width:1"/>
+            <path d="M70 290 79 290 88 290 97 290 106 290 115 290 124 290 133 290 142 290 151 290 160 289.9 169 289.9 178 289.9 187 289.8 196 289.7 205 289.6 214 289.4 223 289.2 232 288.8 241 288.2 250 287.4 259 286.3 268 284.7 277 282.6 286 279.6 295 275.6 304 270.4 313 264.1 322 256.7 331 248.5 340 240.1 349 232.0 358 224.7 367 218.6 376 213.7 385 209.9 394 207.0 403 204.9 412 203.5 421 202.4 430 201.7 439 201.2 448 200.8 457 200.5 466 200.4 475 200.3 484 200.2 493 200.1 502 200.1 511 200.1 520 200 529 200 538 200 547 200 556 200 565 200 574 200 583 200 592 200 601 200 610 200" class="d-ln-acc" style="stroke-width:2"/>
+            <text class="d-al" x="62" y="204" text-anchor="end">1</text>
+            <text class="d-al" x="62" y="249" text-anchor="end">0.5</text>
+            <text class="d-al" x="62" y="294" text-anchor="end">0</text>
+
+            <line class="d-ln d-dash" x1="334.7" y1="30" x2="334.7" y2="170" style="stroke-width:1.2"/>
+            <line class="d-ln d-dash" x1="334.7" y1="194" x2="334.7" y2="296" style="stroke-width:1.2"/>
+            <text class="d-s" x="344" y="268">boundary: P(y = 1 | x) = 0.5</text>
+            <path class="d-ln" d="M548 158 L548 192" marker-end="url(#p14a-ah)"/>
+            <text class="d-s" x="556" y="180">Bayes' rule</text>
+
+            <text class="d-al" x="70" y="308" text-anchor="middle">−4</text><text class="d-al" x="130" y="308" text-anchor="middle">−3</text><text class="d-al" x="190" y="308" text-anchor="middle">−2</text><text class="d-al" x="250" y="308" text-anchor="middle">−1</text><text class="d-al" x="310" y="308" text-anchor="middle">0</text><text class="d-al" x="370" y="308" text-anchor="middle">1</text><text class="d-al" x="430" y="308" text-anchor="middle">2</text><text class="d-al" x="490" y="308" text-anchor="middle">3</text><text class="d-al" x="550" y="308" text-anchor="middle">4</text><text class="d-al" x="610" y="308" text-anchor="middle">5</text>
+            <text class="d-s" x="340" y="326" text-anchor="middle">feature x</text>
+          </svg>
+        </div>
+        <figcaption><b>What each kind of model describes.</b> An illustrative one-feature example with two Gaussian classes and \(p = 0.4\). A generative model describes both weighted class densities (top), so it could also generate new points; Bayes' rule turns them into the posterior (bottom). A discriminative model learns only the bottom curve, or just which side of the boundary a point falls on.</figcaption>
+      </figure>
+    </section>
+
+    <section id="knn-trees">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=1125s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L45 · 18:45</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=1253s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L45 · 20:53 trivial probabilities</a>
+        </div>
+        <h2>k-NN and decision trees are discriminative</h2>
+      </div>
+      <p>Both algorithms from <a href="part-13.html">Part 13</a> have a model: for a decision tree it is the tree, for k-NN it is the entire data set. Neither says anything about how the features \(\mathbf{x}\) were generated. Each only says how to get a label once \(\mathbf{x}\) is given, so both are discriminative.</p>
+      <p>Where is the probability? A deterministic rule is a trivial \(P(y \mid \mathbf{x})\) that only takes the values 0 and 1:</p>
+      <div class="eq">\[ \text{tree: } P(y = 1 \mid \mathbf{x}) = \begin{cases} 1 &amp; \text{if the tree labels } \mathbf{x} \text{ as } 1 \\ 0 &amp; \text{otherwise} \end{cases} \qquad \text{k-NN: } P(y = 1 \mid \mathbf{x}) = \begin{cases} 1 &amp; \text{if most of the } k \text{ neighbours say } 1 \\ 0 &amp; \text{otherwise} \end{cases} \]</div>
+      <p>Any deterministic map from the input (feature) space to the output (label) space is of this form, so it falls under modelling \(P(y \mid \mathbf{x})\). Probability is a generalization of deterministic decision making. The next lectures build the first algorithm on a generative assumption <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=gwa47ZzhYno&amp;t=1375s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:55</a>.</p>
+    </section>
+
+    <!-- ============ LECTURE 46 ============ -->
+    <section id="binary-features">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=33s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 0:33</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=98s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 1:38 spam</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=161s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 2:41 emails as vectors</a>
+        </div>
+        <h2>A test case: spam with binary features</h2>
+      </div>
+      <p>The setting is binary classification, except that the features are now binary too.</p>
+      <div class="eq">\[ \{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}, \qquad y_i \in \{0, 1\}, \qquad \mathbf{x}_i \in \{0, 1\}^d \]</div>
+      <p>The motivating application is <dfn>spam classification</dfn>. Some emails in the data set are tagged spam (label 1), the rest not spam (label 0). Emails are unstructured: different lengths, different words. The algorithms need a fixed-length vector, so each email must be encoded with the same \(d\) for some fixed \(d\), possibly large.</p>
+      <p>One encoding is to let \(d\) be the number of words in a dictionary (say 10,000) and give each word one component. An email gets a 1 in the component of every word it contains and 0 everywhere else.</p>
+      <div class="eq">\[ \text{“hello how are you”} \;\mapsto\; \big(\underbrace{0}_{\text{about}}, \dots, \underbrace{1}_{\text{are}}, \dots, \underbrace{1}_{\text{hello}}, \underbrace{1}_{\text{how}}, \dots, \underbrace{1}_{\text{you}}, \dots, \underbrace{0}_{\text{zebra}}\big) \in \{0, 1\}^{10{,}000} \]</div>
+      <p class="note">This is one way to build features, not the only one; good features depend on the problem at hand. It is simple enough to explain the algorithm, and it does reasonably well in practice.</p>
+    </section>
+
+    <section id="factorizing">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=393s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 6:33</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=486s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 8:06 two factorizations</a>
+        </div>
+        <h2>Two ways to split \(P(\mathbf{x}, y)\)</h2>
+      </div>
+      <p>A generative model must give a probability to every (email, label) pair. The pair ("hello how are you", spam) might get 0.01, and ("hello how are you", not spam) gets its own number. Instead of guessing the joint directly, use one of its two factorizations:</p>
+      <div class="eq">\[ P(\mathbf{x}, y) \;=\; P(\mathbf{x})\,P(y \mid \mathbf{x}) \;=\; P(y)\,P(\mathbf{x} \mid y) \]</div>
+      <p>What we finally need is \(P(y \mid \mathbf{x}_{\text{test}})\). If it is 0.9 for spam we predict spam; if it is 0.05 we predict not spam.</p>
+      <ul>
+        <li><b>Route 1, \(P(\mathbf{x})\,P(y \mid \mathbf{x})\).</b> This already contains an assumption about how the label depends on the email, which is all prediction needs. Modelling \(P(\mathbf{x})\) on top gains little, so this route might as well be a discriminative model.</li>
+        <li><b>Route 2, \(P(y)\,P(\mathbf{x} \mid y)\).</b> \(P(y)\) says how often spam occurs; \(P(\mathbf{x} \mid y)\) says what spam emails look like and what non-spam emails look like. This is the more meaningful assumption, because we may well have some idea of how the emails in each class are distributed. The lectures take this route <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=690s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:30</a>.</li>
+      </ul>
+    </section>
+
+    <section id="dice-story">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=755s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 12:35</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=952s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 15:52 eight possible emails</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=1085s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 18:05 the dice</a>
+        </div>
+        <h2>The generative story: a coin and two dice</h2>
+      </div>
+      <p>A generative model comes with a <dfn>generative story</dfn>: a random procedure that produces each data point. You can tell your own story; this is the first one the lecture tries.</p>
+      <ol class="algo">
+        <li class="algo-title">Story 1: generate the i-th data point</li>
+        <li><b>Decide the label.</b> Toss a coin with \(P(y_i = 1) = p\). Heads means this point will be a spam email (we do not know the email yet, only its type).</li>
+        <li><b>Decide the features using the label.</b> Draw \(\mathbf{x}_i\) from \(P(\mathbf{x} \mid y_i)\).</li>
+        <li>Repeat \(n\) times to get the training set.</li>
+      </ol>
+      <p>To make step 2 concrete, take a dictionary of \(d = 3\) words. Each word is either in the email or not, so there are only \(2 \times 2 \times 2 = 8\) possible emails, from 000 (none of the words, an empty email) to 111 (all three).</p>
+      <p>In the <b>spam room</b> sits an imaginary eight-faced die, one face per possible email. Unlike a fair die, its faces have different probabilities, unknown to us but fixed, and they sum to 1. Rolling it gives the email. The <b>non-spam room</b> has a different die with the same eight faces and different probabilities; some faces may even have probability 0 there <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=1181s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:41</a>.</p>
+      <p>Why two dice? An email containing "lottery", "money", "dollar" and "reply immediately" has the same encoding in both rooms, but that face comes up more often on the spam die. It can still come up on the non-spam die (someone in the lottery business may get such mail), only less often <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=1280s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:20</a>. The coin fixes \(P(y)\) and the dice fix \(P(\mathbf{x} \mid y)\); multiplying them gives \(P(\mathbf{x}, y)\) for every pair.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 334" role="img" aria-label="A coin with P(y = 1) = p sends each point to the spam room on heads or the non-spam room on tails. Each room has a die whose eight faces are the bit patterns 000 to 111. Parameters: 1 for the coin plus 2 to the d minus 1 for each die, 2 to the d plus 1 minus 1 in total.">
+            <defs><marker id="p14b-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-row" x="20" y="22">Step 1 · label</text>
+            <text class="d-row" x="190" y="22">Step 2 · features, given the label</text>
+            <circle class="d-box-acc" cx="80" cy="165" r="36"/>
+            <text class="d-t" x="80" y="161" text-anchor="middle">coin</text>
+            <text class="d-s" x="80" y="178" text-anchor="middle">P(y=1) = p</text>
+            <path class="d-ln-acc" d="M108 142 L184 96" marker-end="url(#p14b-ah)"/>
+            <text class="d-s" x="88" y="98">heads: y = 1</text>
+            <path class="d-ln-acc" d="M108 188 L184 234" marker-end="url(#p14b-ah)"/>
+            <text class="d-s" x="88" y="246">tails: y = 0</text>
+
+            <rect class="d-box" x="190" y="38" width="450" height="108" rx="8"/>
+            <text class="d-t" x="204" y="60">Spam room (y = 1): one die with 2<tspan dy="-5" style="font-size:9px">d</tspan><tspan dy="5"> faces</tspan></text>
+            <rect class="d-box-acc" x="204" y="72" width="48" height="34" rx="4"/><text class="d-al" x="228" y="93" text-anchor="middle" style="fill: var(--ink)">000</text>
+            <rect class="d-box-acc" x="258" y="72" width="48" height="34" rx="4"/><text class="d-al" x="282" y="93" text-anchor="middle" style="fill: var(--ink)">001</text>
+            <rect class="d-box-acc" x="312" y="72" width="48" height="34" rx="4"/><text class="d-al" x="336" y="93" text-anchor="middle" style="fill: var(--ink)">010</text>
+            <rect x="366" y="72" width="48" height="34" rx="4" style="fill: var(--mark); stroke: var(--ink); stroke-width: 1.6"/><text class="d-al" x="390" y="93" text-anchor="middle" style="fill: var(--ink)">011</text>
+            <rect class="d-box-acc" x="420" y="72" width="48" height="34" rx="4"/><text class="d-al" x="444" y="93" text-anchor="middle" style="fill: var(--ink)">100</text>
+            <rect class="d-box-acc" x="474" y="72" width="48" height="34" rx="4"/><text class="d-al" x="498" y="93" text-anchor="middle" style="fill: var(--ink)">101</text>
+            <rect class="d-box-acc" x="528" y="72" width="48" height="34" rx="4"/><text class="d-al" x="552" y="93" text-anchor="middle" style="fill: var(--ink)">110</text>
+            <rect class="d-box-acc" x="582" y="72" width="48" height="34" rx="4"/><text class="d-al" x="606" y="93" text-anchor="middle" style="fill: var(--ink)">111</text>
+            <text class="d-s" x="204" y="130">d = 3: the 8 face probabilities sum to 1, so 2<tspan dy="-4" style="font-size:8.5px">d</tspan><tspan dy="4"> − 1 = 7 are free</tspan></text>
+
+            <rect class="d-box" x="190" y="184" width="450" height="108" rx="8"/>
+            <text class="d-t" x="204" y="206">Non-spam room (y = 0): another die, same faces</text>
+            <rect class="d-box" x="204" y="218" width="48" height="34" rx="4"/><text class="d-al" x="228" y="239" text-anchor="middle" style="fill: var(--ink)">000</text>
+            <rect class="d-box" x="258" y="218" width="48" height="34" rx="4"/><text class="d-al" x="282" y="239" text-anchor="middle" style="fill: var(--ink)">001</text>
+            <rect class="d-box" x="312" y="218" width="48" height="34" rx="4"/><text class="d-al" x="336" y="239" text-anchor="middle" style="fill: var(--ink)">010</text>
+            <rect class="d-box" x="366" y="218" width="48" height="34" rx="4"/><text class="d-al" x="390" y="239" text-anchor="middle" style="fill: var(--ink)">011</text>
+            <rect class="d-box" x="420" y="218" width="48" height="34" rx="4"/><text class="d-al" x="444" y="239" text-anchor="middle" style="fill: var(--ink)">100</text>
+            <rect class="d-box" x="474" y="218" width="48" height="34" rx="4"/><text class="d-al" x="498" y="239" text-anchor="middle" style="fill: var(--ink)">101</text>
+            <rect class="d-box" x="528" y="218" width="48" height="34" rx="4"/><text class="d-al" x="552" y="239" text-anchor="middle" style="fill: var(--ink)">110</text>
+            <rect class="d-box" x="582" y="218" width="48" height="34" rx="4"/><text class="d-al" x="606" y="239" text-anchor="middle" style="fill: var(--ink)">111</text>
+            <text class="d-s" x="204" y="276">different probabilities for the same faces: another 2<tspan dy="-4" style="font-size:8.5px">d</tspan><tspan dy="4"> − 1 free numbers</tspan></text>
+
+            <text class="d-t" x="20" y="322">Parameters: 1 + (2<tspan dy="-5" style="font-size:9px">d</tspan><tspan dy="5"> − 1) + (2</tspan><tspan dy="-5" style="font-size:9px">d</tspan><tspan dy="5"> − 1) = 2</tspan><tspan dy="-5" style="font-size:9px">d+1</tspan><tspan dy="5"> − 1</tspan></text>
+            <text class="d-s" x="640" y="322" text-anchor="end">about 4 × 10<tspan dy="-4" style="font-size:8.5px">3010</tspan><tspan dy="4"> for a 10,000-word dictionary</tspan></text>
+          </svg>
+        </div>
+        <figcaption><b>Story 1: one coin, two dice.</b> The coin picks the room; the room's die picks the whole email in one roll (the highlighted face, 011, is one possible roll). Both dice have the same \(2^d\) faces with unrelated probabilities, which is where the parameter count explodes.</figcaption>
+      </figure>
+    </section>
+
+    <section id="parameter-count">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=1415s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 23:35</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=1617s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 26:57 the total</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=1713s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L46 · 28:33 two tests</a>
+        </div>
+        <h2>Counting parameters: far too many</h2>
+      </div>
+      <p>To learn this model from data we must estimate every number that determines it. With all of them known we control the generating process completely, so we could generate new \((\mathbf{x}, y)\) pairs and compute \(P(y \mid \mathbf{x}_{\text{test}})\) for any test email.</p>
+      <ul>
+        <li><b>The coin:</b> one parameter, its bias \(p\).</li>
+        <li><b>The spam die:</b> \(2^d\) faces (8 for \(d = 3\), 16 for \(d = 4\)). The faces are mutually exclusive and exactly one shows up, so their probabilities sum to 1. Fixing \(2^d - 1\) of them determines the last one, leaving \(2^d - 1\) free parameters.</li>
+        <li><b>The non-spam die:</b> another \(2^d - 1\), since its numbers can be completely different.</li>
+      </ul>
+      <div class="result">
+        <span class="lbl">Parameter count of story 1</span>
+        \[ 1 + 2\,(2^d - 1) \;=\; 2^{d+1} - 1 \]
+      </div>
+      <p>Even a moderate dictionary has 10,000 words, which means on the order of \(2^{10{,}000}\) parameters. That is astronomical, far beyond what even modern GPUs could learn.</p>
+      <p class="rule-of-thumb">Ask two things of any generative model. Is it a reasonable explanation of the data? Is it reasonable enough that we can actually learn under it?</p>
+      <p>Story 1 may well pass the first test, but it fails the second unless \(d\) is tiny, and in spam classification \(d\) is large. So the story has to change, to one with far fewer parameters <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=tna8wxoasss&amp;t=1780s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>29:40</a>.</p>
+    </section>
+
+    <!-- ============ LECTURE 47 ============ -->
+    <section id="coin-story">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L47 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=90s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L47 · 1:30 a coin per word</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=369s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L47 · 6:09 counting again</a>
+        </div>
+        <h2>An alternate story: one coin per word</h2>
+      </div>
+      <p>One parameter for the label coin is manageable, so step 1 stays. The trouble was the \(2^d\)-faced die in step 2. The new story replaces each die by \(d\) coins, one per word.</p>
+      <ul>
+        <li>Spam room: coins with probabilities \(p^{1}_{1}, p^{1}_{2}, \dots, p^{1}_{d}\).</li>
+        <li>Non-spam room: coins with probabilities \(p^{0}_{1}, p^{0}_{2}, \dots, p^{0}_{d}\).</li>
+      </ul>
+      <p class="note">Notation: in \(p^{y}_{j}\) the superscript is the label (which room) and the subscript is the word. \(p^{1}_{j}\) is the chance that word \(j\) appears in a spam email.</p>
+      <ol class="algo">
+        <li class="algo-title">Story 2: generate the i-th data point</li>
+        <li>Toss the label coin (bias \(p\)). Heads: go to the spam room. Tails: go to the non-spam room.</li>
+        <li>In room \(y\), toss each of the \(d\) coins. If coin \(j\) falls heads, word \(j\) is in the email (\(f_j = 1\)); if tails, it is not (\(f_j = 0\)).</li>
+        <li>Come out and repeat for the next point.</li>
+      </ol>
+      <p>For example, the spam email 011 arises when the word-1 coin falls tails and the word-2 and word-3 coins fall heads <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=219s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:39</a>. Two sets of coins are needed for the same reason as two dice: if word 1 is "lottery", its spam coin might have \(p^{1}_{1} = 0.8\) while its non-spam coin has only \(p^{0}_{1} = 0.1\).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 334" role="img" aria-label="The same label coin sends each point to the spam or non-spam room. Each room now holds three coins, one per word, with probabilities p1 sub j in the spam room and p0 sub j in the non-spam room. In the spam room the tosses tails, heads, heads give the email 011 with probability (1 minus p1 1) times p1 2 times p1 3. Parameters: 1 + d + d = 2d + 1.">
+            <defs><marker id="p14c-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-row" x="20" y="22">Step 1 · label</text>
+            <text class="d-row" x="190" y="22">Step 2 · one coin per word</text>
+            <circle class="d-box-acc" cx="80" cy="165" r="36"/>
+            <text class="d-t" x="80" y="161" text-anchor="middle">coin</text>
+            <text class="d-s" x="80" y="178" text-anchor="middle">P(y=1) = p</text>
+            <path class="d-ln-acc" d="M108 142 L184 96" marker-end="url(#p14c-ah)"/>
+            <text class="d-s" x="88" y="98">heads: y = 1</text>
+            <path class="d-ln-acc" d="M108 188 L184 234" marker-end="url(#p14c-ah)"/>
+            <text class="d-s" x="88" y="246">tails: y = 0</text>
+
+            <rect class="d-box" x="190" y="38" width="450" height="108" rx="8"/>
+            <text class="d-t" x="204" y="60">Spam room (y = 1)</text>
+            <circle class="d-box-acc" cx="245" cy="94" r="20"/><text class="d-t" x="245" y="99" text-anchor="middle">p¹₁</text>
+            <circle class="d-box-acc" cx="340" cy="94" r="20"/><text class="d-t" x="340" y="99" text-anchor="middle">p¹₂</text>
+            <circle class="d-box-acc" cx="435" cy="94" r="20"/><text class="d-t" x="435" y="99" text-anchor="middle">p¹₃</text>
+            <text class="d-s" x="245" y="132" text-anchor="middle">word 1: T → 0</text>
+            <text class="d-s" x="340" y="132" text-anchor="middle">word 2: H → 1</text>
+            <text class="d-s" x="435" y="132" text-anchor="middle">word 3: H → 1</text>
+            <path class="d-ln-acc" d="M462 94 L494 94" marker-end="url(#p14c-ah)"/>
+            <text class="d-t" x="568" y="90" text-anchor="middle">email 011</text>
+            <text class="d-s" x="568" y="110" text-anchor="middle">prob. (1 − p¹₁) · p¹₂ · p¹₃</text>
+
+            <rect class="d-box" x="190" y="184" width="450" height="108" rx="8"/>
+            <text class="d-t" x="204" y="206">Non-spam room (y = 0)</text>
+            <circle class="d-box" cx="245" cy="240" r="20"/><text class="d-t" x="245" y="245" text-anchor="middle">p⁰₁</text>
+            <circle class="d-box" cx="340" cy="240" r="20"/><text class="d-t" x="340" y="245" text-anchor="middle">p⁰₂</text>
+            <circle class="d-box" cx="435" cy="240" r="20"/><text class="d-t" x="435" y="245" text-anchor="middle">p⁰₃</text>
+            <text class="d-s" x="245" y="278" text-anchor="middle">word 1</text>
+            <text class="d-s" x="340" y="278" text-anchor="middle">word 2</text>
+            <text class="d-s" x="435" y="278" text-anchor="middle">word 3</text>
+            <text class="d-s" x="560" y="236" text-anchor="middle">same words, own biases</text>
+            <text class="d-s" x="560" y="254" text-anchor="middle">lottery: p¹ = 0.8, p⁰ = 0.1</text>
+
+            <text class="d-t" x="20" y="322">Parameters: 1 + d + d = 2d + 1</text>
+            <text class="d-s" x="640" y="322" text-anchor="end">20,001 for a 10,000-word dictionary</text>
+          </svg>
+        </div>
+        <figcaption><b>Story 2: one coin per word.</b> Same coin, same rooms; only step 2 changes. An email is built word by word from \(d\) independent tosses, so each room needs \(d\) numbers instead of \(2^d - 1\).</figcaption>
+      </figure>
+
+      <p>The count is now one coin for the label plus \(d\) coins in each room:</p>
+      <div class="result">
+        <span class="lbl">Parameter count of story 2</span>
+        \[ 1 + d + d \;=\; 2d + 1 \]
+      </div>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">\(d\)</th><th class="num">Story 1: \(2^{d+1} - 1\)</th><th class="num">Story 2: \(2d + 1\)</th></tr></thead>
+          <tbody>
+            <tr><td class="num">3</td><td class="num">15</td><td class="num">7</td></tr>
+            <tr><td class="num">10</td><td class="num">2,047</td><td class="num">21</td></tr>
+            <tr><td class="num">10,000</td><td class="num">≈ 4 × 10³⁰¹⁰</td><td class="num">20,001</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>\(2d + 1\) is exponentially smaller than \(2^{d+1} - 1\). Twenty thousand parameters is manageable; \(2^{10{,}000}\) is not <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=430s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:10</a>.</p>
+    </section>
+
+    <section id="independence">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=462s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L47 · 7:42</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=623s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L47 · 10:23 the name</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=714s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L47 · 11:54 the formulas</a>
+        </div>
+        <h2>The price: class-conditional independence</h2>
+      </div>
+      <p>What do we lose? Suppose the label coin says spam and the "lottery" coin falls heads, so the email contains "lottery". Does that change the chance that "money" also appears? Intuitively yes: a spam email that mentions a lottery probably mentions money too. Under story 2 it does not, because "money" has its own coin with its own fixed probability. Given the class, every word is decided by a separate, independent toss <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=524s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:44</a>.</p>
+      <p>This is the <dfn>class-conditional independence assumption</dfn>: conditioned on the class, the features are independent of each other. Once you know an email is spam, learning that "lottery" or "dollar" is present tells you nothing more about "money"; the same holds inside the non-spam class. It may not hold in practice, but it is exactly what reduces the parameter count from \(2^{d+1} - 1\) to \(2d + 1\).</p>
+      <p>Written as formulas, with a feature vector \(\mathbf{x} = (f_1, \dots, f_d)\), \(f_j \in \{0, 1\}\):</p>
+      <div class="eq">\[ P(y = 1) = p, \qquad P(y = 0) = 1 - p \]</div>
+      <div class="eq">\[ P\big(\mathbf{x} = (f_1, \dots, f_d) \,\big|\, y\big) \;=\; \prod_{j=1}^{d} \big(p^{y}_{j}\big)^{f_j}\,\big(1 - p^{y}_{j}\big)^{1 - f_j} \]</div>
+      <p>Each factor is \(p^{y}_{j}\) when word \(j\) is present (\(f_j = 1\)) and \(1 - p^{y}_{j}\) when it is absent; this is the compact form of the Bernoulli likelihood from <a href="part-08.html">Part 8</a>. Multiplying the factors is justified only because the features are assumed independent given the label. A worked case with \(d = 3\):</p>
+      <div class="eq">\[ P\big(\mathbf{x} = (0, 1, 0) \mid y = 1\big) = (1 - p^{1}_{1}) \cdot p^{1}_{2} \cdot (1 - p^{1}_{3}) \]</div>
+      <p>Word 1 is absent (its spam coin fell tails), word 2 present, word 3 absent. Together, \(P(y)\) and \(P(\mathbf{x} \mid y)\) give \(P(\mathbf{x}, y)\) for every (email, label) pair using only \(2d + 1\) parameters: \(d\) coins in the spam room, \(d\) in the non-spam room and one to choose the room. The next step is to estimate them, using the simplest method we know, maximum likelihood <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=GdYLuJqHZAc&amp;t=1023s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>17:03</a>.</p>
+    </section>
+
+    <!-- ============ LECTURE 48 ============ -->
+    <section id="nb-estimates">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=153s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L48 · 2:33</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=255s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L48 · 4:15 the label coin</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=377s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L48 · 6:17 the word coins</a>
+        </div>
+        <h2>Maximum likelihood estimates are counts</h2>
+      </div>
+      <p>The parameters to estimate are \(p\), \(p^{1}_{1}, \dots, p^{1}_{d}\) and \(p^{0}_{1}, \dots, p^{0}_{d}\). Every one of them is the bias of a coin, a Bernoulli parameter, and maximum likelihood for Bernoulli parameters was done in detail in <a href="part-08.html">Part 8</a>. The estimates are the intuitive ones. Write \(f^{\,i}_{j}\) for feature \(j\) of training email \(i\).</p>
+      <p><b>The label coin.</b> In the story, the label is decided first and the features afterwards, so the features carry no information about \(p\). Only the labels do: with \(n\) emails, the coin was tossed \(n\) times.</p>
+      <div class="eq">\[ \hat p = \frac{1}{n}\sum_{i=1}^{n} y_i = \text{fraction of spam emails in the data set} \]</div>
+      <p><b>The word coins.</b> The coin \(p^{y}_{j}\) was only ever tossed for emails with label \(y\), and it only decided feature \(j\). Say 1,000 emails contain 600 spam and 400 non-spam. Then the spam coin for word 5 was tossed 600 times, and we count how often word 5 appeared in those 600 emails <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=499s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:19</a>.</p>
+      <div class="eq">\[ \hat p^{\,y}_{j} = \frac{\sum_{i=1}^{n} \mathbf{1}\big[f^{\,i}_{j} = 1 \text{ and } y_i = y\big]}{\sum_{i=1}^{n} \mathbf{1}\big[y_i = y\big]} \qquad \text{for all } j \in \{1, \dots, d\},\ y \in \{0, 1\} \]</div>
+      <div class="result">
+        <span class="lbl">Naive Bayes estimates</span>
+        <p>\(\hat p\) is the fraction of emails labelled 1. \(\hat p^{\,y}_{j}\) is the fraction of label-\(y\) emails that contain word \(j\): for \(y = 1\), the number of spam emails containing word \(j\) divided by the number of spam emails. That is \(2d\) word estimates plus \(\hat p\), all \(2d + 1\) in closed form, obtained just by counting <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=718s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:58</a>.</p>
+      </div>
+      <p>The lecture gives these estimates and leaves the derivation to you. A sketch: the log-likelihood of the training set splits into separate groups of terms,</p>
+      <div class="eq">\[ \ell = \sum_{i=1}^{n} \big[y_i \log p + (1 - y_i)\log(1 - p)\big] \;+\; \sum_{y \in \{0,1\}} \sum_{j=1}^{d} \sum_{i:\, y_i = y} \big[f^{\,i}_{j} \log p^{y}_{j} + (1 - f^{\,i}_{j}) \log(1 - p^{y}_{j})\big] \]</div>
+      <p>Each parameter appears in only one group, and each group is a Bernoulli log-likelihood, maximized by the sample fraction of ones.</p>
+    </section>
+
+    <section id="nb-prediction">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=779s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L48 · 12:59</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=997s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L48 · 16:37 Bayes' rule</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=1181s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L48 · 19:41 plugging in</a>
+        </div>
+        <h2>Predicting with Bayes' rule</h2>
+      </div>
+      <p>A new email arrives, encoded as a 0/1 vector \(\mathbf{x}_{\text{test}}\) in the same way as the training set; it may or may not appear in the training data. The natural rule, and in a sense the best one can do, is to pick the class that is more probable given the features:</p>
+      <div class="eq">\[ \hat y_{\text{test}} = \begin{cases} 1 &amp; \text{if } P(y_{\text{test}} = 1 \mid \mathbf{x}_{\text{test}}) \ge P(y_{\text{test}} = 0 \mid \mathbf{x}_{\text{test}}) \\ 0 &amp; \text{otherwise} \end{cases} \]</div>
+      <p>But the model specifies \(P(y)\) and \(P(\mathbf{x} \mid y)\), not \(P(y \mid \mathbf{x})\). Bayes' rule converts one into the other:</p>
+      <div class="eq">\[ P(y_{\text{test}} = 1 \mid \mathbf{x}_{\text{test}}) = \frac{P(\mathbf{x}_{\text{test}} \mid y = 1)\,P(y = 1)}{P(\mathbf{x}_{\text{test}})}, \qquad P(y_{\text{test}} = 0 \mid \mathbf{x}_{\text{test}}) = \frac{P(\mathbf{x}_{\text{test}} \mid y = 0)\,P(y = 0)}{P(\mathbf{x}_{\text{test}})} \]</div>
+      <p>Both have the same positive denominator, which does not affect the comparison, so only the numerators need comparing <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=1087s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:07</a>. Write \(\mathbf{x}_{\text{test}} = (f_1, \dots, f_d)\), use class-conditional independence to expand \(P(\mathbf{x}_{\text{test}} \mid y)\) as a product, and plug in the maximum likelihood estimates as our best guesses for the parameters:</p>
+      <div class="eq">\[ \text{predict } 1 \text{ if } \;\; \underbrace{\prod_{j=1}^{d} \big(\hat p^{\,1}_{j}\big)^{f_j}\big(1 - \hat p^{\,1}_{j}\big)^{1 - f_j} \cdot \hat p}_{\text{spam score}} \;\ge\; \underbrace{\prod_{j=1}^{d} \big(\hat p^{\,0}_{j}\big)^{f_j}\big(1 - \hat p^{\,0}_{j}\big)^{1 - f_j} \cdot (1 - \hat p)}_{\text{non-spam score}}, \;\text{ else } 0 \]</div>
+      <p>The left side is the likelihood function from before, now evaluated at the estimates instead of treated as a function of the parameters. It uses \(d + 1\) estimates (the spam-room coins and \(\hat p\)); the right side uses the non-spam coins and \(1 - \hat p\). The test features enter only through the exponents: for \(\mathbf{x}_{\text{test}} = (0, 0, 1, 0)\), word 3 contributes \(\hat p^{\,y}_{3}\) and words 1, 2 and 4 contribute \(1 - \hat p^{\,y}_{j}\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=1396s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:16</a>.</p>
+      <ol class="algo">
+        <li class="algo-title">Naive Bayes for binary features</li>
+        <li>Encode every training email as \(\mathbf{x}_i \in \{0, 1\}^d\) with label \(y_i \in \{0, 1\}\).</li>
+        <li>Estimate \(\hat p\) = fraction of emails labelled 1.</li>
+        <li>For each class \(y\) and word \(j\), estimate \(\hat p^{\,y}_{j}\) = fraction of class-\(y\) emails containing word \(j\).</li>
+        <li>For a test email \((f_1, \dots, f_d)\), compute the spam score \(\hat p \prod_j (\hat p^{\,1}_{j})^{f_j}(1 - \hat p^{\,1}_{j})^{1 - f_j}\) and the non-spam score \((1 - \hat p) \prod_j (\hat p^{\,0}_{j})^{f_j}(1 - \hat p^{\,0}_{j})^{1 - f_j}\).</li>
+        <li>Predict 1 if the spam score is larger, else 0. (L50 sends ties to class 1.)</li>
+      </ol>
+    </section>
+
+    <section id="nb-name">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=1488s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L48 · 24:48</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=VKqGflpKG_A&amp;t=1642s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L48 · 27:22 works in practice</a>
+        </div>
+        <h2>Why it is called Naive Bayes</h2>
+      </div>
+      <p>The name comes from the two things the algorithm rests on.</p>
+      <ul>
+        <li><b>Naive:</b> the class-conditional independence assumption, the key step that cut \(2^d\) parameters per class down to \(d\). It is a simplifying assumption that may not hold. Told that an email is spam and contains "lottery", you would expect "money" or "dollar" to be more likely too, so those words are correlated, yet the model treats them as independent given the class.</li>
+        <li><b>Bayes:</b> it is a generative model of \(P(y)\) and \(P(\mathbf{x} \mid y)\), so Bayes' rule is needed to flip the estimates to \(P(y \mid \mathbf{x})\), the quantity prediction actually needs.</li>
+      </ul>
+      <p>Despite the naive assumption, the <dfn>Naive Bayes</dfn> algorithm works pretty well in practice, especially when the number of dimensions is large. With dictionary-sized \(d\), the ignored correlations do not seem to matter much for prediction accuracy on real-world data sets. It is a very popular, simple and effective algorithm.</p>
+    </section>
+
+    <!-- ============ LECTURE 49 ============ -->
+    <section id="zero-frequency">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=RuE8SQajgxY&amp;t=62s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L49 · 1:02</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=RuE8SQajgxY&amp;t=186s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L49 · 3:06 both scores vanish</a>
+        </div>
+        <h2>Pitfall: a word never seen in training</h2>
+      </div>
+      <p>Suppose the \(2d + 1\) parameters have been estimated, and a test email contains a word \(j\), say "zebra", that is in the dictionary but never appeared in any training email, spam or not. Its counting estimates are both zero:</p>
+      <div class="eq">\[ \hat p^{\,1}_{j} = 0, \qquad \hat p^{\,0}_{j} = 0 \]</div>
+      <p>In the test email \(f_j = 1\), so word \(j\)'s factor in the spam score is \((\hat p^{\,1}_{j})^{1}(1 - \hat p^{\,1}_{j})^{0} = 0 \times 1 = 0\), and one zero factor makes the whole product 0. The non-spam score has the same factor with \(\hat p^{\,0}_{j} = 0\), so it is 0 too <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=RuE8SQajgxY&amp;t=376s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:16</a>. Comparing 0 with 0 decides nothing.</p>
+      <p>The email may be full of "lottery", "money" and "dollar", all strongly indicating spam. Because the probabilities are multiplied, a single word missing from the training set destroys the information all the other words provide.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 334" role="img" aria-label="Factor-by-factor scores for the test email containing money, free and zebra, using the toy training set of the widget below. Without smoothing the zebra factor is 0 in both rows, so both scores are 0. With Laplace smoothing every factor is positive: the spam score is 0.0102 and the ham score 0.00071.">
+            <text class="d-t" x="142" y="34" text-anchor="middle">prior</text>
+            <text class="d-t" x="216" y="34" text-anchor="middle">lottery</text>
+            <text class="d-t" x="290" y="34" text-anchor="middle">money</text>
+            <text class="d-t" x="364" y="34" text-anchor="middle">free</text>
+            <text class="d-t" x="438" y="34" text-anchor="middle">meeting</text>
+            <text class="d-t" x="512" y="34" text-anchor="middle">report</text>
+            <text class="d-t" x="586" y="34" text-anchor="middle">zebra</text>
+            <text class="d-al" x="216" y="50" text-anchor="middle">absent</text>
+            <text class="d-al" x="290" y="50" text-anchor="middle">present</text>
+            <text class="d-al" x="364" y="50" text-anchor="middle">present</text>
+            <text class="d-al" x="438" y="50" text-anchor="middle">absent</text>
+            <text class="d-al" x="512" y="50" text-anchor="middle">absent</text>
+            <text class="d-al" x="586" y="50" text-anchor="middle">present</text>
+
+            <text class="d-row" x="16" y="76">Without smoothing (plain counts)</text>
+            <text class="d-t" x="16" y="106">Spam score</text>
+            <rect class="d-box" x="112" y="84" width="60" height="34" rx="5"/><text class="d-t" x="142" y="106" text-anchor="middle">0.40</text>
+            <text class="d-s" x="179" y="106" text-anchor="middle">×</text>
+            <rect class="d-box" x="186" y="84" width="60" height="34" rx="5"/><text class="d-t" x="216" y="106" text-anchor="middle">0.50</text>
+            <text class="d-s" x="253" y="106" text-anchor="middle">×</text>
+            <rect class="d-box" x="260" y="84" width="60" height="34" rx="5"/><text class="d-t" x="290" y="106" text-anchor="middle">0.75</text>
+            <text class="d-s" x="327" y="106" text-anchor="middle">×</text>
+            <rect class="d-box" x="334" y="84" width="60" height="34" rx="5"/><text class="d-t" x="364" y="106" text-anchor="middle">0.75</text>
+            <text class="d-s" x="401" y="106" text-anchor="middle">×</text>
+            <rect class="d-box" x="408" y="84" width="60" height="34" rx="5"/><text class="d-t" x="438" y="106" text-anchor="middle">1.00</text>
+            <text class="d-s" x="475" y="106" text-anchor="middle">×</text>
+            <rect class="d-box" x="482" y="84" width="60" height="34" rx="5"/><text class="d-t" x="512" y="106" text-anchor="middle">0.75</text>
+            <text class="d-s" x="549" y="106" text-anchor="middle">×</text>
+            <rect class="d-box-acc" x="556" y="84" width="60" height="34" rx="5"/><text class="d-t" x="586" y="106" text-anchor="middle" style="fill: var(--accent)">0</text>
+            <text class="d-t" x="626" y="106" style="fill: var(--accent)">= 0</text>
+
+            <text class="d-t" x="16" y="148">Ham score</text>
+            <rect class="d-box" x="112" y="126" width="60" height="34" rx="5"/><text class="d-t" x="142" y="148" text-anchor="middle">0.60</text>
+            <text class="d-s" x="179" y="148" text-anchor="middle">×</text>
+            <rect class="d-box" x="186" y="126" width="60" height="34" rx="5"/><text class="d-t" x="216" y="148" text-anchor="middle">1.00</text>
+            <text class="d-s" x="253" y="148" text-anchor="middle">×</text>
+            <rect class="d-box" x="260" y="126" width="60" height="34" rx="5"/><text class="d-t" x="290" y="148" text-anchor="middle">0.33</text>
+            <text class="d-s" x="327" y="148" text-anchor="middle">×</text>
+            <rect class="d-box" x="334" y="126" width="60" height="34" rx="5"/><text class="d-t" x="364" y="148" text-anchor="middle">0.17</text>
+            <text class="d-s" x="401" y="148" text-anchor="middle">×</text>
+            <rect class="d-box" x="408" y="126" width="60" height="34" rx="5"/><text class="d-t" x="438" y="148" text-anchor="middle">0.33</text>
+            <text class="d-s" x="475" y="148" text-anchor="middle">×</text>
+            <rect class="d-box" x="482" y="126" width="60" height="34" rx="5"/><text class="d-t" x="512" y="148" text-anchor="middle">0.33</text>
+            <text class="d-s" x="549" y="148" text-anchor="middle">×</text>
+            <rect class="d-box-acc" x="556" y="126" width="60" height="34" rx="5"/><text class="d-t" x="586" y="148" text-anchor="middle" style="fill: var(--accent)">0</text>
+            <text class="d-t" x="626" y="148" style="fill: var(--accent)">= 0</text>
+
+            <text class="d-row" x="16" y="192">With Laplace smoothing (two pseudo-emails)</text>
+            <text class="d-t" x="16" y="222">Spam score</text>
+            <rect class="b-ok" x="112" y="200" width="60" height="34" rx="5"/><text class="d-t" x="142" y="222" text-anchor="middle">0.42</text>
+            <text class="d-s" x="179" y="222" text-anchor="middle">×</text>
+            <rect class="b-ok" x="186" y="200" width="60" height="34" rx="5"/><text class="d-t" x="216" y="222" text-anchor="middle">0.40</text>
+            <text class="d-s" x="253" y="222" text-anchor="middle">×</text>
+            <rect class="b-ok" x="260" y="200" width="60" height="34" rx="5"/><text class="d-t" x="290" y="222" text-anchor="middle">0.80</text>
+            <text class="d-s" x="327" y="222" text-anchor="middle">×</text>
+            <rect class="b-ok" x="334" y="200" width="60" height="34" rx="5"/><text class="d-t" x="364" y="222" text-anchor="middle">0.80</text>
+            <text class="d-s" x="401" y="222" text-anchor="middle">×</text>
+            <rect class="b-ok" x="408" y="200" width="60" height="34" rx="5"/><text class="d-t" x="438" y="222" text-anchor="middle">0.80</text>
+            <text class="d-s" x="475" y="222" text-anchor="middle">×</text>
+            <rect class="b-ok" x="482" y="200" width="60" height="34" rx="5"/><text class="d-t" x="512" y="222" text-anchor="middle">0.60</text>
+            <text class="d-s" x="549" y="222" text-anchor="middle">×</text>
+            <rect class="b-ok" x="556" y="200" width="60" height="34" rx="5"/><text class="d-t" x="586" y="222" text-anchor="middle">0.20</text>
+            <text class="d-t" x="626" y="222">= 0.0102</text>
+
+            <text class="d-t" x="16" y="264">Ham score</text>
+            <rect class="b-ok" x="112" y="242" width="60" height="34" rx="5"/><text class="d-t" x="142" y="264" text-anchor="middle">0.58</text>
+            <text class="d-s" x="179" y="264" text-anchor="middle">×</text>
+            <rect class="b-ok" x="186" y="242" width="60" height="34" rx="5"/><text class="d-t" x="216" y="264" text-anchor="middle">0.86</text>
+            <text class="d-s" x="253" y="264" text-anchor="middle">×</text>
+            <rect class="b-ok" x="260" y="242" width="60" height="34" rx="5"/><text class="d-t" x="290" y="264" text-anchor="middle">0.43</text>
+            <text class="d-s" x="327" y="264" text-anchor="middle">×</text>
+            <rect class="b-ok" x="334" y="242" width="60" height="34" rx="5"/><text class="d-t" x="364" y="264" text-anchor="middle">0.29</text>
+            <text class="d-s" x="401" y="264" text-anchor="middle">×</text>
+            <rect class="b-ok" x="408" y="242" width="60" height="34" rx="5"/><text class="d-t" x="438" y="264" text-anchor="middle">0.29</text>
+            <text class="d-s" x="475" y="264" text-anchor="middle">×</text>
+            <rect class="b-ok" x="482" y="242" width="60" height="34" rx="5"/><text class="d-t" x="512" y="264" text-anchor="middle">0.29</text>
+            <text class="d-s" x="549" y="264" text-anchor="middle">×</text>
+            <rect class="b-ok" x="556" y="242" width="60" height="34" rx="5"/><text class="d-t" x="586" y="264" text-anchor="middle">0.14</text>
+            <text class="d-t" x="626" y="264">= 0.00071</text>
+
+            <text class="d-s" x="16" y="306">Without smoothing: 0 against 0, no decision; the evidence from money and free is lost.</text>
+            <text class="d-s" x="16" y="324">With smoothing: P(spam | x) = 0.0102 / (0.0102 + 0.00071) ≈ 0.93, so predict spam.</text>
+          </svg>
+        </div>
+        <figcaption><b>One zero factor wipes out a score.</b> Scores for the test email "money, free, zebra" on the toy training set of the widget below (4 spam and 6 ham emails, made up for this page). A present word contributes \(\hat p^{\,y}_{j}\), an absent one \(1 - \hat p^{\,y}_{j}\). "zebra" never occurs in training, so its factor is 0 in both rows until the pseudo-emails make every estimate positive.</figcaption>
+      </figure>
+    </section>
+
+    <section id="laplace">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=RuE8SQajgxY&amp;t=470s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L49 · 7:50</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=RuE8SQajgxY&amp;t=501s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L49 · 8:21 pseudo-emails</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=RuE8SQajgxY&amp;t=624s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L49 · 10:24 a prior</a>
+        </div>
+        <h2>The fix: Laplace smoothing</h2>
+      </div>
+      <p>The lecture mentions two fixes.</p>
+      <ol>
+        <li><b>Ignore the word.</b> If a test email contains a word that never occurred in training, leave that feature out. This works, but you have to keep track of which words were seen in training and which were not.</li>
+        <li><b>Add two pseudo-emails</b> (the usual simple fix). Add to the training set the all-ones email \((1, 1, \dots, 1)\) with label 1 and the same all-ones email with label 0. Now every word appears in at least one spam email and at least one non-spam email, so no maximum likelihood estimate can be 0. It may be small, but it is enough to stop the products from collapsing.</li>
+      </ol>
+      <p>This is called <dfn>Laplace smoothing</dfn>. Working out what the two pseudo-emails do to the counts: if \(n_y\) training emails have label \(y\) and \(c^{\,y}_{j}\) of them contain word \(j\), each class gains one email that contains every word, and the label coin sees one extra toss of each kind.</p>
+      <div class="result">
+        <span class="lbl">Estimates after adding the two pseudo-emails</span>
+        \[ \hat p^{\,y}_{j} = \frac{c^{\,y}_{j} + 1}{n_y + 1}, \qquad \hat p = \frac{n_1 + 1}{n + 2} \]
+        <p>An unseen word now gets \(1/(n_y + 1)\) in each class instead of 0.</p>
+      </div>
+      <p>There is also a Bayesian reading, as in <a href="part-08.html">Part 8</a>. The pseudo-emails act like a prior: before seeing the data, someone has shown you one all-words email of each label, so no word is ever dismissed with probability 0. You can think of it as Bayesian estimation with that prior, or simply as maximum likelihood on the enlarged data set; the two views are equivalent.</p>
+      <p class="callout">Beyond the lecture: with this version, a word that occurs in every class-\(y\) training email gets \(\hat p^{\,y}_{j} = 1\), and a test email without that word still meets a zero factor \(1 - \hat p^{\,y}_{j}\). The common textbook form for binary features adds, per class, one pseudo-email with every word and one with none, giving \((c^{\,y}_{j} + 1)/(n_y + 2)\), which is always strictly between 0 and 1. The toy data below has no such word.</p>
+
+      <figure id="nb-fig">
+        <div class="controls">
+          <label class="check" for="nb-smooth"><input type="checkbox" id="nb-smooth"> Laplace smoothing</label>
+          <output id="nb-smooth-out" for="nb-smooth">off</output>
+          <button class="btn" id="nb-reset" type="button">Reset</button>
+        </div>
+        <div class="controls" role="group" aria-label="Words in the test email">
+          <span>Test email contains</span>
+          <label class="check"><input type="checkbox" id="nb-w-lottery"> lottery</label>
+          <label class="check"><input type="checkbox" id="nb-w-money" checked> money</label>
+          <label class="check"><input type="checkbox" id="nb-w-free" checked> free</label>
+          <label class="check"><input type="checkbox" id="nb-w-meeting"> meeting</label>
+          <label class="check"><input type="checkbox" id="nb-w-report"> report</label>
+          <label class="check"><input type="checkbox" id="nb-w-zebra" checked> zebra</label>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Spam score</span><span class="v mine" id="nb-s1">–</span></div>
+          <div><span class="k">Ham score</span><span class="v" id="nb-s0">–</span></div>
+          <div><span class="k">P(spam | x)</span><span class="v" id="nb-post">–</span></div>
+          <div><span class="k">wᵀx + b</span><span class="v" id="nb-logit">–</span></div>
+        </div>
+        <div class="status" id="nb-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="nb-svg" viewBox="0 0 640 330" role="img" aria-label="Table of the six dictionary words with their counts and estimated probabilities in the spam and ham classes, the Naive Bayes weight of each word, and which words the test email contains, followed by a bar showing the posterior probability of spam."></svg></div>
+        <figcaption><b>A toy Naive Bayes spam filter.</b> The training set is made up for this page: 4 spam and 6 ham (non-spam) emails over a six-word dictionary; "zebra" occurs in none of them. Tick words to build the test email and toggle smoothing. Without smoothing, "zebra" makes both scores 0, and "lottery" (never in ham) or "meeting" (never in spam) single-handedly decide the class. The weight column is the \(w_j\) of <a href="#nb-linear">lecture 50</a>.</figcaption>
+      </figure>
+    </section>
+
+    <section id="log-sums">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=RuE8SQajgxY&amp;t=655s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L49 · 10:55</a>
+        <h2>Pitfall: products of many small numbers</h2>
+      </div>
+      <p>Each score multiplies \(d\) probability estimates, with \(d\) in the thousands, so the products become tiny (standard name: numerical underflow). The numerically more stable way to compare them is to take logarithms and compare sums:</p>
+      <div class="eq">\[ \log \hat p + \sum_{j=1}^{d} \Big[f_j \log \hat p^{\,1}_{j} + (1 - f_j)\log\big(1 - \hat p^{\,1}_{j}\big)\Big] \;\;\text{vs}\;\; \log(1 - \hat p) + \sum_{j=1}^{d} \Big[f_j \log \hat p^{\,0}_{j} + (1 - f_j)\log\big(1 - \hat p^{\,0}_{j}\big)\Big] \]</div>
+      <p>The logarithm is increasing, so the larger log score belongs to the larger score. Taking logs does not remove the zero-frequency problem: \(\log 0\) is undefined, so the estimates must be made nonzero first.</p>
+    </section>
+
+    <!-- ============ LECTURE 50 ============ -->
+    <section id="nb-linear">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ADXQaTI0Lpo&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L50 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ADXQaTI0Lpo&amp;t=156s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L50 · 2:36 log of the ratio</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ADXQaTI0Lpo&amp;t=653s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L50 · 10:53 wᵀx + b</a>
+        </div>
+        <h2>The decision function of Naive Bayes is linear</h2>
+      </div>
+      <p>For k-NN and decision trees (<a href="part-13.html">Part 13</a>) we asked what the decision boundary looks like: for k-NN it had many holes at small \(k\) and smoothed out as \(k\) grew; a tree cut the feature space with lines parallel to the axes, one per question. The same question for Naive Bayes: in terms of the features, what does its decision function look like?</p>
+      <p>Predict 1 when the posterior ratio is at least 1, or equivalently when its logarithm is at least 0. Logs turn products into sums, which are easier to read.</p>
+      <div class="eq">\[ \frac{P(y = 1 \mid \mathbf{x}_{\text{test}})}{P(y = 0 \mid \mathbf{x}_{\text{test}})} \ge 1 \quad\Longleftrightarrow\quad \log \frac{P(y = 1 \mid \mathbf{x}_{\text{test}})}{P(y = 0 \mid \mathbf{x}_{\text{test}})} \ge 0 \]</div>
+      <p><b>Step 1, Bayes' rule.</b> Both posteriors have the denominator \(P(\mathbf{x}_{\text{test}})\), which does not depend on the label, so it cancels:</p>
+      <div class="eq">\[ \log \frac{P(\mathbf{x}_{\text{test}} \mid y = 1)\,\hat p}{P(\mathbf{x}_{\text{test}} \mid y = 0)\,(1 - \hat p)} \ge 0 \]</div>
+      <p><b>Step 2, plug in the product.</b> With \(\mathbf{x}_{\text{test}} = (f_1, \dots, f_d)\), both products have the same exponents \(f_j\) and \(1 - f_j\), so they combine into one product <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ADXQaTI0Lpo&amp;t=338s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:38</a>:</p>
+      <div class="eq">\[ \log \left[ \prod_{j=1}^{d} \left(\frac{\hat p^{\,1}_{j}}{\hat p^{\,0}_{j}}\right)^{f_j} \left(\frac{1 - \hat p^{\,1}_{j}}{1 - \hat p^{\,0}_{j}}\right)^{1 - f_j} \cdot \frac{\hat p}{1 - \hat p} \right] \ge 0 \]</div>
+      <p><b>Step 3, the log of a product is a sum:</b></p>
+      <div class="eq">\[ \sum_{j=1}^{d} \left[ f_j \log\frac{\hat p^{\,1}_{j}}{\hat p^{\,0}_{j}} + (1 - f_j)\log\frac{1 - \hat p^{\,1}_{j}}{1 - \hat p^{\,0}_{j}} \right] + \log\frac{\hat p}{1 - \hat p} \ge 0 \]</div>
+      <p><b>Step 4, collect the terms that multiply \(f_j\).</b> The \(-f_j\) part of \((1 - f_j)\) joins the first log, and the remaining "1" part does not involve the features at all <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ADXQaTI0Lpo&amp;t=466s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:46</a>:</p>
+      <div class="eq">\[ \sum_{j=1}^{d} f_j \log\frac{\hat p^{\,1}_{j}\,(1 - \hat p^{\,0}_{j})}{\hat p^{\,0}_{j}\,(1 - \hat p^{\,1}_{j})} \;+\; \sum_{j=1}^{d} \log\frac{1 - \hat p^{\,1}_{j}}{1 - \hat p^{\,0}_{j}} + \log\frac{\hat p}{1 - \hat p} \;\ge\; 0 \]</div>
+      <div class="result">
+        <span class="lbl">Result: Naive Bayes is a linear classifier</span>
+        \[ \hat y_{\text{test}} = 1 \iff \mathbf{w}^\top \mathbf{x}_{\text{test}} + b \ge 0, \qquad w_j = \log\frac{\hat p^{\,1}_{j}\,(1 - \hat p^{\,0}_{j})}{\hat p^{\,0}_{j}\,(1 - \hat p^{\,1}_{j})}, \qquad b = \sum_{j=1}^{d} \log\frac{1 - \hat p^{\,1}_{j}}{1 - \hat p^{\,0}_{j}} + \log\frac{\hat p}{1 - \hat p} \]
+        <p>When the expression equals 0 either label is fine; the lecture breaks ties toward class 1 (spam).</p>
+      </div>
+      <p>So the features are multiplied by constants that depend only on the estimates, summed, and shifted by another constant that does not depend on the features; the sign decides. \(\mathbf{w}\) depends on the estimated parameters in a complicated way, but it is still just a vector in \(\mathbb{R}^d\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ADXQaTI0Lpo&amp;t=746s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:26</a>. Every \(\mathbf{x}_{\text{test}}\) on one side of the hyperplane \(\mathbf{w}^\top\mathbf{x} + b = 0\) is predicted spam, everything on the other side not spam. The constant \(b\) is called the <dfn>bias</dfn> (nothing to do with the bias of a coin): it sets how far the hyperplane sits from the origin. The inputs here happen to be binary, but the decision function is still a linear function of them.</p>
+
+      <figure>
+        <div class="fig-split">
+          <svg class="dg" viewBox="0 0 300 290" role="img" aria-label="The four binary emails over two words drawn as the corners of a unit square. The Naive Bayes boundary w transpose x plus b equals 0 is a straight line between the left and right corners; the two corners with lottery present fall in the shaded spam side.">
+            <defs><marker id="p14d-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <path d="M102.7 260 L204 20 L270 20 L270 260 Z" style="fill: var(--accent-soft)"/>
+            <line class="d-rule" x1="30" y1="215" x2="270" y2="215"/>
+            <line class="d-rule" x1="75" y1="20" x2="75" y2="260"/>
+            <path class="d-ln-mut d-dash" d="M75 65 L225 65 L225 215"/>
+            <line class="d-ln-acc" x1="102.7" y1="260" x2="204" y2="20" style="stroke-width:2.2"/>
+            <path class="d-ln-acc" d="M153.4 140 L192 156.3" marker-end="url(#p14d-ah)"/>
+            <text class="d-t" x="196" y="172" style="fill: var(--accent)">w</text>
+            <circle class="pt-no" cx="75" cy="215" r="6"/>
+            <circle class="pt-tree" cx="225" cy="215" r="6"/>
+            <circle class="pt-no" cx="75" cy="65" r="6"/>
+            <circle class="pt-tree" cx="225" cy="65" r="6"/>
+            <text class="d-al" x="75" y="237" text-anchor="middle">(0, 0)</text>
+            <text class="d-al" x="225" y="237" text-anchor="middle">(1, 0)</text>
+            <text class="d-al" x="75" y="50" text-anchor="middle">(0, 1)</text>
+            <text class="d-al" x="225" y="50" text-anchor="middle">(1, 1)</text>
+            <text class="d-s" x="84" y="140">not spam</text>
+            <text class="d-s" x="264" y="140" text-anchor="end" style="fill: var(--accent)">spam</text>
+            <text class="d-s" x="150" y="282" text-anchor="middle">x₁: lottery present</text>
+            <text class="d-s" x="18" y="140" text-anchor="middle" transform="rotate(-90 18 140)">x₂: meeting present</text>
+          </svg>
+          <div class="tbl-wrap">
+            <table class="mini">
+              <thead><tr><th>Email \(\mathbf{x}\)</th><th class="num">\(\mathbf{w}^\top\mathbf{x} + b\)</th><th>Predict</th></tr></thead>
+              <tbody>
+                <tr><td>(0, 0)</td><td class="num">−0.81</td><td>not spam</td></tr>
+                <tr><td>(1, 0)</td><td class="num">1.79</td><td>spam</td></tr>
+                <tr><td>(0, 1)</td><td class="num">−1.91</td><td>not spam</td></tr>
+                <tr><td>(1, 1)</td><td class="num">0.69</td><td>spam</td></tr>
+                <tr><td colspan="3">\(\mathbf{w} = (2.60,\ -1.10)\), \(b = -0.81\)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <figcaption><b>A hyperplane through the cube of binary emails.</b> Illustrative estimates for two words: \(\hat p^{\,1} = (0.6, 0.25)\), \(\hat p^{\,0} = (0.1, 0.5)\), \(\hat p = 0.4\). The possible emails are the corners of the unit square, and Naive Bayes splits them with the straight line \(\mathbf{w}^\top\mathbf{x} + b = 0\). Here an email with "lottery" is flagged even if it mentions a meeting.</figcaption>
+      </figure>
+
+      <p>Summary of the binary story so far: a class-conditional independence model, its maximum likelihood estimates, the pitfalls and Laplace smoothing, and a linear decision function. Throughout, the features were binary, justified by applications like spam. Can the same generative approach handle real-valued features? Yes; that is the next lecture <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ADXQaTI0Lpo&amp;t=932s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:32</a>.</p>
+    </section>
+
+    <!-- ============ LECTURE 51 ============ -->
+    <section id="gaussian-story">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=32s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 0:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=160s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 2:40 a Gaussian per class</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=293s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 4:53 shared covariance</a>
+        </div>
+        <h2>Real-valued features: a Gaussian per class</h2>
+      </div>
+      <p>Now drop the binary assumption. The data is \(\{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}\) with \(y_i \in \{0, 1\}\) as before but \(\mathbf{x}_i \in \mathbb{R}^d\) instead of \(\{0, 1\}^d\). The plan is the same as for Naive Bayes: model \(P(y)\), then \(P(\mathbf{x} \mid y)\).</p>
+      <ol class="algo">
+        <li class="algo-title">Generative story with Gaussian classes</li>
+        <li>Decide the label with a coin, \(P(y = 1) = p\). Nothing changes here.</li>
+        <li>Generate the feature vector from the Gaussian of that class: \(\mathbf{x} \mid y = 1 \sim \mathcal{N}(\boldsymbol\mu_1, \Sigma)\) and \(\mathbf{x} \mid y = 0 \sim \mathcal{N}(\boldsymbol\mu_0, \Sigma)\).</li>
+      </ol>
+      <p>Earlier, \(d\) coins generated \(d\) binary values. Here a single probability distribution generates the whole point in \(\mathbb{R}^d\) more succinctly, and the most standard choice is a Gaussian. Its density contours are ellipses around the mean; their shape and direction are set by the covariance matrix \(\Sigma\), which describes how the features are correlated (the density involves \(\Sigma^{-1}\)).</p>
+      <p>Something must differ between the two classes, and here it is the means \(\boldsymbol\mu_1 \ne \boldsymbol\mu_0\). For simplicity <b>the covariance matrix is assumed to be the same for both classes</b>. This is a modelling choice, and the lecture returns to it below. The story looks like the Gaussian mixture model of <a href="part-09.html">Part 9</a>, except that here the label of every training point is observed.</p>
+      <p><b>Parameters:</b> \(p\), \(\boldsymbol\mu_0\), \(\boldsymbol\mu_1\) and the shared \(\Sigma\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=364s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:04</a>.</p>
+
+      <h3>Maximum likelihood estimates <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=430s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 7:10</a></h3>
+      <p>The lecture states these without derivation; they are what intuition suggests.</p>
+      <div class="eq">\[ \hat p = \frac1n \sum_{i=1}^{n} y_i, \qquad \hat{\boldsymbol\mu}_1 = \frac{\sum_{i=1}^{n} \mathbf{1}[y_i = 1]\,\mathbf{x}_i}{\sum_{i=1}^{n} \mathbf{1}[y_i = 1]}, \qquad \hat{\boldsymbol\mu}_0 = \frac{\sum_{i=1}^{n} \mathbf{1}[y_i = 0]\,\mathbf{x}_i}{\sum_{i=1}^{n} \mathbf{1}[y_i = 0]} \]</div>
+      <div class="eq">\[ \hat\Sigma = \frac1n \sum_{i=1}^{n} \big(\mathbf{x}_i - \hat{\boldsymbol\mu}_{y_i}\big)\big(\mathbf{x}_i - \hat{\boldsymbol\mu}_{y_i}\big)^\top \]</div>
+      <ul>
+        <li>\(\hat p\) depends only on the labels and is the same as in Naive Bayes: the fraction of points labelled 1.</li>
+        <li>\(\hat{\boldsymbol\mu}_1\) is the sample mean of the points labelled 1, and \(\hat{\boldsymbol\mu}_0\) the sample mean of the points labelled 0.</li>
+        <li>\(\hat\Sigma\) is not the plain empirical covariance of all the data, because the two classes have different means. Each point is centred at the estimated mean of its own class, \(\hat{\boldsymbol\mu}_{y_i}\), and the \(n\) outer products are averaged. If all points came from one Gaussian, this would reduce to the usual \(\frac1n\sum_i(\mathbf{x}_i - \hat{\boldsymbol\mu})(\mathbf{x}_i - \hat{\boldsymbol\mu})^\top\).</li>
+      </ul>
+    </section>
+
+    <section id="gaussian-linear">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=701s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 11:41</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=857s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 14:17 the densities</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=953s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 15:53 after taking logs</a>
+        </div>
+        <h2>Prediction, and again a linear boundary</h2>
+      </div>
+      <p>In a generative model, prediction always goes through Bayes' rule: \(P(y_{\text{test}} \mid \mathbf{x}_{\text{test}}) \propto P(\mathbf{x}_{\text{test}} \mid y_{\text{test}})\,P(y_{\text{test}})\). The features are continuous now, so \(P(\mathbf{x}_{\text{test}} \mid y)\) is a density, determined by \(\hat{\boldsymbol\mu}_{y}\) and \(\hat\Sigma\). Predict 1 if</p>
+      <div class="eq">\[ f\big(\mathbf{x}_{\text{test}};\, \hat{\boldsymbol\mu}_1, \hat\Sigma\big)\,\hat p \;\ge\; f\big(\mathbf{x}_{\text{test}};\, \hat{\boldsymbol\mu}_0, \hat\Sigma\big)\,(1 - \hat p), \qquad f(\mathbf{x}; \boldsymbol\mu, \Sigma) = \frac{1}{(2\pi)^{d/2}\,\lvert\Sigma\rvert^{1/2}} \exp\!\Big(-\tfrac12 (\mathbf{x} - \boldsymbol\mu)^\top \Sigma^{-1} (\mathbf{x} - \boldsymbol\mu)\Big) \]</div>
+      <p>The constant in front depends only on the covariance matrix (through its determinant), and the covariance is shared, so it is the same on both sides and can be ignored. The lecture leaves the remaining simplification as an exercise; here it is. Take logs:</p>
+      <div class="eq">\[ -\tfrac12 (\mathbf{x} - \hat{\boldsymbol\mu}_1)^\top \hat\Sigma^{-1} (\mathbf{x} - \hat{\boldsymbol\mu}_1) + \tfrac12 (\mathbf{x} - \hat{\boldsymbol\mu}_0)^\top \hat\Sigma^{-1} (\mathbf{x} - \hat{\boldsymbol\mu}_0) + \log\frac{\hat p}{1 - \hat p} \;\ge\; 0 \]</div>
+      <p>\(\hat\Sigma^{-1}\) is symmetric, so each quadratic form expands as \((\mathbf{x} - \boldsymbol\mu)^\top \Sigma^{-1} (\mathbf{x} - \boldsymbol\mu) = \mathbf{x}^\top\Sigma^{-1}\mathbf{x} - 2\boldsymbol\mu^\top\Sigma^{-1}\mathbf{x} + \boldsymbol\mu^\top\Sigma^{-1}\boldsymbol\mu\). The two \(\mathbf{x}^\top\hat\Sigma^{-1}\mathbf{x}\) terms have opposite signs and cancel, leaving</p>
+      <div class="eq">\[ (\hat{\boldsymbol\mu}_1 - \hat{\boldsymbol\mu}_0)^\top \hat\Sigma^{-1} \mathbf{x} \;+\; \tfrac12\big(\hat{\boldsymbol\mu}_0^\top \hat\Sigma^{-1} \hat{\boldsymbol\mu}_0 - \hat{\boldsymbol\mu}_1^\top \hat\Sigma^{-1} \hat{\boldsymbol\mu}_1\big) \;+\; \log\frac{\hat p}{1 - \hat p} \;\ge\; 0 \]</div>
+      <div class="result">
+        <span class="lbl">Result: shared covariance gives a linear classifier</span>
+        \[ \hat y_{\text{test}} = 1 \iff \mathbf{w}^\top \mathbf{x}_{\text{test}} + b \ge 0, \qquad \mathbf{w} = \hat\Sigma^{-1}(\hat{\boldsymbol\mu}_1 - \hat{\boldsymbol\mu}_0), \qquad b = \tfrac12\big(\hat{\boldsymbol\mu}_0^\top \hat\Sigma^{-1} \hat{\boldsymbol\mu}_0 - \hat{\boldsymbol\mu}_1^\top \hat\Sigma^{-1} \hat{\boldsymbol\mu}_1\big) + \log\frac{\hat p}{1 - \hat p} \]
+      </div>
+      <p>Only the first term depends on the test point; the rest are numbers computed from the estimates. \(\mathbf{w}\) and especially \(b\) depend on the parameters in complicated ways, but in the end they are a vector and a number, and the decision function is again linear: points on one side of \(\mathbf{w}^\top\mathbf{x} + b = 0\) are predicted 1, points on the other side 0 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=1054s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>17:34</a>.</p>
+      <p class="note">The expression written in the lecture drops the factor \(\tfrac12\) on the mean terms and writes the prior term as \(\log\frac{1 - \hat p}{\hat p}\). Neither changes the conclusion that the boundary is linear. The version above is what the algebra gives, and it matches the lecture's later remark that a larger \(\hat p\) gives more of the space to class 1.</p>
+    </section>
+
+    <section id="boundary-shape">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=1187s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 19:47</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=1354s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 22:34 identity covariance</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=1490s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 24:50 separate covariances</a>
+        </div>
+        <h2>Shared or separate covariance: a line or a curve</h2>
+      </div>
+      <p>The shared \(\Sigma\) is what makes the boundary linear. Geometrically, both classes have density contours of the same shape and orientation, centred at \(\hat{\boldsymbol\mu}_1\) and \(\hat{\boldsymbol\mu}_0\). At a test point we compare the class-1 density times \(\hat p\) with the class-0 density times \(1 - \hat p\). When the contour shapes match, there is a line on one side of which the first product is always larger.</p>
+      <ul>
+        <li><b>\(\Sigma = I\).</b> The contours are circles and \(\mathbf{w} = \hat{\boldsymbol\mu}_1 - \hat{\boldsymbol\mu}_0\), so the boundary is perpendicular to the segment joining the two means. With \(\hat p = \tfrac12\) the prior term vanishes and the boundary is the perpendicular bisector of that segment. The bias \(\log\frac{\hat p}{1 - \hat p}\) slides it along the segment: as \(\hat p\) grows toward 1, more of the space is predicted 1, so the line moves toward \(\hat{\boldsymbol\mu}_0\); as \(\hat p\) falls toward 0 it moves toward \(\hat{\boldsymbol\mu}_1\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=1422s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:42</a>.</li>
+        <li><b>Shared general \(\Sigma\)</b>, circular or elliptical. Still a line, a version of the same picture scaled by the covariance; \(\hat\Sigma^{-1}\) tilts it, so it is no longer exactly perpendicular to the segment between the means.</li>
+        <li><b>Separate covariances.</b> Estimate \(\hat\Sigma_1\) and \(\hat\Sigma_0\), one per class. The ellipses can now have different shapes and directions (one class might be round, the other long and tilted), and the region where one class wins need not be separable by a line. The boundary is still the set of points where \(P(y = 1 \mid \mathbf{x}) = P(y = 0 \mid \mathbf{x})\), the place where ties are broken, but in general it is <b>quadratic</b>: a term of the form \(\mathbf{x}^\top A\,\mathbf{x}\) survives <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=1623s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>27:03</a>.</li>
+      </ul>
+      <p>The lecture does not derive the quadratic case. Standard result, by the same steps as before with \(\hat\Sigma_1 \ne \hat\Sigma_0\), so that neither the \(\mathbf{x}^\top\Sigma^{-1}\mathbf{x}\) terms nor the determinants cancel:</p>
+      <div class="eq">\[ -\tfrac12\,\mathbf{x}^\top\big(\hat\Sigma_1^{-1} - \hat\Sigma_0^{-1}\big)\mathbf{x} + \big(\hat\Sigma_1^{-1}\hat{\boldsymbol\mu}_1 - \hat\Sigma_0^{-1}\hat{\boldsymbol\mu}_0\big)^\top\mathbf{x} + c \;\ge\; 0, \qquad c = -\tfrac12\hat{\boldsymbol\mu}_1^\top\hat\Sigma_1^{-1}\hat{\boldsymbol\mu}_1 + \tfrac12\hat{\boldsymbol\mu}_0^\top\hat\Sigma_0^{-1}\hat{\boldsymbol\mu}_0 + \tfrac12\log\frac{\lvert\hat\Sigma_0\rvert}{\lvert\hat\Sigma_1\rvert} + \log\frac{\hat p}{1 - \hat p} \]</div>
+      <p class="rule-of-thumb">Same covariance: linear decision boundary. Different covariances: a richer, generally quadratic boundary. Which to use is a modelling decision.</p>
+
+      <figure id="gnb-fig">
+        <div class="controls">
+          <label for="gnb-mode">Covariance model</label>
+          <select id="gnb-mode">
+            <option value="iso">Σ = I for both classes</option>
+            <option value="shared" selected>Shared Σ̂ (the lecture's model)</option>
+            <option value="sep">Separate Σ̂₁ and Σ̂₀</option>
+          </select>
+        </div>
+        <div class="controls">
+          <label for="gnb-p">Prior \(\hat p = \hat P(y = 1)\)</label>
+          <input type="range" id="gnb-p" min="0.05" max="0.95" step="0.005" value="0.375">
+          <output id="gnb-p-out" for="gnb-p">0.375</output>
+          <button class="btn" id="gnb-reset" type="button">Use the fraction in the data</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Boundary</span><span class="v mine" id="gnb-shape">–</span></div>
+          <div><span class="k">Training accuracy</span><span class="v" id="gnb-acc">–</span></div>
+        </div>
+        <div class="status" id="gnb-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="gnb-svg" viewBox="0 0 400 400" role="img" aria-label="Synthetic two-dimensional points from two classes with their estimated means, two-standard-deviation covariance ellipses, the region predicted as class 1 shaded, and the decision boundary: a straight line for identity or shared covariance, a curve for separate covariances."></svg></div>
+        <figcaption><b>Synthetic data (45 points of class 1, 75 of class 0)</b>, generated for this page from two Gaussians with different true covariances. Dashed ellipses are the 2-standard-deviation contours of the covariance each model uses; the shaded region is predicted class 1. With \(\Sigma = I\) or a shared \(\hat\Sigma\) the boundary is a straight line, and moving \(\hat p\) only slides it. With separate \(\hat\Sigma_1, \hat\Sigma_0\) (each estimated from its own class) it curves around the tighter class.</figcaption>
+      </figure>
+    </section>
+
+    <section id="next-discriminative">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=1689s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 28:09</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=oTMYU7hC2bw&amp;t=1749s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L51 · 29:09 toward discriminative models</a>
+        </div>
+        <h2>Names, and the road to discriminative models</h2>
+      </div>
+      <p>This algorithm goes by several names. The one the lecturer prefers is <dfn>Gaussian naive Bayes</dfn>: the naive part is the simple assumption that, given the label, the data is generated by a single Gaussian, and Bayes' rule inverts \(P(\mathbf{x} \mid y)\) and \(P(y)\) into \(P(y \mid \mathbf{x})\), as in any generative model.</p>
+      <p class="note">Standard names: with a shared covariance this model is usually called <i>linear discriminant analysis</i> (LDA), and with one covariance per class <i>quadratic discriminant analysis</i> (QDA). Many textbooks keep "Gaussian naive Bayes" for the case of a diagonal covariance per class, where the features are independent given the label.</p>
+      <p>To summarize the generative thread: Naive Bayes for binary features, then a Gaussian model for real features; with a shared covariance the boundary is linear, with different covariances generally quadratic. The linear case is the interesting one, because nice generative assumptions keep producing linear decision boundaries.</p>
+      <p>That suggests a shortcut. If the decision function ends up linear in most of these nice cases, why not model \(P(y \mid \mathbf{x})\) directly, in a linear fashion, as a discriminative model? This time the model of \(P(y \mid \mathbf{x})\) is explicit, unlike the heuristic rules of k-NN and decision trees. The next lectures take this route: the perceptron and logistic regression, in <a href="part-15.html">Part 15</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Data distribution \(\mathcal{D}\)</dt><dd>Unknown but fixed distribution over features and labels that produces both the training and the test pairs.</dd></div>
+        <div><dt>Generative model</dt><dd>Makes assumptions about the joint \(P(\mathbf{x}, y)\), here as \(P(y)\,P(\mathbf{x} \mid y)\); it describes how the features themselves arise.</dd></div>
+        <div><dt>Discriminative model</dt><dd>Models only \(P(y \mid \mathbf{x})\). k-NN and decision trees are trivial cases with probabilities 0 or 1.</dd></div>
+        <div><dt>Generative story</dt><dd>A step-by-step random procedure for producing each data point: a coin for the label, then features given the label.</dd></div>
+        <div><dt>Class-conditional independence</dt><dd>Given the label, the features are independent. Cuts \(2^{d+1} - 1\) parameters to \(2d + 1\).</dd></div>
+        <div><dt>Naive Bayes</dt><dd>Classifier built on class-conditional independence ("naive") and Bayes' rule to get \(P(y \mid \mathbf{x})\).</dd></div>
+        <div><dt>\(\hat p^{\,y}_{j}\)</dt><dd>Estimated chance that word \(j\) appears in a class-\(y\) email: the fraction of class-\(y\) training emails containing it.</dd></div>
+        <div><dt>Zero-frequency problem</dt><dd>A word absent from training gets estimates 0 in both classes, so both scores of a test email containing it become 0.</dd></div>
+        <div><dt>Laplace smoothing</dt><dd>Adding pseudo-emails (here one all-words email per label) so no estimate is 0; equivalent to using a prior.</dd></div>
+        <div><dt>Log scores</dt><dd>Comparing sums of logs instead of products of many small probabilities, for numerical stability.</dd></div>
+        <div><dt>Decision function</dt><dd>The rule that maps \(\mathbf{x}\) to a label. For Naive Bayes and shared-covariance Gaussians it is \(\mathbf{w}^\top\mathbf{x} + b \ge 0\).</dd></div>
+        <div><dt>Bias \(b\)</dt><dd>The constant term of a linear decision function, setting how far the hyperplane is from the origin; unrelated to a coin's bias.</dd></div>
+        <div><dt>Gaussian naive Bayes (lecture's name)</dt><dd>\(\mathbf{x} \mid y \sim \mathcal{N}(\boldsymbol\mu_y, \Sigma)\) with a shared \(\Sigma\), giving \(\mathbf{w} = \hat\Sigma^{-1}(\hat{\boldsymbol\mu}_1 - \hat{\boldsymbol\mu}_0)\).</dd></div>
+        <div><dt>Quadratic decision boundary</dt><dd>What separate class covariances give in general, because the \(\mathbf{x}^\top A\,\mathbf{x}\) term no longer cancels.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Why are k-NN and decision trees called discriminative models, and what is \(P(y = 1 \mid \mathbf{x})\) for a decision tree?</span><span class="tog"></span></summary>
+          <p>Neither says anything about how \(\mathbf{x}\) is generated; each only maps a given \(\mathbf{x}\) to a label. For a tree, \(P(y = 1 \mid \mathbf{x}) = 1\) if the tree labels \(\mathbf{x}\) as 1 and 0 otherwise, a trivial (deterministic) probability.</p></details>
+        <details><summary><span class="q">Q2</span><span>With a 4-word dictionary, how many parameters does the coin-and-two-dice story need? And the coin-per-word story?</span><span class="tog"></span></summary>
+          <p>Dice: \(1 + 2(2^4 - 1) = 2^5 - 1 = 31\). Coins: \(2 \cdot 4 + 1 = 9\).</p></details>
+        <details><summary><span class="q">Q3</span><span>Under the coin-per-word model with \(p^{1} = (0.8, 0.3, 0.5)\), what is \(P(\mathbf{x} = (1, 0, 1) \mid y = 1)\)?</span><span class="tog"></span></summary>
+          <p>Word 1 present, word 2 absent, word 3 present: \(0.8 \times (1 - 0.3) \times 0.5 = 0.28\).</p></details>
+        <details><summary><span class="q">Q4</span><span>Five training emails, 2 of them spam. "free" appears in 1 of the spam emails and in 1 of the 3 non-spam emails. Find \(\hat p\), \(\hat p^{\,1}_{\text{free}}\), \(\hat p^{\,0}_{\text{free}}\), then redo them with the lecture's two pseudo-emails.</span><span class="tog"></span></summary>
+          <p>Plain counts: \(\hat p = 2/5 = 0.4\), \(\hat p^{\,1}_{\text{free}} = 1/2\), \(\hat p^{\,0}_{\text{free}} = 1/3\). With smoothing: \(\hat p = 3/7\), \(\hat p^{\,1}_{\text{free}} = 2/3\), \(\hat p^{\,0}_{\text{free}} = 2/4 = 1/2\).</p></details>
+        <details><summary><span class="q">Q5</span><span>Why can a single unseen word make Naive Bayes useless for an email, and why doesn't working with logs fix it?</span><span class="tog"></span></summary>
+          <p>Both estimates for that word are 0, the word is present, so each class score includes a factor 0 and both scores are 0. Logs only replace products by sums; \(\log 0\) is undefined, so the estimates must first be made nonzero, for example by Laplace smoothing.</p></details>
+        <details><summary><span class="q">Q6</span><span>A word has \(\hat p^{\,1}_{j} = \hat p^{\,0}_{j}\). What is its weight \(w_j\), and does it affect the decision at all?</span><span class="tog"></span></summary>
+          <p>\(w_j = \log\frac{q(1 - q)}{q(1 - q)} = 0\), and its contribution to \(b\), \(\log\frac{1 - q}{1 - q}\), is also 0. The word appears equally often in both classes, so it carries no evidence and drops out entirely.</p></details>
+        <details><summary><span class="q">Q7</span><span>Gaussian classes with \(\Sigma = I\), \(\hat{\boldsymbol\mu}_1 = (2, 0)\), \(\hat{\boldsymbol\mu}_0 = (0, 0)\), \(\hat p = \tfrac12\). Find the decision boundary. Which way does it move if \(\hat p\) increases?</span><span class="tog"></span></summary>
+          <p>\(\mathbf{w} = (2, 0)\), \(b = \tfrac12(0 - 4) + \log 1 = -2\), so predict 1 when \(2x_1 - 2 \ge 0\): the line \(x_1 = 1\), the perpendicular bisector of the means. In general \(x_1 = 1 - \tfrac12\log\frac{\hat p}{1 - \hat p}\), so a larger \(\hat p\) moves the line toward \(\hat{\boldsymbol\mu}_0\), giving more space to class 1.</p></details>
+        <details><summary><span class="q">Q8</span><span>Why does a shared covariance give a linear boundary while separate covariances generally give a quadratic one?</span><span class="tog"></span></summary>
+          <p>The log-ratio contains \(-\tfrac12\mathbf{x}^\top\Sigma_1^{-1}\mathbf{x} + \tfrac12\mathbf{x}^\top\Sigma_0^{-1}\mathbf{x}\). With \(\Sigma_1 = \Sigma_0\) these cancel (as do the determinant constants), leaving only terms linear in \(\mathbf{x}\). With different covariances the quadratic term \(\mathbf{x}^\top(\Sigma_0^{-1} - \Sigma_1^{-1})\mathbf{x}/2\) remains.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a class="next" href="index.html"><span class="dir">Part 15 · coming</span><span class="nm">Perceptron and logistic regression</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+
+  /* ---------- Toy Naive Bayes spam filter with Laplace smoothing ---------- */
+  (() => {
+    const svg = document.getElementById('nb-svg'); if (!svg) return;
+    const words = ['lottery', 'money', 'free', 'meeting', 'report', 'zebra'];
+    const spam = [[1, 1, 1, 0, 0, 0], [0, 1, 1, 0, 0, 0], [1, 0, 1, 0, 0, 0], [0, 1, 0, 0, 1, 0]];
+    const ham = [[0, 0, 0, 1, 1, 0], [0, 0, 0, 1, 0, 0], [0, 1, 0, 0, 1, 0], [0, 0, 1, 1, 1, 0], [0, 0, 0, 0, 1, 0], [0, 1, 0, 1, 0, 0]];
+    const n1 = spam.length, n0 = ham.length, n = n1 + n0;
+    const count = (set, j) => set.reduce((s, e) => s + e[j], 0);
+    const c1 = words.map((_, j) => count(spam, j)), c0 = words.map((_, j) => count(ham, j));
+    const defaults = [false, true, true, false, false, true];
+    const boxes = words.map(w => document.getElementById('nb-w-' + w));
+    const smooth = document.getElementById('nb-smooth'), smoothOut = document.getElementById('nb-smooth-out');
+    const oS1 = document.getElementById('nb-s1'), oS0 = document.getElementById('nb-s0'), oPost = document.getElementById('nb-post'), oLogit = document.getElementById('nb-logit');
+    const status = document.getElementById('nb-status');
+    const NUM = 'font: 500 12px var(--font-mono); fill: var(--ink)';
+    const X = { word: 18, a: 160, b: 250, p1: 340, p0: 420, w: 505, t: 592 };
+    const rowY = j => 54 + j * 30;
+    const heads = [['word', X.word, 'start'], ['spam count', X.a], ['ham count', X.b], ['p̂ in spam', X.p1], ['p̂ in ham', X.p0], ['weight w', X.w], ['test email', X.t]];
+    heads.forEach(h => mk('text', { x: h[1], y: 24, 'text-anchor': h[2] || 'middle', class: 'c-title' }, svg).textContent = h[0]);
+    mk('line', { x1: 12, x2: 632, y1: 32, y2: 32, class: 'c-faint' }, svg);
+    const rows = words.map((w, j) => {
+      const y = rowY(j);
+      const hl = mk('rect', { x: 12, y: y - 18, width: 620, height: 26, rx: 4, style: 'fill: var(--accent-soft)' }, svg);
+      mk('text', { x: X.word, y, class: 'c-note', style: 'font-size: 13px' }, svg).textContent = w;
+      const t = {};
+      ['a', 'b', 'p1', 'p0', 'w', 't'].forEach(k => { t[k] = mk('text', { x: X[k], y, 'text-anchor': 'middle', style: NUM }, svg); });
+      return { hl, t };
+    });
+    const yp = rowY(words.length) + 4;
+    mk('line', { x1: 12, x2: 632, y1: yp - 18, y2: yp - 18, class: 'c-faint' }, svg);
+    const priorTxt = mk('text', { x: X.word, y: yp, class: 'c-note', style: 'font-size: 13px' }, svg);
+    const biasTxt = mk('text', { x: 632, y: yp, 'text-anchor': 'end', class: 'c-note', style: 'font-size: 13px' }, svg);
+    const by = yp + 24, bx = 160, bw = 440;
+    mk('text', { x: X.word, y: by + 15, class: 'c-note', style: 'font-size: 13px' }, svg).textContent = 'P(spam | x)';
+    const barBg = mk('rect', { x: bx, y: by, width: bw, height: 22, rx: 3, style: 'fill: var(--rule)' }, svg);
+    const bar = mk('rect', { x: bx, y: by, width: 0, height: 22, rx: 3, style: 'fill: var(--accent)' }, svg);
+    const mid = mk('line', { x1: bx + bw / 2, x2: bx + bw / 2, y1: by - 3, y2: by + 25, style: 'stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 2' }, svg);
+    const barTxt = mk('text', { x: bx + bw / 2, y: by + 15, 'text-anchor': 'middle', class: 'c-note' }, svg);
+    [[0, '0'], [0.5, '0.5'], [1, '1']].forEach(v => mk('text', { x: bx + v[0] * bw, y: by + 38, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v[1]);
+    const sup = s => s.replace(/[-0-9]/g, c => '⁻⁰¹²³⁴⁵⁶⁷⁸⁹'['-0123456789'.indexOf(c)]);
+    const fmt = v => { if (v === 0) return '0'; if (v >= 0.001) return v.toPrecision(3); const e = Math.floor(Math.log10(v)); return (v / Math.pow(10, e)).toFixed(2) + '×10' + sup(String(e)); };
+    const fmtW = (a, b) => { const num = a * (1 - b), den = b * (1 - a); if (num === 0 && den === 0) return 'undef.'; if (den === 0) return '+∞'; if (num === 0) return '−∞'; const v = Math.log(num / den); return (v < 0 ? '−' : '') + Math.abs(v).toFixed(2); };
+    const signed = v => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(2);
+    const list = a => a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+    const draw = () => {
+      const sm = smooth.checked, k = sm ? 1 : 0;
+      smoothOut.textContent = sm ? 'on' : 'off';
+      const ph = (n1 + k) / (n + 2 * k);
+      const q1 = c1.map(c => (c + k) / (n1 + k)), q0 = c0.map(c => (c + k) / (n0 + k));
+      const x = boxes.map(b => b.checked);
+      let s1 = ph, s0 = 1 - ph; const z1 = [], z0 = [];
+      words.forEach((w, j) => {
+        const f1 = x[j] ? q1[j] : 1 - q1[j], f0 = x[j] ? q0[j] : 1 - q0[j];
+        s1 *= f1; s0 *= f0; if (f1 === 0) z1.push(w); if (f0 === 0) z0.push(w);
+        const r = rows[j];
+        r.t.a.textContent = (c1[j] + k) + ' / ' + (n1 + k);
+        r.t.b.textContent = (c0[j] + k) + ' / ' + (n0 + k);
+        r.t.p1.textContent = q1[j].toFixed(3);
+        r.t.p0.textContent = q0[j].toFixed(3);
+        r.t.w.textContent = fmtW(q1[j], q0[j]);
+        r.t.t.textContent = x[j] ? '✓ in' : '–';
+        r.hl.style.display = x[j] ? '' : 'none';
+      });
+      const bterm = words.reduce((s, _, j) => s + Math.log((1 - q1[j]) / (1 - q0[j])), 0) + Math.log(ph / (1 - ph));
+      priorTxt.textContent = 'label coin: p̂ = ' + (n1 + k) + ' / ' + (n + 2 * k) + ' = ' + ph.toFixed(3);
+      biasTxt.textContent = 'bias b = ' + signed(bterm);
+      oS1.textContent = fmt(s1); oS0.textContent = fmt(s0);
+      const undef = s1 === 0 && s0 === 0;
+      const post = undef ? NaN : s1 / (s1 + s0);
+      oPost.textContent = undef ? 'undefined' : post.toFixed(3);
+      oLogit.textContent = undef ? 'undefined' : s1 === 0 ? '−∞' : s0 === 0 ? '+∞' : signed(Math.log(s1) - Math.log(s0));
+      if (undef) {
+        bar.setAttribute('width', 0); barBg.style.fill = 'var(--surface)'; barBg.style.stroke = 'var(--muted)'; barBg.style.strokeDasharray = '4 3';
+        barTxt.textContent = '0 / (0 + 0): undefined'; barTxt.style.fill = 'var(--ink)'; mid.style.display = 'none';
+      } else {
+        bar.setAttribute('width', (post * bw).toFixed(1)); barBg.style.fill = 'var(--rule)'; barBg.style.stroke = 'none'; barBg.style.strokeDasharray = '';
+        mid.style.display = ''; barTxt.textContent = post.toFixed(3); barTxt.style.fill = post > 0.5 ? 'var(--surface)' : 'var(--ink)';
+        barTxt.setAttribute('x', post > 0.5 ? bx + 24 : bx + bw - 24);
+      }
+      if (undef) barTxt.setAttribute('x', bx + bw / 2);
+      let msg;
+      if (undef) msg = 'Both scores are 0 (the spam score is zeroed by ' + list(z1) + ', the ham score by ' + list(z0) + '). No decision is possible.';
+      else if (s1 === 0) msg = 'Spam score is 0 only because ' + list(z1) + ' never appeared in a spam email; every other word is ignored. Predict not spam.';
+      else if (s0 === 0) msg = 'Ham score is 0 only because ' + list(z0) + ' never appeared in a ham email; every other word is ignored. Predict spam.';
+      else msg = 'Predict ' + (post >= 0.5 ? 'spam' : 'not spam') + '.' + (sm ? ' Every estimate is strictly between 0 and 1, so every word counts.' : '');
+      status.textContent = msg;
+    };
+    draw();
+    smooth.addEventListener('change', draw);
+    boxes.forEach(b => b.addEventListener('change', draw));
+    document.getElementById('nb-reset').addEventListener('click', () => { boxes.forEach((b, j) => { b.checked = defaults[j]; }); smooth.checked = false; draw(); });
+  })();
+
+  /* ---------- Gaussian classes: shared vs separate covariance ---------- */
+  (() => {
+    const svg = document.getElementById('gnb-svg'); if (!svg) return;
+    let seed = 1451;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const gen = (k, m, s1, s2, deg) => { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), out = []; for (let i = 0; i < k; i++) { const u = s1 * normal(), v = s2 * normal(); out.push([m[0] + u * c - v * s, m[1] + u * s + v * c]); } return out; };
+    const A = gen(45, [1.7, 1.5], 0.75, 0.55, -25);   /* class 1 */
+    const B = gen(75, [-1.0, -0.9], 2.0, 0.75, 35);   /* class 0 */
+    const mean = P => [P.reduce((s, p) => s + p[0], 0) / P.length, P.reduce((s, p) => s + p[1], 0) / P.length];
+    const scat = (P, m) => P.reduce((s, p) => { const u = p[0] - m[0], v = p[1] - m[1]; return [s[0] + u * u, s[1] + u * v, s[2] + v * v]; }, [0, 0, 0]);
+    const m1 = mean(A), m0 = mean(B), n1 = A.length, n0 = B.length, n = n1 + n0;
+    const S1 = scat(A, m1), S0 = scat(B, m0);
+    const pooled = [0, 1, 2].map(k => (S1[k] + S0[k]) / n);
+    const prep = c => { const det = c[0] * c[2] - c[1] * c[1]; return { c, i: [c[2] / det, -c[1] / det, c[0] / det], ld: Math.log(det) }; };
+    const models = { iso: [prep([1, 0, 1]), prep([1, 0, 1])], shared: [prep(pooled), prep(pooled)], sep: [prep(S1.map(v => v / n1)), prep(S0.map(v => v / n0))] };
+    const lo = -5.5, hi = 5.5, P = 22, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'gnb-clip' }, defs); mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P }, cp);
+    const region = mk('path', { style: 'fill: var(--accent-soft)', 'clip-path': 'url(#gnb-clip)' }, svg);
+    axes(svg, sx, sy, lo, hi, 2);
+    mk('line', { x1: sx(m0[0]), y1: sy(m0[1]), x2: sx(m1[0]), y2: sy(m1[1]), style: 'stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 3' }, svg);
+    mk('circle', { cx: sx((m0[0] + m1[0]) / 2), cy: sy((m0[1] + m1[1]) / 2), r: 2.5, style: 'fill: var(--ink-2)' }, svg);
+    const ell1 = mk('ellipse', { style: 'fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4' }, svg);
+    const ell0 = mk('ellipse', { style: 'fill: none; stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 5 4' }, svg);
+    const bnd = mk('path', { class: 'c-user', fill: 'none', 'clip-path': 'url(#gnb-clip)' }, svg);
+    B.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.4, style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.4' }, svg));
+    A.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.4, style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.2' }, svg));
+    mk('circle', { cx: sx(m1[0]), cy: sy(m1[1]), r: 6, class: 'c-centroid' }, svg);
+    mk('circle', { cx: sx(m0[0]), cy: sy(m0[1]), r: 6, class: 'c-centroid' }, svg);
+    mk('text', { x: sx(m1[0]) + 10, y: sy(m1[1]) - 9, class: 'c-lbl', style: 'paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round' }, svg).textContent = 'μ̂₁';
+    mk('text', { x: sx(m0[0]) - 10, y: sy(m0[1]) + 18, 'text-anchor': 'end', class: 'c-note', style: 'font-size: 13px; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round' }, svg).textContent = 'μ̂₀';
+    const lx = sx(-5.1), ly = sy(-4.15);
+    mk('circle', { cx: lx + 4, cy: ly - 4, r: 3.4, style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.2' }, svg);
+    mk('text', { x: lx + 13, y: ly, class: 'c-note' }, svg).textContent = 'class 1';
+    mk('circle', { cx: lx + 4, cy: ly + 12, r: 3.4, style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.4' }, svg);
+    mk('text', { x: lx + 13, y: ly + 16, class: 'c-note' }, svg).textContent = 'class 0';
+    mk('rect', { x: lx, y: ly + 24, width: 9, height: 9, style: 'fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1' }, svg);
+    mk('text', { x: lx + 13, y: ly + 32, class: 'c-note' }, svg).textContent = 'predicted class 1';
+    const eig = c => { const tr = c[0] + c[2], det = c[0] * c[2] - c[1] * c[1], disc = Math.sqrt(Math.max(0, tr * tr / 4 - det)); return [tr / 2 + disc, tr / 2 - disc, 0.5 * Math.atan2(2 * c[1], c[0] - c[2]) * 180 / Math.PI]; };
+    const setEll = (el, m, c) => { const e = eig(c); el.setAttribute('rx', (2 * Math.sqrt(e[0]) * S).toFixed(1)); el.setAttribute('ry', (2 * Math.sqrt(Math.max(e[1], 0)) * S).toFixed(1)); el.setAttribute('transform', `translate(${sx(m[0]).toFixed(1)} ${sy(m[1]).toFixed(1)}) rotate(${(-e[2]).toFixed(2)})`); };
+    const modeSel = document.getElementById('gnb-mode'), slider = document.getElementById('gnb-p'), pOut = document.getElementById('gnb-p-out');
+    const oShape = document.getElementById('gnb-shape'), oAcc = document.getElementById('gnb-acc'), status = document.getElementById('gnb-status');
+    const pData = n1 / n;
+    let p = parseFloat(slider.value);
+    const N = 110, h = (hi - lo) / N, V = new Float64Array((N + 1) * (N + 1));
+    const draw = () => {
+      const mode = modeSel.value, M1 = models[mode][0], M0 = models[mode][1];
+      const prior = Math.log(p / (1 - p)) - 0.5 * M1.ld + 0.5 * M0.ld;
+      const g = (x, y) => { const u1 = x - m1[0], v1 = y - m1[1], u0 = x - m0[0], v0 = y - m0[1]; return prior - 0.5 * (M1.i[0] * u1 * u1 + 2 * M1.i[1] * u1 * v1 + M1.i[2] * v1 * v1) + 0.5 * (M0.i[0] * u0 * u0 + 2 * M0.i[1] * u0 * v0 + M0.i[2] * v0 * v0); };
+      for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) V[j * (N + 1) + i] = g(lo + i * h, lo + j * h);
+      let seg = '', reg = '';
+      const pt = (x, y) => sx(x).toFixed(1) + ' ' + sy(y).toFixed(1);
+      for (let j = 0; j < N; j++) {
+        let run = -1;
+        for (let i = 0; i <= N; i++) {
+          if (i < N) {
+            const a = V[j * (N + 1) + i], b = V[j * (N + 1) + i + 1], c = V[(j + 1) * (N + 1) + i + 1], d = V[(j + 1) * (N + 1) + i];
+            const x0 = lo + i * h, y0 = lo + j * h, ps = [];
+            const cut = (va, vb, xa, ya, xb, yb) => { const t = va / (va - vb); ps.push([xa + t * (xb - xa), ya + t * (yb - ya)]); };
+            if ((a >= 0) !== (b >= 0)) cut(a, b, x0, y0, x0 + h, y0);
+            if ((b >= 0) !== (c >= 0)) cut(b, c, x0 + h, y0, x0 + h, y0 + h);
+            if ((c >= 0) !== (d >= 0)) cut(c, d, x0 + h, y0 + h, x0, y0 + h);
+            if ((d >= 0) !== (a >= 0)) cut(d, a, x0, y0 + h, x0, y0);
+            for (let s = 0; s + 1 < ps.length; s += 2) seg += 'M' + pt(ps[s][0], ps[s][1]) + 'L' + pt(ps[s + 1][0], ps[s + 1][1]);
+            const inside = a + b + c + d >= 0;
+            if (inside && run < 0) run = i;
+            if (!inside && run >= 0) { reg += `M${sx(lo + run * h).toFixed(1)} ${sy(lo + (j + 1) * h).toFixed(1)}H${sx(lo + i * h).toFixed(1)}V${sy(lo + j * h).toFixed(1)}H${sx(lo + run * h).toFixed(1)}Z`; run = -1; }
+          } else if (run >= 0) { reg += `M${sx(lo + run * h).toFixed(1)} ${sy(lo + (j + 1) * h).toFixed(1)}H${sx(hi).toFixed(1)}V${sy(lo + j * h).toFixed(1)}H${sx(lo + run * h).toFixed(1)}Z`; }
+        }
+      }
+      bnd.setAttribute('d', seg); region.setAttribute('d', reg);
+      setEll(ell1, m1, M1.c); setEll(ell0, m0, M0.c);
+      let ok = 0; A.forEach(q => { if (g(q[0], q[1]) >= 0) ok++; }); B.forEach(q => { if (g(q[0], q[1]) < 0) ok++; });
+      oAcc.textContent = (100 * ok / n).toFixed(1) + '%';
+      oShape.textContent = mode === 'sep' ? 'quadratic' : 'linear';
+      pOut.textContent = p.toFixed(3);
+      const half = Math.abs(p - 0.5) < 0.003;
+      status.textContent = mode === 'iso' ? (half ? 'Σ = I and p̂ = ½: the boundary is the perpendicular bisector of the segment joining μ̂₀ and μ̂₁.' : 'Σ = I: the boundary stays perpendicular to the segment joining the means; p̂ slides it along that segment, toward μ̂₀ as p̂ grows.')
+        : mode === 'shared' ? 'Shared Σ̂: the same ellipse at both means and a straight boundary, tilted by Σ̂⁻¹.'
+        : 'Separate Σ̂₁ and Σ̂₀: the quadratic term survives and the boundary curves around the tighter class.';
+    };
+    draw();
+    modeSel.addEventListener('change', draw);
+    slider.addEventListener('input', () => { p = parseFloat(slider.value); draw(); });
+    document.getElementById('gnb-reset').addEventListener('click', () => tween(p, pData, v => { p = v; slider.value = v.toFixed(3); draw(); }));
+  })();
+})();
+</script>
+</body>
+</html>
