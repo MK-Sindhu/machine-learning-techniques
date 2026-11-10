@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import html
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -45,8 +46,18 @@ def fname(n: int) -> str:
     return f"part-{n:02d}.html"
 
 
+ONLY: set[int] | None = None  # set by --ready 1,2,4 to restrict which parts count as ready
+
+
 def ready(n: int) -> bool:
+    if ONLY is not None and n not in ONLY:
+        return False
     return (ROOT / fname(n)).exists()
+
+
+def write_if_changed(path: Path, text: str) -> None:
+    if path.read_text(encoding="utf-8") != text:
+        path.write_text(text, encoding="utf-8")
 
 
 def replace_region(text: str, name: str, content: str) -> str:
@@ -103,18 +114,22 @@ def pager(n: int) -> str:
 
 
 def main() -> None:
+    global ONLY
+    args = sys.argv[1:]
+    if args[:1] == ["--ready"] and len(args) > 1:
+        ONLY = {int(x) for x in args[1].split(",") if x.strip()}
     idx = ROOT / "index.html"
     if idx.exists():
-        idx.write_text(replace_region(idx.read_text(encoding="utf-8"), "COURSE-MAP", course_map()), encoding="utf-8")
+        write_if_changed(idx, replace_region(idx.read_text(encoding="utf-8"), "COURSE-MAP", course_map()))
     done = []
     for n, *_ in PARTS:
         f = ROOT / fname(n)
-        if not f.exists():
+        if not f.exists() or (ONLY is not None and n not in ONLY):
             continue
         t = f.read_text(encoding="utf-8")
         t = replace_region(t, "PARTNAV", partnav(n))
         t = replace_region(t, "PAGER", pager(n))
-        f.write_text(t, encoding="utf-8")
+        write_if_changed(f, t)
         done.append(n)
     print("ready parts:", done)
 

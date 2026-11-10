@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 4 · Issues with PCA, and computing it fast · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 4: lectures 8–9 on eigenfaces, the two issues with PCA, and computing PCA through the n × n matrix XᵀX when there are many more features than data points.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 4 of 18</span><span class="sep">·</span><a href="part-05.html">Part 5 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Eigenfaces, the two issues with PCA, and computing it fast</h1>
+    <p class="lede">Notes for lectures 8 and 9. PCA is run on face images to give eigenfaces, and then two issues are raised: the cost of the eigendecomposition when there are many features, and data whose structure is not linear. Lecture 9 fixes the cost by working with the small \(n \times n\) matrix \(X^\top X\), and notices on the way that PCA only needs dot products between data points.</p>
+    <div class="meta">
+      <span><b>Part 4</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>62 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L8 · 25:45</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L9 · 36:36</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 8</h4>
+      <ul>
+        <li><a href="#eigenfaces">Eigenfaces</a></li>
+        <li><a href="#how-many">How many components?</a></li>
+        <li><a href="#not-a-face">A dog, a tree, noise</a></li>
+        <li><a href="#issue-time">Issue 1: time</a></li>
+        <li><a href="#issue-nonlinear">Issue 2: non-linear data</a></li>
+        <li><a href="#one-fix">Two issues, one fix</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 9</h4>
+      <ul>
+        <li><a href="#matrix-form">C as XXᵀ</a></li>
+        <li><a href="#span">Eigenvectors from data points</a></li>
+        <li><a href="#k-equation">An eigen-equation for α</a></li>
+        <li><a href="#shared-eigenvalues">Shared eigenvalues</a></li>
+        <li><a href="#beta-to-alpha">From β to α to w</a></li>
+        <li><a href="#algorithm">The algorithm</a></li>
+        <li><a href="#dot-products">Only dot products</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li><dfn>Eigenfaces</dfn>: turn each face image (about 32,000 pixels) into a vector and run PCA. Folded back into images, the principal components look like faces. About 300 components are enough to recognize a person, roughly 100 times fewer numbers than pixels.</li>
+        <li>Components learnt from faces represent faces. A dog needs about 1,600 of them and a random-pixel image all 32,000. In practice the projections are the input to a supervised learning algorithm.</li>
+        <li><b>Issue 1, time:</b> the eigendecomposition of the \(d \times d\) covariance matrix costs \(O(d^3)\), which is a problem when \(d\) is huge. <b>Issue 2, non-linear structure:</b> PCA only finds linear subspaces, so data on a curved surface fools it. One idea will fix both.</li>
+        <li>Each eigenvector with \(\lambda_k \neq 0\) is a combination of the data points, \(\mathbf{w}_k = X\boldsymbol\alpha_k\). The weights \(\boldsymbol\alpha_k\) come from the \(n \times n\) matrix \(K = X^\top X\), which has the same non-zero eigenvalues as \(XX^\top\).</li>
+        <li>Algorithm for \(d \gg n\): eigendecompose \(K\) in \(O(n^3)\), set \(\boldsymbol\alpha_k = \boldsymbol\beta_k/\sqrt{n\lambda_k}\), recover \(\mathbf{w}_k = X\boldsymbol\alpha_k\).</li>
+        <li>\(K_{ij} = \mathbf{x}_i^\top\mathbf{x}_j\): PCA needs only the pairwise dot products between data points. This is the key to issue 2 in Part 5.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 8 ============ -->
+    <section id="eigenfaces">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=45s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 0:45</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=214s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 3:34 components as images</a>
+        </div>
+        <h2>Eigenfaces: PCA on pictures of faces</h2>
+      </div>
+      <p>Before looking at PCA's shortcomings, L8 shows a real application of it, called <dfn>eigenfaces</dfn>. The data is the extended Yale face data set: about 20,000 grayscale photographs of faces, all the same size and all facing the camera.</p>
+
+      <h3>From an image to a vector <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=81s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 1:21</a></h3>
+      <p>Each image is a grid of pixels, say \(a \times b\), and each pixel holds a grayscale value between 0 and 255. Read the grid in a fixed order (row after row, for instance) and stack the values into one long column. The image becomes a vector with \(ab\) entries. The Yale images have about 32,000 pixels, so each face becomes a point in \(\mathbb{R}^{32{,}000}\).</p>
+      <p class="note">The lecture writes the image size as \(m \times n\). These notes keep \(n\) for the number of data points.</p>
+      <p>The data set is now 20,000 points in 32,000 dimensions, and standard PCA from <a href="part-03.html">Part 3</a> applies unchanged: build the covariance matrix and find its eigenvectors. The covariance matrix is \(d \times d\), here \(32{,}000 \times 32{,}000\), and each eigenvector is itself a vector in \(\mathbb{R}^{32{,}000}\). The best line through the data is spanned by a 32,000-dimensional vector.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 728 222" role="img" aria-label="A small pixel grid is read row by row into a column vector x in R^d. PCA on 20,000 such vectors gives eigenvectors w_k in R^d, and each one is folded back into a pixel grid in the same order, giving an eigenface.">
+            <defs><marker id="p04-f1-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-t" x="20" y="56">Face image, a × b</text>
+            <rect x="20" y="70" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .2; stroke: var(--surface)"/>
+            <rect x="44" y="70" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .7; stroke: var(--surface)"/>
+            <rect x="68" y="70" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .7; stroke: var(--surface)"/>
+            <rect x="92" y="70" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .2; stroke: var(--surface)"/>
+            <rect x="20" y="94" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .5; stroke: var(--surface)"/>
+            <rect x="44" y="94" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .25; stroke: var(--surface)"/>
+            <rect x="68" y="94" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .25; stroke: var(--surface)"/>
+            <rect x="92" y="94" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .5; stroke: var(--surface)"/>
+            <rect x="20" y="118" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .3; stroke: var(--surface)"/>
+            <rect x="44" y="118" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .8; stroke: var(--surface)"/>
+            <rect x="68" y="118" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .8; stroke: var(--surface)"/>
+            <rect x="92" y="118" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .3; stroke: var(--surface)"/>
+            <rect class="d-plot" x="20" y="70" width="96" height="72"/>
+            <text class="d-s" x="20" y="162">each pixel: 0 to 255</text>
+
+            <line class="d-ln" x1="126" y1="106" x2="176" y2="106" marker-end="url(#p04-f1-ah)"/>
+            <text class="d-s" x="151" y="84" text-anchor="middle">vectorize</text>
+            <text class="d-al" x="151" y="98" text-anchor="middle">row by row</text>
+
+            <rect x="186" y="34" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .2; stroke: var(--surface)"/>
+            <rect x="186" y="46" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .7; stroke: var(--surface)"/>
+            <rect x="186" y="58" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .7; stroke: var(--surface)"/>
+            <rect x="186" y="70" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .2; stroke: var(--surface)"/>
+            <rect x="186" y="82" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .5; stroke: var(--surface)"/>
+            <rect x="186" y="94" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .25; stroke: var(--surface)"/>
+            <rect x="186" y="106" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .25; stroke: var(--surface)"/>
+            <rect x="186" y="118" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .5; stroke: var(--surface)"/>
+            <rect x="186" y="130" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .3; stroke: var(--surface)"/>
+            <rect x="186" y="142" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .8; stroke: var(--surface)"/>
+            <rect x="186" y="154" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .8; stroke: var(--surface)"/>
+            <rect x="186" y="166" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .3; stroke: var(--surface)"/>
+            <rect class="d-plot" x="186" y="34" width="20" height="144"/>
+            <text class="d-t" x="196" y="196" text-anchor="middle">x ∈ ℝᵈ</text>
+            <text class="d-al" x="196" y="212" text-anchor="middle">d = ab ≈ 32,000</text>
+
+            <line class="d-ln" x1="216" y1="106" x2="262" y2="106" marker-end="url(#p04-f1-ah)"/>
+            <text class="d-s" x="239" y="96" text-anchor="middle">PCA</text>
+
+            <rect class="d-box-acc" x="270" y="62" width="190" height="88" rx="8"/>
+            <text class="d-s" x="365" y="86" text-anchor="middle">n ≈ 20,000 such vectors</text>
+            <text class="d-t" x="365" y="108" text-anchor="middle">C is d × d</text>
+            <text class="d-s" x="365" y="130" text-anchor="middle">top eigenvectors w₁, w₂, …</text>
+
+            <line class="d-ln" x1="468" y1="106" x2="512" y2="106" marker-end="url(#p04-f1-ah)"/>
+            <text class="d-s" x="490" y="96" text-anchor="middle">one wₖ</text>
+
+            <rect x="520" y="34" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .6; stroke: var(--surface)"/>
+            <rect x="520" y="46" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .3; stroke: var(--surface)"/>
+            <rect x="520" y="58" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .3; stroke: var(--surface)"/>
+            <rect x="520" y="70" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .6; stroke: var(--surface)"/>
+            <rect x="520" y="82" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .2; stroke: var(--surface)"/>
+            <rect x="520" y="94" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .75; stroke: var(--surface)"/>
+            <rect x="520" y="106" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .75; stroke: var(--surface)"/>
+            <rect x="520" y="118" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .2; stroke: var(--surface)"/>
+            <rect x="520" y="130" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .55; stroke: var(--surface)"/>
+            <rect x="520" y="142" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .35; stroke: var(--surface)"/>
+            <rect x="520" y="154" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .35; stroke: var(--surface)"/>
+            <rect x="520" y="166" width="20" height="12" style="fill: var(--ink-2); fill-opacity: .55; stroke: var(--surface)"/>
+            <rect class="d-plot" x="520" y="34" width="20" height="144" style="stroke: var(--accent); stroke-width: 1.6"/>
+            <text class="d-t" x="530" y="196" text-anchor="middle">wₖ ∈ ℝᵈ</text>
+
+            <line class="d-ln" x1="550" y1="106" x2="604" y2="106" marker-end="url(#p04-f1-ah)"/>
+            <text class="d-s" x="577" y="84" text-anchor="middle">reshape</text>
+            <text class="d-al" x="577" y="98" text-anchor="middle">same order</text>
+
+            <text class="d-t" x="614" y="56">wₖ as an image</text>
+            <rect x="614" y="70" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .6; stroke: var(--surface)"/>
+            <rect x="638" y="70" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .3; stroke: var(--surface)"/>
+            <rect x="662" y="70" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .3; stroke: var(--surface)"/>
+            <rect x="686" y="70" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .6; stroke: var(--surface)"/>
+            <rect x="614" y="94" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .2; stroke: var(--surface)"/>
+            <rect x="638" y="94" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .75; stroke: var(--surface)"/>
+            <rect x="662" y="94" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .75; stroke: var(--surface)"/>
+            <rect x="686" y="94" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .2; stroke: var(--surface)"/>
+            <rect x="614" y="118" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .55; stroke: var(--surface)"/>
+            <rect x="638" y="118" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .35; stroke: var(--surface)"/>
+            <rect x="662" y="118" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .35; stroke: var(--surface)"/>
+            <rect x="686" y="118" width="24" height="24" style="fill: var(--ink-2); fill-opacity: .55; stroke: var(--surface)"/>
+            <rect class="d-plot" x="614" y="70" width="96" height="72" style="stroke: var(--accent); stroke-width: 1.6"/>
+            <text class="d-s" x="614" y="162">an eigenface</text>
+          </svg>
+        </div>
+        <figcaption><b>Images in, images out.</b> A fixed reading order turns every image into a vector, and the same order folds any vector back into an image. That is what lets us look at an eigenvector of the 32,000 × 32,000 covariance matrix as a picture. (Schematic: 12 pixels stand in for 32,000, with shades chosen for illustration.)</figcaption>
+      </figure>
+
+      <h3>What the principal components look like</h3>
+      <p>Because the reading order is fixed, vectorizing can be undone: any 32,000-dimensional vector can be folded back into an \(a \times b\) picture. Doing this to the eigenvectors shows the principal components as images, and they look like faces.</p>
+      <ul>
+        <li><b>PC1</b> is the direction of greatest variance (Part 3). As an image it is a prototype face: the single template that best captures what all the images share, their "faceness".</li>
+        <li><b>Later components add detail.</b> By some \(k\)-th component the nose and the mouth are sharper. The common template already accounts for most of the variance, so the other directions pick up the remaining characteristics in which faces differ, and each adds more detail.</li>
+      </ul>
+    </section>
+
+    <section id="how-many">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=339s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 5:39</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=471s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 7:51 a test image</a>
+        </div>
+        <h2>How many components does a face need?</h2>
+      </div>
+      <p>Suppose a company builds a face recognition system for its employees (the lecture says 1,000 employees, then 20,000 to match the data set). Storing 32,000 pixel values per person looks wasteful. Is there a lower-dimensional representation that still does the job? PCA can tell us.</p>
+      <p>Keep the top \(r\) principal components. In this setting, keeping \(r\) components, running the residue procedure of <a href="part-02.html">Part 2</a> for \(r\) rounds and keeping \(r\) eigendirections all mean the same thing. Then rebuild the proxy of each image from those components alone <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=407s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:47</a>.</p>
+      <ul>
+        <li><b>One component.</b> The coefficient is the dot product \(\mathbf{x}^\top\mathbf{w}_1\) and the proxy is \((\mathbf{x}^\top\mathbf{w}_1)\,\mathbf{w}_1\). Every proxy is a scaled copy of the PC1 image.</li>
+        <li><b>Two components.</b> Take the dot products with \(\mathbf{w}_1\) and \(\mathbf{w}_2\), and combine the two component images with those numbers as weights.</li>
+      </ul>
+      <div class="eq">\[ \tilde{\mathbf{x}} = \sum_{k=1}^{r} (\mathbf{x}^\top\mathbf{w}_k)\,\mathbf{w}_k \qquad \text{stored per image: the } r \text{ numbers } \mathbf{x}^\top\mathbf{w}_1, \dots, \mathbf{x}^\top\mathbf{w}_r \]</div>
+      <p class="note">Standard practice, not discussed in the lecture: if the images were centred before PCA (Part 2), the mean image is added back to \(\tilde{\mathbf{x}}\).</p>
+      <p>The lecture shows this for a <b>test image</b> that is not in the data set, for example a photo taken by a CCTV camera as someone walks into the office. Its reconstructions use \(r = 25, 50, 100, \dots\) up to 1,600 components <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=506s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:26</a>.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">Components r</th><th>What the reconstruction of the test face shows</th></tr></thead>
+          <tbody>
+            <tr><td class="num">25</td><td>Clearly a person, but not clearly this person</td></tr>
+            <tr><td class="num">200 to 400</td><td>The details specific to this person are there: enough to say who it is</td></tr>
+            <tr><td class="num">1,600</td><td>Very close to the original. The extra components add finer detail of the eyes, nose and so on, which identification does not need</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="result">
+        <span class="lbl">Compression in eigenfaces</span>
+        <p>About 300 numbers per face are enough to recognize people, against 32,000 pixel values: roughly 100 times fewer. As in Part 2, the 300 directions themselves are stored once and shared by every face.</p>
+      </div>
+    </section>
+
+    <section id="not-a-face">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=601s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 10:01</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=794s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 13:14 a tree, random pixels</a>
+        </div>
+        <h2>A dog, a tree and random noise</h2>
+      </div>
+      <p>Now feed in an image unlike anything in the data set: a dog's face, also 32,000 pixels. With 25 components, its proxy is the projection onto the 25-dimensional subspace that best represents <i>human</i> faces. What comes back is the best human-face version of the dog. At \(r = 100\), 200 and 400 the result is still poor. Only at about 1,600 components does the dog look like the dog.</p>
+      <p>The reason <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=697s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:37</a> is that the components were learnt from human faces only, so they capture the directions that matter for human faces. Anything else needs many more of them. How many components are enough depends on what you want to do.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 304" role="img" aria-label="Log-scale chart of how many face components each task needs: about 25 to tell a human face from a dog, 200 to 400 to recognize a person, 1,600 for a near-exact face, about 1,500 to 1,600 for the dog to look like a dog, perhaps 2,000 to 3,000 for a tree (a guess), and all 32,000 for an exact random-pixel image.">
+            <text class="d-row" x="210" y="24">Components kept, r (log scale)</text>
+            <line class="d-ln-mut d-dash" x1="667.6" y1="34" x2="667.6" y2="252"/>
+            <text class="d-al" x="660" y="24" text-anchor="end">d ≈ 32,000</text>
+
+            <line class="d-rule" x1="210" y1="56" x2="680" y2="56"/>
+            <text x="196" y="60" text-anchor="end">Human face or dog face?</text>
+            <circle class="pt-tree" cx="262" cy="56" r="5.5"/>
+            <text class="d-s" x="272" y="60">about 25 is enough</text>
+
+            <line class="d-rule" x1="210" y1="92" x2="680" y2="92"/>
+            <text x="196" y="96" text-anchor="end">Which person is it?</text>
+            <rect class="pill" x="379.9" y="86" width="39.3" height="12" rx="6"/>
+            <circle class="pt-tree" cx="402.8" cy="92" r="5.5"/>
+            <text class="d-s" x="428" y="96">200 to 400, about 300</text>
+
+            <line class="d-rule" x1="210" y1="128" x2="680" y2="128"/>
+            <text x="196" y="132" text-anchor="end">Face almost exact</text>
+            <circle class="pt-tree" cx="497.8" cy="128" r="5.5"/>
+            <text class="d-s" x="508" y="132">1,600</text>
+
+            <line class="d-rule" x1="210" y1="164" x2="680" y2="164"/>
+            <text x="196" y="168" text-anchor="end">Dog looks like a dog</text>
+            <circle class="pt-tree" cx="497.8" cy="164" r="5.5"/>
+            <text class="d-s" x="508" y="168">about 1,500 to 1,600</text>
+
+            <line class="d-rule" x1="210" y1="200" x2="680" y2="200"/>
+            <text x="196" y="204" text-anchor="end">A tree (lecturer's guess)</text>
+            <rect class="b-unk" x="510.4" y="194" width="23" height="12" rx="6"/>
+            <text class="d-s" x="541" y="204">2,000 to 3,000?</text>
+
+            <line class="d-rule" x1="210" y1="236" x2="680" y2="236"/>
+            <text x="196" y="240" text-anchor="end">Random pixels, exactly</text>
+            <circle class="pt-new" cx="667.6" cy="236" r="5.5"/>
+            <text class="d-s" x="656" y="240" text-anchor="end">all of them</text>
+
+            <line class="d-ln" x1="210" y1="260" x2="680" y2="260"/>
+            <line class="d-ln" x1="210" y1="260" x2="210" y2="265"/><text class="d-al" x="210" y="278" text-anchor="middle">10</text>
+            <line class="d-ln" x1="340.6" y1="260" x2="340.6" y2="265"/><text class="d-al" x="340.6" y="278" text-anchor="middle">100</text>
+            <line class="d-ln" x1="471.1" y1="260" x2="471.1" y2="265"/><text class="d-al" x="471.1" y="278" text-anchor="middle">1,000</text>
+            <line class="d-ln" x1="601.7" y1="260" x2="601.7" y2="265"/><text class="d-al" x="601.7" y="278" text-anchor="middle">10,000</text>
+            <text class="d-s" x="445" y="298" text-anchor="middle">number of face components kept</text>
+          </svg>
+        </div>
+        <figcaption><b>Enough depends on the task.</b> Numbers from the lecture, for components learnt from human faces. Telling a human from a dog takes few components, recognizing a person a few hundred, and images unlike faces need far more. The tree's range is the lecturer's untested guess (dashed).</figcaption>
+      </figure>
+
+      <ul>
+        <li><b>Human or dog?</b> Even 25 components suffice. On the 25-dimensional face subspace the dog looks like neither a human nor a dog, and that difference is already enough to tell the two apart.</li>
+        <li><b>Which human?</b> About 200 to 300 components. At that level the dog still looks nothing like a dog.</li>
+        <li><b>With 1,600 components</b> both the human faces and the dog's face are rebuilt well. The lecture's reading: these directions hold enough information to represent perhaps any face, anything with eyes, a nose and a mouth.</li>
+        <li><b>A tree</b> would probably need more, perhaps 2,000 or 3,000. The lecturer says this is a guess he has not tried on this data set.</li>
+        <li><b>An image of random pixels</b> has no structure, so it is not even clear how to judge whether a reconstruction resembles it. Rebuilding it exactly needs all 32,000 components.</li>
+      </ul>
+      <p>Keeping all 32,000 components reconstructs any image exactly, because no information has been thrown away. The real question is when far fewer components are enough. For human faces, 200 to 300 do the job.</p>
+
+      <h3>Eigenfaces in a recognition system <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=862s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 14:22</a></h3>
+      <p>In practice PCA is used as a preprocessing step. Store each training face only as its projections onto the top few eigendirections, and train a supervised learning algorithm on those short vectors. A new test image is projected onto the same directions, and the trained algorithm makes its prediction from the projections.</p>
+      <p>This works because natural images have structure. Most of the information about human faces lies in an underlying <dfn>linear subspace</dfn> of far lower dimension than 32,000.</p>
+    </section>
+
+    <section id="issue-time">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=929s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 15:29</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=1063s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 17:43 order d³</a>
+        </div>
+        <h2>Issue 1: the time PCA takes</h2>
+      </div>
+      <p>The rest of L8 raises two concerns about PCA, to be fixed over the next lectures. Understanding and fixing them leads to an idea that is useful far beyond PCA.</p>
+      <p>The first concern is the running time; the lecture calls it a concern more than a problem. PCA builds the covariance matrix and then finds its eigenvectors and eigenvalues, and the eigendecomposition is the expensive step <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=997s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:37</a>. Special-purpose numerical linear algebra solvers can do better in particular cases. As a general figure, though, the eigendecomposition of a \(d \times d\) matrix takes time of order \(d^3\).</p>
+      <div class="result">
+        <span class="lbl">Cost of PCA</span>
+        \[ \text{eigendecomposition of } C \in \mathbb{R}^{d \times d}: \quad O(d^3) \]
+        <p>If order notation is new to you, read it as: the time grows like the cube of the number of features \(d\).</p>
+      </div>
+      <p>This becomes a problem when \(d\) is large. In eigenfaces \(d \approx 32{,}000\), while \(n\) is only about 20,000: there are fewer data points than features. With \(d\) in the tens of thousands or the millions, \(d^3\) is enormous.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">Features d</th><th class="num">d³</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1,000</td><td class="num">10⁹</td></tr>
+            <tr><td class="num">32,000 (eigenfaces)</td><td class="num">3.3 × 10¹³</td></tr>
+            <tr><td class="num">1,000,000</td><td class="num">10¹⁸</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Face recognition is the lecture's example of where this happens. The fix comes in L9. First, the second issue.</p>
+    </section>
+
+    <section id="issue-nonlinear">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=1162s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 19:22</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=1262s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 21:02 a curved space</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=1353s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 22:33 PCA still answers</a>
+        </div>
+        <h2>Issue 2: structure that is not linear</h2>
+      </div>
+      <p>PCA looks for important <i>linear combinations</i> of features: weight plus height, say, or two times weight plus three times height. Features need not be related linearly. Add body mass index to weight and height: it depends on them through a quadratic, weight divided by height squared. (The lecturer warns he may have the formula wrong; that is the standard one.)</p>
+      <p>Picture three features plotted in \(\mathbb{R}^3\), with all the data points lying on a curved surface, like a blanket draped in space. A relationship such as \(f_3 = f_1 f_2 + f_2^2\) between the features could produce this; it is the lecture's example. The lecture calls such a curved space inside \(\mathbb{R}^3\) a <dfn>manifold</dfn> and skips the formal definition. The data has real structure, but the structure is curved, because the features themselves are related non-linearly.</p>
+      <p>PCA only looks for relationships in which each feature gets a weight and the weighted features are added up. It still produces an output on the curved surface, and the output misleads:</p>
+      <ol>
+        <li>PCA returns the best plane for the data. The surface is curved, so the reconstruction error with respect to that plane is still large, far from insignificant.</li>
+        <li>That large error suggests a third direction matters as well. Add it, and the error drops to 0, but only because three dimensions can rebuild any data set in \(\mathbb{R}^3\).</li>
+        <li>PCA never learns that the data is essentially two-dimensional.</li>
+      </ol>
+      <p class="rule-of-thumb">Data need not lie in a low-dimensional <i>linear</i> subspace. It can be low-dimensional and curved. <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=1424s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:44</a></p>
+      <p>Here a subspace means a line or a plane through the origin, or the higher-dimensional analogue. The widget below shows the same failure one dimension lower: points on a curve in the plane, where PCA can only offer lines.</p>
+
+      <figure id="curve-fig">
+        <div class="controls">
+          <label for="curve-th">Direction of the line</label>
+          <input type="range" id="curve-th" min="0" max="179" step="1" value="80">
+          <output id="curve-th-out" for="curve-th">80°</output>
+          <button class="btn" id="curve-snap" type="button">Snap to the best line</button>
+          <button class="btn" id="curve-swap" type="button">Show points on a circle</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">wᵀCw kept by the line</span><span class="v" id="curve-var">–</span></div>
+          <div><span class="k">Avg reconstruction error</span><span class="v mine" id="curve-err">–</span></div>
+          <div><span class="k">Total (fixed)</span><span class="v" id="curve-sum">–</span></div>
+        </div>
+        <div class="status" id="curve-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="curve-svg" viewBox="0 0 400 400" role="img" aria-label="Centred synthetic points lying exactly on a curve, with a rotatable line through the origin, each point's projection onto the line and its error segment. A button switches the points to an evenly spaced circle."></svg></div>
+        <figcaption><b>A 2-D analogue of the curved sheet.</b> Synthetic points made for this page: 25 points on a parabola (rotated and centred), or 36 evenly spaced points on a circle of radius 3. On the parabola the best line keeps 3.25 of the total 4.28, so about 24% of the spread is still error, and the errors follow the bend of the curve. On the circle every line keeps exactly half, 4.50 of 9.00, so PCA has no preferred direction at all. In both cases one number, the position along the curve, pins down each point, and no line can express that.</figcaption>
+      </figure>
+    </section>
+
+    <section id="one-fix">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=1458s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L8 · 24:18</a>
+        <h2>Two issues, one fix</h2>
+      </div>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Issue</th><th>When it bites</th><th>What happens</th></tr></thead>
+          <tbody>
+            <tr><td><b>1. Time</b></td><td>Many features: \(d\) large, often \(d \gg n\)</td><td>PCA works, but slowly: \(O(d^3)\)</td></tr>
+            <tr><td><b>2. Non-linear structure</b></td><td>Features related non-linearly</td><td>PCA runs, but may not give the result you need</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The two issues look unrelated: one is about computation, the other about the shape of the data. The punch line of L8 is that they have the same solution <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=sgU4zbO-W4M&amp;t=1491s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>24:51</a>. Solve issue 1 intelligently, and the solution can be reused for issue 2.</p>
+      <p>The lecture keeps the suspense. The plan is to solve issue 1 first (L9, below), make some observations along the way, and use them to solve issue 2 in <a href="part-05.html">Part 5</a>.</p>
+    </section>
+
+    <!-- ============ LECTURE 9 ============ -->
+    <section id="matrix-form">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=0s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 0:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=95s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 1:35 C as XXᵀ</a>
+        </div>
+        <h2>Many features: write \(C\) as \(XX^\top\)</h2>
+      </div>
+      <p>Issue 1 is a large \(d\), in particular \(d \gg n\): many more features than data points. The first step is some notation that makes the problem easier to handle. Stack the data points as the columns of one matrix:</p>
+      <div class="eq">\[ X = \begin{bmatrix} | & | & & | \\ \mathbf{x}_1 & \mathbf{x}_2 & \cdots & \mathbf{x}_n \\ | & | & & | \end{bmatrix} \in \mathbb{R}^{d \times n} \]</div>
+      <p>The covariance matrix is \(C = \frac1n\sum_i \mathbf{x}_i\mathbf{x}_i^\top\) (Part 3). That sum is exactly the matrix product \(XX^\top\): a \(d \times n\) matrix times an \(n \times d\) matrix whose rows are the data points.</p>
+      <div class="result">
+        <span class="lbl">Covariance in matrix form</span>
+        \[ \sum_{i=1}^{n} \mathbf{x}_i\mathbf{x}_i^\top = XX^\top, \qquad C = \frac1n\,XX^\top \in \mathbb{R}^{d \times d} \]
+      </div>
+      <p>The lecture leaves the identity as an exercise. Write \((\mathbf{x}_i)_p\) for the \(p\)-th coordinate of \(\mathbf{x}_i\). Entry \((p, q)\) of \(XX^\top\) is row \(p\) of \(X\) dotted with row \(q\) of \(X\), which is \(\sum_i (\mathbf{x}_i)_p(\mathbf{x}_i)_q\). That is also entry \((p, q)\) of \(\sum_i \mathbf{x}_i\mathbf{x}_i^\top\).</p>
+      <p class="note">Dimension check: \(d \times n\) times \(n \times d\) gives \(d \times d\), the size of \(C\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=167s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:47</a>. Some definitions divide by \(n - 1\) instead of \(n\); it does not matter, and this course uses \(n\). As in Parts 2 and 3, the data is taken to be centred.</p>
+    </section>
+
+    <section id="span">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=202s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 3:22</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=449s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 7:29 a linear combination</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=548s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 9:08 w = Xα</a>
+        </div>
+        <h2>Every eigenvector is a combination of data points</h2>
+      </div>
+      <p>PCA wants the eigenvectors and eigenvalues of \(C\). Arrange the eigenvalues in decreasing order, \(\lambda_1 \ge \lambda_2 \ge \dots\), and let \(\mathbf{w}_k\) be the eigenvector for the \(k\)-th largest, \(\lambda_k\). An eigenvector is a direction that the matrix only scales. The scale may be negative, which flips the vector but keeps its line.</p>
+      <div class="eq">\[ C\mathbf{w}_k = \lambda_k\mathbf{w}_k \]</div>
+      <p>Where do these eigenvectors live? They are \(d\)-dimensional vectors, but more can be said <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=302s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:02</a>. Replace \(C\) by its definition. Since \(\mathbf{x}_i^\top\mathbf{w}_k\) is a number, \(\mathbf{x}_i\mathbf{x}_i^\top\mathbf{w}_k = (\mathbf{x}_i^\top\mathbf{w}_k)\,\mathbf{x}_i\). Then divide both sides by \(\lambda_k\):</p>
+      <div class="eq">\[ \frac1n\sum_{i=1}^{n}\mathbf{x}_i\mathbf{x}_i^\top\mathbf{w}_k = \lambda_k\mathbf{w}_k \quad\Longrightarrow\quad \mathbf{w}_k = \sum_{i=1}^{n} \frac{\mathbf{x}_i^\top\mathbf{w}_k}{n\lambda_k}\;\mathbf{x}_i \]</div>
+      <p>Dividing by \(\lambda_k\) needs \(\lambda_k \neq 0\), which the lecture assumes from here on. The right-hand side takes each data point \(\mathbf{x}_i\), multiplies it by a number and adds the results. So <b>\(\mathbf{w}_k\) is a linear combination of the data points</b>. Each eigenvector combines them with its own weights.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 262" role="img" aria-label="Sketch of three-dimensional space with two data points x1 and x2 spanning a shaded plane through the origin. The eigenvector w lies in the plane as a combination alpha1 x1 plus alpha2 x2, shown by a dashed parallelogram. A direction u that leaves the plane is marked as having C u equal to zero.">
+            <defs>
+              <marker id="p04-f4-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p04-f4-ahk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <line class="d-rule" x1="170" y1="190" x2="356" y2="190"/>
+            <line class="d-rule" x1="170" y1="190" x2="96" y2="243"/>
+            <line class="d-rule" x1="170" y1="190" x2="170" y2="14"/>
+            <path class="d-plot" d="M127.5 223.75 L322.5 178.75 L382.5 21.25 L187.5 66.25 Z" style="fill: var(--accent-soft); fill-opacity: .55; stroke: var(--accent)"/>
+            <text class="d-s" x="232" y="70" style="fill: var(--accent)">span of the data points</text>
+
+            <line class="d-ln d-dash" x1="267.5" y1="167.5" x2="289.5" y2="109.75"/>
+            <line class="d-ln d-dash" x1="192" y1="132.25" x2="289.5" y2="109.75"/>
+            <line class="d-ln" x1="170" y1="190" x2="296" y2="160.9" marker-end="url(#p04-f4-ahk)"/>
+            <line class="d-ln" x1="170" y1="190" x2="208.6" y2="88.7" marker-end="url(#p04-f4-ahk)"/>
+            <circle class="pt-plain" cx="300" cy="160" r="4.5"/>
+            <circle class="pt-plain" cx="210" cy="85" r="4.5"/>
+            <text class="d-t" x="310" y="166">x₁</text>
+            <text class="d-t" x="200" y="80" text-anchor="end">x₂</text>
+            <text class="d-al" x="262" y="186" text-anchor="middle">α₁x₁</text>
+            <text class="d-al" x="198" y="150">α₂x₂</text>
+            <line class="d-ln-acc" x1="170" y1="190" x2="287.7" y2="110.6" marker-end="url(#p04-f4-ah)" style="stroke-width: 2.4"/>
+            <text class="d-t" x="296" y="106" style="fill: var(--accent)">w</text>
+
+            <line class="d-ln d-dash" x1="170" y1="190" x2="112" y2="122" marker-end="url(#p04-f4-ahk)"/>
+            <text class="d-s" x="104" y="110" text-anchor="end">u, at right angles</text>
+            <text class="d-s" x="104" y="125" text-anchor="end">to every xᵢ</text>
+            <circle class="pt-new" cx="170" cy="190" r="4"/>
+            <text class="d-al" x="178" y="206">0</text>
+
+            <line class="d-rule" x1="430" y1="14" x2="430" y2="248"/>
+            <text class="d-h" x="450" y="40">d = 3 features, n = 2 points</text>
+            <text class="d-t" x="450" y="74">Every eigenvector with λₖ ≠ 0</text>
+            <text class="d-s" x="450" y="92">is a weighted sum of the data points:</text>
+            <text class="d-t" x="450" y="124" style="fill: var(--accent)">wₖ = αₖ₁x₁ + αₖ₂x₂ = Xαₖ</text>
+            <text class="d-s" x="450" y="154">αₖ ∈ ℝⁿ holds one weight per point.</text>
+            <text class="d-s" x="450" y="186">A direction u at right angles to all</text>
+            <text class="d-s" x="450" y="202">the points has Cu = 0: eigenvalue 0.</text>
+          </svg>
+        </div>
+        <figcaption><b>Where the eigenvectors live.</b> With fewer points than features, the data points span only part of \(\mathbb{R}^d\), here a plane in \(\mathbb{R}^3\). Every eigenvector of \(C\) with a non-zero eigenvalue lies in that span. A direction \(\mathbf{u}\) at right angles to every data point has \(\mathbf{x}_i^\top\mathbf{u} = 0\) for all \(i\), so \(C\mathbf{u} = \mathbf{0}\) (a one-line consequence, not stated in the lecture).</figcaption>
+      </figure>
+
+      <p>Collect the weights for \(\mathbf{w}_k\) into a vector \(\boldsymbol\alpha_k\) with one entry per data point. Multiplying \(X\) by it combines the columns of \(X\), which are the data points, with those weights:</p>
+      <div class="result">
+        <span class="lbl">Eigenvectors in terms of the data</span>
+        \[ \mathbf{w}_k = X\boldsymbol\alpha_k = \sum_{i=1}^{n} \alpha_{ki}\,\mathbf{x}_i \qquad \text{for some } \boldsymbol\alpha_k = [\alpha_{k1}, \dots, \alpha_{kn}]^\top \in \mathbb{R}^n \]
+      </div>
+      <p>So finding the eigenvectors is the same as finding the right weights. Once we have \(\mathbf{w}_k\) we know what to do: project each point onto it to get the compressed representation. And once we have \(\boldsymbol\alpha_k\), we have \(\mathbf{w}_k = X\boldsymbol\alpha_k\).</p>
+
+      <h3>A chicken-and-egg problem <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=614s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 10:14</a></h3>
+      <p>The derivation even says what the weights are: \(\alpha_{ki} = \mathbf{x}_i^\top\mathbf{w}_k / (n\lambda_k)\). Computing them that way needs \(\mathbf{w}_k\), the very thing we are trying to find. So set this formula aside and look for a different way to get \(\boldsymbol\alpha_k\), one for each \(k\). The new route is worth it only if it avoids the \(O(d^3)\) eigendecomposition of \(C\).</p>
+    </section>
+
+    <section id="k-equation">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=740s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 12:20</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=879s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 14:39 K = XᵀX</a>
+        </div>
+        <h2>An eigen-equation for \(\boldsymbol\alpha_k\)</h2>
+      </div>
+      <p>The lecture works through the algebra for completeness; what comes out of it matters more. Start from the eigenvector equation \(C\mathbf{w}_k = \lambda_k\mathbf{w}_k\) and substitute the two facts \(C = \frac1n XX^\top\) and \(\mathbf{w}_k = X\boldsymbol\alpha_k\). Then move \(n\) to the right:</p>
+      <div class="eq">\[ \frac1n\,XX^\top X\boldsymbol\alpha_k = \lambda_k\,X\boldsymbol\alpha_k \quad\Longrightarrow\quad XX^\top X\boldsymbol\alpha_k = n\lambda_k\,X\boldsymbol\alpha_k \]</div>
+      <p>Now pre-multiply both sides by \(X^\top\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=818s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:38</a>. Matrix multiplication is not commutative, so factors cannot be swapped. It is associative, so the brackets can be placed anywhere:</p>
+      <div class="eq">\[ X^\top X X^\top X\boldsymbol\alpha_k = n\lambda_k\,X^\top X\boldsymbol\alpha_k \quad\Longrightarrow\quad (X^\top X)(X^\top X)\,\boldsymbol\alpha_k = n\lambda_k\,(X^\top X)\,\boldsymbol\alpha_k \]</div>
+      <p>The matrix \(X^\top X\) is \(n \times d\) times \(d \times n\), so it is only \(n \times n\). Give it a name:</p>
+      <div class="eq">\[ K = X^\top X \in \mathbb{R}^{n \times n}, \qquad K^2\boldsymbol\alpha_k = n\lambda_k\,K\boldsymbol\alpha_k \]</div>
+      <p>It is enough to find an \(\boldsymbol\alpha_k\) with \(K\boldsymbol\alpha_k = (n\lambda_k)\,\boldsymbol\alpha_k\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=954s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:54</a>: multiplying both sides of it by \(K\) gives the equation above. And that is an <b>eigen-equation</b>. Applying \(K\) to \(\boldsymbol\alpha_k\) must only scale it, by \(n\lambda_k\). So \(\boldsymbol\alpha_k\) should be an eigenvector of \(K\) with eigenvalue \(n\lambda_k\).</p>
+
+      <h3>Which length? <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1021s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 17:01</a></h3>
+      <p>An eigen-equation does not fix the length of its solution. If \(K\mathbf{u} = (n\lambda_k)\,\mathbf{u}\), then also \(K(2\mathbf{u}) = (n\lambda_k)(2\mathbf{u})\), and the same holds for any multiple of \(\mathbf{u}\). These multiples cannot all be \(\boldsymbol\alpha_k\): we need the specific weights that give a \(\mathbf{w}_k\) of length 1. The length condition on \(\mathbf{w}_k\) turns into a condition on \(\boldsymbol\alpha_k\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1088s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:08</a>:</p>
+      <div class="eq">\[ 1 = \mathbf{w}_k^\top\mathbf{w}_k = (X\boldsymbol\alpha_k)^\top(X\boldsymbol\alpha_k) = \boldsymbol\alpha_k^\top X^\top X\,\boldsymbol\alpha_k = \boldsymbol\alpha_k^\top K\,\boldsymbol\alpha_k \]</div>
+      <div class="result">
+        <span class="lbl">What α<sub>k</sub> must satisfy</span>
+        \[ K\boldsymbol\alpha_k = (n\lambda_k)\,\boldsymbol\alpha_k \qquad \text{and} \qquad \boldsymbol\alpha_k^\top K\,\boldsymbol\alpha_k = 1 \]
+        <p>An eigenvector of the \(n \times n\) matrix \(K\), scaled so that \(\mathbf{w}_k = X\boldsymbol\alpha_k\) has length 1.</p>
+      </div>
+      <p>One gap remains. The equation involves \(\lambda_k\), an eigenvalue of \(C\), but we only intend to decompose \(K\). If we solve the eigen-equation of \(K\), how are its eigenvalues related to the ones we would have got from \(XX^\top\)?</p>
+    </section>
+
+    <section id="shared-eigenvalues">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1219s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 20:19</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1320s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 22:00 the fact</a>
+        </div>
+        <h2>\(XX^\top\) and \(X^\top X\) share their eigenvalues</h2>
+      </div>
+      <p>The answer is a theorem of linear algebra, which the lecture states as a fact.</p>
+      <div class="result">
+        <span class="lbl">Linear algebra fact</span>
+        <p>The non-zero eigenvalues of \(XX^\top \in \mathbb{R}^{d \times d}\) and of \(X^\top X \in \mathbb{R}^{n \times n}\) are exactly the same.</p>
+      </div>
+      <p>The two matrices have different sizes, but both are built from the same \(d \times n\) matrix \(X\), which is why their eigenvalues are related. Some details <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1357s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:37</a>:</p>
+      <ul>
+        <li>Each matrix has at most \(\min(d, n)\) non-zero eigenvalues (another linear algebra fact).</li>
+        <li>So when \(d\) is large, \(XX^\top\) has many zero eigenvalues, with no counterpart in \(X^\top X\).</li>
+        <li>If \(n &lt; d\) and \(X\) has full rank, \(X^\top X\) has \(n\) non-zero eigenvalues, and they match the top \(n\) eigenvalues of \(XX^\top\).</li>
+      </ul>
+      <p>The lecture suggests proving the fact in two steps with the singular value decomposition, and leaves it to you. A shorter standard argument: suppose \(X^\top X\boldsymbol\beta = \mu\boldsymbol\beta\) with \(\mu \neq 0\) and \(\boldsymbol\beta \neq \mathbf{0}\). Then</p>
+      <div class="eq">\[ XX^\top(X\boldsymbol\beta) = X(X^\top X\boldsymbol\beta) = \mu\,(X\boldsymbol\beta), \qquad \lVert X\boldsymbol\beta\rVert^2 = \boldsymbol\beta^\top X^\top X\boldsymbol\beta = \mu\lVert\boldsymbol\beta\rVert^2 \neq 0 \]</div>
+      <p>So \(X\boldsymbol\beta\) is a non-zero vector, and \(\mu\) is an eigenvalue of \(XX^\top\) with eigenvector \(X\boldsymbol\beta\). Swapping the roles of \(X\) and \(X^\top\) gives the other direction. Notice that this eigenvector, \(X\boldsymbol\beta\), is again a combination of the data points.</p>
+    </section>
+
+    <section id="beta-to-alpha">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1422s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 23:42</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1634s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 27:14 is β = α?</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1706s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 28:26 rescale</a>
+        </div>
+        <h2>From β to α to w</h2>
+      </div>
+      <p>Now put everything together. We want the unit eigenvectors \(\mathbf{w}_1, \dots, \mathbf{w}_l\) of \(C\), with eigenvalues \(\lambda_1 &gt; \lambda_2 &gt; \dots &gt; \lambda_l\). Compare the three matrices involved:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Matrix</th><th>Size</th><th>Unit eigenvectors</th><th>Eigenvalues</th></tr></thead>
+          <tbody>
+            <tr><td>\(C = \frac1n XX^\top\)</td><td>\(d \times d\)</td><td>\(\mathbf{w}_1, \dots, \mathbf{w}_l\)</td><td>\(\lambda_1 &gt; \dots &gt; \lambda_l\)</td></tr>
+            <tr><td>\(XX^\top = nC\)</td><td>\(d \times d\)</td><td>the same \(\mathbf{w}_k\): scaling a matrix does not change its eigenvectors</td><td>\(n\lambda_1 &gt; \dots &gt; n\lambda_l\)</td></tr>
+            <tr><td>\(K = X^\top X\)</td><td>\(n \times n\)</td><td>call them \(\boldsymbol\beta_1, \dots, \boldsymbol\beta_l\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1529s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>25:29</a></td><td>\(n\lambda_1 &gt; \dots &gt; n\lambda_l\), by the fact</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>So \(K\boldsymbol\beta_k = (n\lambda_k)\,\boldsymbol\beta_k\): \(\boldsymbol\beta_k\) satisfies the eigen-equation that \(\boldsymbol\alpha_k\) must satisfy. Is \(\boldsymbol\beta_k = \boldsymbol\alpha_k\)? Check the length condition. Using \(K\boldsymbol\beta_k = n\lambda_k\boldsymbol\beta_k\) and \(\boldsymbol\beta_k^\top\boldsymbol\beta_k = 1\):</p>
+      <div class="eq">\[ \boldsymbol\beta_k^\top K\boldsymbol\beta_k = \boldsymbol\beta_k^\top(n\lambda_k\,\boldsymbol\beta_k) = n\lambda_k\,\boldsymbol\beta_k^\top\boldsymbol\beta_k = n\lambda_k \]</div>
+      <p>That is \(n\lambda_k\), not 1 in general, so \(\boldsymbol\beta_k\) has the right direction and the wrong length. Rescale it. A multiple of an eigenvector is still an eigenvector, so \(\boldsymbol\alpha_k = \boldsymbol\beta_k/\sqrt{n\lambda_k}\) still satisfies \(K\boldsymbol\alpha_k = (n\lambda_k)\,\boldsymbol\alpha_k\), and the square root is applied twice in the length condition:</p>
+      <div class="eq">\[ \boldsymbol\alpha_k^\top K\boldsymbol\alpha_k = \frac{\boldsymbol\beta_k^\top K\boldsymbol\beta_k}{\sqrt{n\lambda_k}\,\sqrt{n\lambda_k}} = \frac{n\lambda_k}{n\lambda_k} = 1 \]</div>
+      <div class="result">
+        <span class="lbl">From the eigenvectors of K to the eigenvectors of C</span>
+        \[ \boldsymbol\alpha_k = \frac{\boldsymbol\beta_k}{\sqrt{n\lambda_k}}, \qquad \mathbf{w}_k = X\boldsymbol\alpha_k, \qquad \lVert\mathbf{w}_k\rVert = 1, \qquad k = 1, \dots, l \]
+        <p>Here \(n\lambda_k\) is the eigenvalue of \(K\) that belongs to \(\boldsymbol\beta_k\).</p>
+      </div>
+      <p class="note">The square root is real. The eigenvalues of \(C\) are never negative, because \(\mathbf{w}^\top C\mathbf{w} = \frac1n\sum_i(\mathbf{x}_i^\top\mathbf{w})^2 \ge 0\) (Part 2), so the non-zero ones are positive.</p>
+    </section>
+
+    <section id="algorithm">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1773s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 29:33</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1840s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 30:40 order n³</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1976s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 32:56 when it helps</a>
+        </div>
+        <h2>PCA through the \(n \times n\) matrix</h2>
+      </div>
+      <ol class="algo">
+        <li class="algo-title">PCA when d ≫ n</li>
+        <li>Input \(\mathcal{D} = \{\mathbf{x}_1, \dots, \mathbf{x}_n\}\), \(\mathbf{x}_i \in \mathbb{R}^d\), with \(d \gg n\): too many features, the setting where the cost of PCA hurts.</li>
+        <li>Compute \(K = X^\top X \in \mathbb{R}^{n \times n}\).</li>
+        <li>Eigendecompose \(K\): unit eigenvectors \(\boldsymbol\beta_1, \dots, \boldsymbol\beta_l\) with eigenvalues \(n\lambda_1 \ge \dots \ge n\lambda_l\). This costs \(O(n^3)\).</li>
+        <li>Set \(\boldsymbol\alpha_k = \boldsymbol\beta_k / \sqrt{n\lambda_k}\) for \(k = 1, \dots, l\).</li>
+        <li>If you want the directions themselves, \(\mathbf{w}_k = X\boldsymbol\alpha_k\).</li>
+      </ol>
+      <p>The old route computed \(C\) and eigendecomposed it in \(O(d^3)\). Step 2 is still an eigendecomposition, but of an \(n \times n\) matrix, so it takes \(O(n^3)\). When \(d \gg n\) that can be far cheaper. We reach the \(\mathbf{w}_k\) by a different road: decompose a related, smaller matrix, then convert its eigenvectors into the weights that combine the data points into the eigenvectors of \(C\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=1946s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>32:26</a>.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 720 324" role="img" aria-label="Two routes from the data matrix X to the eigenvectors w of C. Top: form the large d by d matrix C and eigendecompose it at cost order d cubed. Bottom: form the small n by n matrix K, eigendecompose it at cost order n cubed to get beta and n lambda, divide by the square root of n lambda to get alpha, and multiply by X to get w. C and K share their non-zero eigenvalues.">
+            <defs><marker id="p04-f5-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-row" x="20" y="24">Direct (Part 3)</text>
+            <rect class="d-box" x="20" y="44" width="30" height="90"/>
+            <text class="d-t" x="35" y="94" text-anchor="middle">X</text>
+            <text class="d-al" x="35" y="150" text-anchor="middle">d × n</text>
+            <line class="d-ln" x1="56" y1="89" x2="108" y2="89" marker-end="url(#p04-f5-ah)"/>
+            <text class="d-s" x="82" y="80" text-anchor="middle">XXᵀ/n</text>
+            <rect class="d-box" x="114" y="44" width="90" height="90"/>
+            <text class="d-t" x="159" y="86" text-anchor="middle">C</text>
+            <text class="d-al" x="159" y="104" text-anchor="middle">d × d</text>
+            <line class="d-ln" x1="210" y1="89" x2="592" y2="89" marker-end="url(#p04-f5-ah)"/>
+            <text class="d-s" x="400" y="80" text-anchor="middle">eigendecomposition of C</text>
+            <text class="d-al" x="400" y="106" text-anchor="middle">O(d³): slow when d is large</text>
+
+            <line class="d-ln d-dash" x1="129" y1="140" x2="129" y2="230"/>
+            <text class="d-s" x="142" y="180">XXᵀ = nC and K = XᵀX share</text>
+            <text class="d-s" x="142" y="196">their non-zero eigenvalues nλₖ</text>
+
+            <text class="d-row" x="20" y="198">Via K (L9)</text>
+            <rect class="d-box" x="20" y="206" width="30" height="90"/>
+            <text class="d-t" x="35" y="256" text-anchor="middle">X</text>
+            <text class="d-al" x="35" y="312" text-anchor="middle">d × n</text>
+            <line class="d-ln" x1="56" y1="251" x2="108" y2="251" marker-end="url(#p04-f5-ah)"/>
+            <text class="d-s" x="82" y="242" text-anchor="middle">XᵀX</text>
+            <rect class="d-box-acc" x="114" y="236" width="30" height="30"/>
+            <text class="d-t" x="129" y="256" text-anchor="middle">K</text>
+            <text class="d-al" x="129" y="284" text-anchor="middle">n × n</text>
+            <line class="d-ln-acc" x1="150" y1="251" x2="236" y2="251" marker-end="url(#p04-f5-ah)"/>
+            <text class="d-s" x="193" y="242" text-anchor="middle">eigen of K</text>
+            <text class="d-al" x="193" y="268" text-anchor="middle" style="fill: var(--accent)">O(n³)</text>
+            <rect class="d-box" x="242" y="231" width="100" height="40" rx="6"/>
+            <text class="d-t" x="292" y="256" text-anchor="middle">βₖ, nλₖ</text>
+            <line class="d-ln" x1="348" y1="251" x2="420" y2="251" marker-end="url(#p04-f5-ah)"/>
+            <text class="d-s" x="384" y="242" text-anchor="middle">÷ √(nλₖ)</text>
+            <rect class="d-box" x="426" y="231" width="80" height="40" rx="6"/>
+            <text class="d-t" x="466" y="256" text-anchor="middle">αₖ</text>
+            <line class="d-ln" x1="512" y1="251" x2="592" y2="251" marker-end="url(#p04-f5-ah)"/>
+            <text class="d-s" x="552" y="242" text-anchor="middle">wₖ = Xαₖ</text>
+
+            <rect class="d-box-acc" x="598" y="44" width="106" height="252" rx="8"/>
+            <text class="d-t" x="651" y="160" text-anchor="middle">w₁, …, wₗ</text>
+            <text class="d-s" x="651" y="180" text-anchor="middle">unit eigenvectors</text>
+            <text class="d-s" x="651" y="196" text-anchor="middle">of C</text>
+          </svg>
+        </div>
+        <figcaption><b>Two roads to the same eigenvectors.</b> Matrix sizes are drawn for a case with \(d\) three times \(n\). The direct route decomposes the large \(d \times d\) matrix. The route through \(K\) decomposes the small \(n \times n\) matrix and then rescales and recombines, which is cheap.</figcaption>
+      </figure>
+
+      <p>Two remarks from the lecture <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=2009s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>33:29</a>:</p>
+      <ul>
+        <li><b>It helps only when \(d \gg n\).</b> If \(n\) is larger than \(d\), you might as well decompose the covariance matrix directly.</li>
+        <li><b>An eigendecomposition cannot be avoided.</b> The problem has two sizes, \(d\) and \(n\), and the trick is simply to decompose the matrix whose side is the smaller of the two.</li>
+      </ul>
+      <p class="note">Not part of the lecture's count: forming \(C\) takes about \(nd^2\) multiplications and forming \(K\) about \(n^2 d\), so building \(K\) is also the cheaper step when \(d \gg n\).</p>
+
+      <figure id="cost-fig">
+        <div class="controls">
+          <label for="cost-d">Features d</label>
+          <input type="range" id="cost-d" min="1" max="6" step="0.001" value="4.505">
+          <output id="cost-d-out" for="cost-d">32,000</output>
+          <button class="btn" id="cost-faces" type="button">Eigenfaces sizes</button>
+        </div>
+        <div class="controls">
+          <label for="cost-n">Data points n</label>
+          <input type="range" id="cost-n" min="1" max="6" step="0.001" value="4.301">
+          <output id="cost-n-out" for="cost-n">20,000</output>
+          <button class="btn" id="cost-swap" type="button">Swap d and n</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">d³ · decompose C</span><span class="v" id="cost-d3">–</span></div>
+          <div><span class="k">n³ · decompose K</span><span class="v" id="cost-n3">–</span></div>
+          <div><span class="k">Ratio d³ / n³</span><span class="v mine" id="cost-ratio">–</span></div>
+        </div>
+        <div class="status" id="cost-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="cost-svg" viewBox="0 0 640 250" role="img" aria-label="Left: the d by d and n by n matrices drawn as squares with sides to scale. Right: the eigendecomposition costs d cubed and n cubed as bars on a logarithmic axis from 10 to the 0 to 10 to the 18."></svg></div>
+        <figcaption><b>The cost of each route</b>, using the lecture's expressions \(d^3\) for decomposing \(C\) and \(n^3\) for decomposing \(K\). Both sliders run on a log scale from 10 to a million. At the eigenfaces sizes the route through \(K\) is about 4 times cheaper; with \(d = 10^6\) and \(n = 10^3\) it is a billion times cheaper. Swap the two and the direct route wins.</figcaption>
+      </figure>
+    </section>
+
+    <section id="dot-products">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=2042s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 34:02</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=2081s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L9 · 34:41 only dot products</a>
+        </div>
+        <h2>PCA needs only dot products</h2>
+      </div>
+      <p>L9 ends with an observation that the next lecture builds on. Look at one entry of \(K = X^\top X\). Row \(i\) of \(X^\top\) is \(\mathbf{x}_i^\top\) and column \(j\) of \(X\) is \(\mathbf{x}_j\), so:</p>
+      <div class="eq">\[ K_{ij} = \mathbf{x}_i^\top\mathbf{x}_j \qquad \text{for all } i, j \]</div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 580 232" role="img" aria-label="X transpose, with the data points as rows, times X, with the data points as columns, equals the n by n matrix K. Row 2 of X transpose and column 3 of X are highlighted, and they meet in the highlighted entry K23, the dot product of points 2 and 3.">
+            <text class="d-t" x="112" y="58" text-anchor="middle">Xᵀ (n × d)</text>
+            <rect class="d-box" x="40" y="70" width="144" height="72"/>
+            <rect class="d-box-acc" x="40" y="88" width="144" height="18"/>
+            <line class="d-rule" x1="40" y1="88" x2="184" y2="88"/><line class="d-rule" x1="40" y1="124" x2="184" y2="124"/>
+            <text class="d-al" x="32" y="83" text-anchor="end">x₁ᵀ</text>
+            <text class="d-al" x="32" y="101" text-anchor="end" style="fill: var(--accent)">x₂ᵀ</text>
+            <text class="d-al" x="32" y="119" text-anchor="end">x₃ᵀ</text>
+            <text class="d-al" x="32" y="137" text-anchor="end">x₄ᵀ</text>
+            <text x="204" y="111" text-anchor="middle">×</text>
+
+            <text class="d-al" x="233" y="28" text-anchor="middle">x₁</text>
+            <text class="d-al" x="251" y="28" text-anchor="middle">x₂</text>
+            <text class="d-al" x="269" y="28" text-anchor="middle" style="fill: var(--accent)">x₃</text>
+            <text class="d-al" x="287" y="28" text-anchor="middle">x₄</text>
+            <rect class="d-box" x="224" y="34" width="72" height="144"/>
+            <rect class="d-box-acc" x="260" y="34" width="18" height="144"/>
+            <line class="d-rule" x1="242" y1="34" x2="242" y2="178"/>
+            <text class="d-t" x="260" y="198" text-anchor="middle">X (d × n)</text>
+            <text x="318" y="111" text-anchor="middle">=</text>
+
+            <text class="d-t" x="374" y="58" text-anchor="middle">K (n × n)</text>
+            <rect class="d-box" x="338" y="70" width="72" height="72"/>
+            <line class="d-rule" x1="338" y1="88" x2="410" y2="88"/><line class="d-rule" x1="338" y1="106" x2="410" y2="106"/><line class="d-rule" x1="338" y1="124" x2="410" y2="124"/>
+            <line class="d-rule" x1="356" y1="70" x2="356" y2="142"/><line class="d-rule" x1="374" y1="70" x2="374" y2="142"/><line class="d-rule" x1="392" y1="70" x2="392" y2="142"/>
+            <rect x="374" y="88" width="18" height="18" style="fill: var(--mark); stroke: var(--ink); stroke-width: 1.4"/>
+            <line class="d-ln" x1="394" y1="97" x2="428" y2="97"/>
+            <text class="d-t" x="434" y="101">K₂₃ = x₂ᵀx₃</text>
+            <text class="d-s" x="434" y="120">dot product of</text>
+            <text class="d-s" x="434" y="136">points 2 and 3</text>
+            <text class="d-s" x="20" y="226">Row i of Xᵀ meets column j of X: one dot product for every pair of data points.</text>
+          </svg>
+        </div>
+        <figcaption><b>K is a table of dot products.</b> With four data points, \(K\) is \(4 \times 4\) no matter how many features each point has. Entry \((i, j)\) is \(\mathbf{x}_i^\top\mathbf{x}_j\), a similarity between points \(i\) and \(j\).</figcaption>
+      </figure>
+
+      <p>In a sense \(K_{ij}\) captures how similar \(\mathbf{x}_i\) and \(\mathbf{x}_j\) are, in the dot-product sense. More importantly, after step 1 the algorithm works with \(K\) alone. To solve the PCA problem you need only the <b>pairwise dot products between the data points</b>, not necessarily the points themselves.</p>
+      <p>A one-line check of this claim (the lecture promises to make it precise next time): the coefficient of a data point \(\mathbf{x}_j\) along \(\mathbf{w}_k\), which is what compression stores, also comes from \(K\) alone.</p>
+      <div class="eq">\[ \mathbf{x}_j^\top\mathbf{w}_k = \mathbf{x}_j^\top X\boldsymbol\alpha_k = \sum_{i=1}^{n}\alpha_{ki}\,\mathbf{x}_j^\top\mathbf{x}_i = (K\boldsymbol\alpha_k)_j = n\lambda_k\,\alpha_{kj} \]</div>
+      <p class="rule-of-thumb">Carry this into Part 5: PCA can be run from the matrix of pairwise dot products \(K\) alone.</p>
+      <p>Why would a speed-up for issue 1 help with curved data in issue 2? This observation, that only similarities between points are needed, is what lets the solution to issue 1 be turned into a solution to issue 2 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=pwpDf2_Pytk&amp;t=2146s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>35:46</a>. It takes some creative thought, and the lecture calls it one of the very important ideas of classical machine learning. That is the subject of <a href="part-05.html">Part 5</a>: feature maps, kernels and kernel PCA.</p>
+      <p>In summary, L8 identified two issues with PCA, and L9 solved the time-complexity issue by converting the original problem into a computationally simpler one whose solution gives back the solution to the original.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Eigenfaces</dt><dd>PCA on vectorized face images; the principal components, folded back into images, look like faces.</dd></div>
+        <div><dt>Vectorizing an image</dt><dd>Reading an \(a \times b\) pixel grid in a fixed order into a vector with \(ab\) entries. The same order reverses it.</dd></div>
+        <div><dt>Components kept, \(r\)</dt><dd>The number of top eigendirections retained; the same as running the residue procedure for \(r\) rounds.</dd></div>
+        <div><dt>Reconstruction from \(r\) components</dt><dd>\(\tilde{\mathbf{x}} = \sum_{k=1}^r(\mathbf{x}^\top\mathbf{w}_k)\mathbf{w}_k\), stored as \(r\) numbers per point.</dd></div>
+        <div><dt>Linear subspace</dt><dd>A line or plane through the origin, or its higher-dimensional analogue. PCA can only find these.</dd></div>
+        <div><dt>Manifold</dt><dd>The lecture's informal word for a curved space inside \(\mathbb{R}^d\) on which the data lies, like a draped blanket in \(\mathbb{R}^3\).</dd></div>
+        <div><dt>Time complexity \(O(d^3)\)</dt><dd>The general cost of an eigendecomposition of a \(d \times d\) matrix: time grows like the cube of \(d\).</dd></div>
+        <div><dt>Data matrix \(X\)</dt><dd>The \(d \times n\) matrix with the data points as columns, so that \(C = \frac1n XX^\top\).</dd></div>
+        <div><dt>\(K = X^\top X\)</dt><dd>The \(n \times n\) matrix of pairwise dot products, \(K_{ij} = \mathbf{x}_i^\top\mathbf{x}_j\). Standard name: the Gram matrix.</dd></div>
+        <div><dt>Weights \(\boldsymbol\alpha_k\)</dt><dd>The \(n\) numbers that combine the data points into the eigenvector, \(\mathbf{w}_k = X\boldsymbol\alpha_k\).</dd></div>
+        <div><dt>Shared non-zero eigenvalues</dt><dd>\(XX^\top\) and \(X^\top X\) have the same non-zero eigenvalues, at most \(\min(d, n)\) of them.</dd></div>
+        <div><dt>Rescaling \(\boldsymbol\beta_k\)</dt><dd>\(\boldsymbol\alpha_k = \boldsymbol\beta_k/\sqrt{n\lambda_k}\) turns a unit eigenvector of \(K\) into weights that give a unit \(\mathbf{w}_k\).</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>A grayscale image is 100 × 120 pixels. What are \(d\) and the size of the covariance matrix PCA would decompose?</span><span class="tog"></span></summary>
+          <p>\(d = 100 \times 120 = 12{,}000\), so \(C\) is \(12{,}000 \times 12{,}000\) and a general eigendecomposition costs on the order of \(12{,}000^3 \approx 1.7 \times 10^{12}\).</p></details>
+        <details><summary><span class="q">Q2</span><span>Why does a dog's face reconstruct badly from 25 eigenfaces, even though it reconstructs well from 1,600?</span><span class="tog"></span></summary>
+          <p>The components were learnt from human faces, so the top 25 span the subspace that best represents human faces. Projecting the dog onto it gives the best human-looking version of the dog. Many more directions are needed before the dog's own features are captured.</p></details>
+        <details><summary><span class="q">Q3</span><span>Data lies on a curved two-dimensional sheet in \(\mathbb{R}^3\). What does PCA report, and what does it miss?</span><span class="tog"></span></summary>
+          <p>Its best plane still leaves a large reconstruction error, which suggests a third dimension is needed. With three components the error is 0, but only because three dimensions rebuild anything in \(\mathbb{R}^3\). PCA never finds the two-dimensional curved structure.</p></details>
+        <details><summary><span class="q">Q4</span><span>With \(d = 10^5\) features and \(n = 10^3\) points, compare the eigendecomposition costs of \(C\) and \(K\).</span><span class="tog"></span></summary>
+          <p>\(d^3 = 10^{15}\) against \(n^3 = 10^9\): the route through \(K\) is about \(10^6\) times cheaper. With \(n = 50{,}000\) and \(d = 300\) it is the other way round, so decompose \(C\).</p></details>
+        <details><summary><span class="q">Q5</span><span>We showed \(\alpha_{ki} = \mathbf{x}_i^\top\mathbf{w}_k/(n\lambda_k)\). Why not compute the weights from this formula?</span><span class="tog"></span></summary>
+          <p>It needs \(\mathbf{w}_k\), which is what we are trying to find. That is why the lecture looks for an equation that \(\boldsymbol\alpha_k\) satisfies on its own: \(K\boldsymbol\alpha_k = n\lambda_k\boldsymbol\alpha_k\) with \(\boldsymbol\alpha_k^\top K\boldsymbol\alpha_k = 1\).</p></details>
+        <details><summary><span class="q">Q6</span><span>\(\boldsymbol\beta\) is a unit eigenvector of \(K\) with eigenvalue 12, and \(n = 4\). What is the corresponding eigenvalue of \(C\), and what is \(\boldsymbol\alpha\)?</span><span class="tog"></span></summary>
+          <p>The eigenvalue of \(K\) is \(n\lambda = 12\), so \(\lambda = 3\). Then \(\boldsymbol\alpha = \boldsymbol\beta/\sqrt{12}\), and \(\boldsymbol\alpha^\top K\boldsymbol\alpha = 12/12 = 1\), so \(X\boldsymbol\alpha\) has length 1.</p></details>
+        <details><summary><span class="q">Q7</span><span>Run the algorithm on \(\mathbf{x}_1 = [1, 0, 2]^\top\), \(\mathbf{x}_2 = [0, 1, 1]^\top\), with \(C = \frac1n\sum\mathbf{x}_i\mathbf{x}_i^\top\) as in the lecture. Find \(\mathbf{w}_1\).</span><span class="tog"></span></summary>
+          <p>\(K = \begin{bmatrix}5 & 2\\ 2 & 2\end{bmatrix}\) (dot products). Its eigenvalues solve \(\mu^2 - 7\mu + 6 = 0\): 6 and 1. The top one, \(n\lambda_1 = 6\) with \(n = 2\), gives \(\lambda_1 = 3\) and \(\boldsymbol\beta_1 = [2, 1]^\top/\sqrt5\). So \(\boldsymbol\alpha_1 = [2, 1]^\top/\sqrt{30}\) and \(\mathbf{w}_1 = (2\mathbf{x}_1 + \mathbf{x}_2)/\sqrt{30} = [2, 1, 5]^\top/\sqrt{30}\). Check: \(\lVert\mathbf{w}_1\rVert^2 = 30/30 = 1\), and \(C\mathbf{w}_1 = \tfrac12(12\,\mathbf{x}_1 + 6\,\mathbf{x}_2)/\sqrt{30} = 3\,\mathbf{w}_1\).</p></details>
+        <details><summary><span class="q">Q8</span><span>Which quantity does the algorithm need from the data after step 1, and why does that matter for later lectures?</span><span class="tog"></span></summary>
+          <p>Only \(K\), whose entries are the dot products \(\mathbf{x}_i^\top\mathbf{x}_j\). Even the coefficients \(\mathbf{x}_j^\top\mathbf{w}_k = (K\boldsymbol\alpha_k)_j\) come from \(K\). Needing only similarities between points is what lets the fix for issue 1 be reused for non-linear data in Part 5.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a class="next" href="part-05.html"><span class="dir">Part 5 →</span><span class="nm">Feature maps, kernels and kernel PCA</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+
+  /* ---------- Best line for points on a curve (parabola or circle) ---------- */
+  (() => {
+    const svg = document.getElementById('curve-svg'); if (!svg) return;
+    const lo = -5, hi = 5, P = 22, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    axes(svg, sx, sy, lo, hi, 2);
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'curve-clip' }, defs); mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P }, cp);
+    const rot = (p, deg) => { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c]; };
+    const stats = pts => {
+      const n = pts.length;
+      const A = pts.reduce((s, p) => s + p[0] * p[0], 0) / n, B = pts.reduce((s, p) => s + p[0] * p[1], 0) / n, D = pts.reduce((s, p) => s + p[1] * p[1], 0) / n;
+      const gap = Math.sqrt(((A - D) / 2) ** 2 + B * B);
+      let th = 0.5 * Math.atan2(2 * B, A - D) * 180 / Math.PI; if (th < 0) th += 180;
+      return { n, total: A + D, iso: gap < 1e-9, thBest: th };
+    };
+    /* Parabola: 25 points with x2 = 0.35 t^2, t from -3 to 3, centred, then rotated by 20 degrees. */
+    const raw = []; for (let i = 0; i < 25; i++) { const t = -3 + 0.25 * i; raw.push([t, 0.35 * t * t]); }
+    const m0 = raw.reduce((s, p) => s + p[0], 0) / raw.length, m1 = raw.reduce((s, p) => s + p[1], 0) / raw.length;
+    const arcPts = raw.map(p => rot([p[0] - m0, p[1] - m1], 20));
+    let arcPath = ''; for (let t = -3.4; t <= 3.401; t += 0.05) { const q = rot([t - m0, 0.35 * t * t - m1], 20); arcPath += (arcPath ? ' L' : 'M') + sx(q[0]).toFixed(1) + ' ' + sy(q[1]).toFixed(1); }
+    /* Circle: 36 evenly spaced points of radius 3 (already centred). */
+    const circPts = []; for (let i = 0; i < 36; i++) { const a = 2 * Math.PI * i / 36; circPts.push([3 * Math.cos(a), 3 * Math.sin(a)]); }
+    const sets = {
+      arc: Object.assign({ pts: arcPts, path: arcPath }, stats(arcPts)),
+      circle: Object.assign({ pts: circPts, path: `M${sx(3)} ${sy(0)} A${3 * S} ${3 * S} 0 1 0 ${sx(-3)} ${sy(0)} A${3 * S} ${3 * S} 0 1 0 ${sx(3)} ${sy(0)}` }, stats(circPts))
+    };
+    const curve = mk('path', { class: 'c-faint', fill: 'none', style: 'stroke: var(--muted); stroke-dasharray: 3 4' }, svg);
+    const gRes = mk('g', { class: 'c-resid', 'clip-path': 'url(#curve-clip)' }, svg);
+    const line = mk('line', { class: 'c-user', 'clip-path': 'url(#curve-clip)' }, svg);
+    const gProj = mk('g', { class: 'c-proj' }, svg);
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    const slider = document.getElementById('curve-th'), out = document.getElementById('curve-th-out');
+    const vOut = document.getElementById('curve-var'), eOut = document.getElementById('curve-err'), sOut = document.getElementById('curve-sum'), status = document.getElementById('curve-status');
+    const swapBtn = document.getElementById('curve-swap');
+    let kind = 'arc', cur = sets.arc, res = [], proj = [], th = parseFloat(slider.value);
+    const clear = g => { while (g.firstChild) g.removeChild(g.firstChild); };
+    const build = () => {
+      cur = sets[kind];
+      [gRes, gProj, gDots].forEach(clear);
+      curve.setAttribute('d', cur.path);
+      res = cur.pts.map(() => mk('line', {}, gRes));
+      proj = cur.pts.map(() => mk('circle', { r: 2.6 }, gProj));
+      cur.pts.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.8 }, gDots));
+      sOut.textContent = cur.total.toFixed(2);
+      swapBtn.textContent = kind === 'arc' ? 'Show points on a circle' : 'Show points on a parabola';
+    };
+    const draw = () => {
+      const r = th * Math.PI / 180, w = [Math.cos(r), Math.sin(r)];
+      line.setAttribute('x1', sx(-10 * w[0])); line.setAttribute('y1', sy(-10 * w[1])); line.setAttribute('x2', sx(10 * w[0])); line.setAttribute('y2', sy(10 * w[1]));
+      let v = 0;
+      cur.pts.forEach((p, i) => { const c = p[0] * w[0] + p[1] * w[1]; v += c * c; const q = [c * w[0], c * w[1]]; res[i].setAttribute('x1', sx(p[0])); res[i].setAttribute('y1', sy(p[1])); res[i].setAttribute('x2', sx(q[0])); res[i].setAttribute('y2', sy(q[1])); proj[i].setAttribute('cx', sx(q[0])); proj[i].setAttribute('cy', sy(q[1])); });
+      v /= cur.n;
+      const e = cur.total - v;
+      vOut.textContent = v.toFixed(2); eOut.textContent = e.toFixed(2); out.textContent = Math.round(th) + '°';
+      if (cur.iso) { status.textContent = 'Points on a circle: every line keeps the same wᵀCw, so PCA has no best line to offer.'; return; }
+      const d = Math.abs(((th - cur.thBest) % 180 + 180) % 180), near = Math.min(d, 180 - d) < 0.6;
+      status.textContent = near ? `Best line for these points, yet ${Math.round(100 * e / cur.total)}% of the spread is still error, and it follows the bend of the curve.` : '';
+    };
+    build(); draw();
+    slider.addEventListener('input', () => { th = parseFloat(slider.value); draw(); });
+    document.getElementById('curve-snap').addEventListener('click', () => {
+      if (cur.iso) { draw(); return; }
+      let target = cur.thBest; if (Math.abs(target - th) > 90) target += target < th ? 180 : -180;
+      tween(th, target, v => { th = ((v % 180) + 180) % 180; slider.value = Math.round(th); draw(); });
+    });
+    swapBtn.addEventListener('click', () => { kind = kind === 'arc' ? 'circle' : 'arc'; build(); draw(); });
+  })();
+
+  /* ---------- Cost of decomposing C (d x d) against K (n x n) ---------- */
+  (() => {
+    const svg = document.getElementById('cost-svg'); if (!svg) return;
+    const dIn = document.getElementById('cost-d'), nIn = document.getElementById('cost-n');
+    const dOut = document.getElementById('cost-d-out'), nOut = document.getElementById('cost-n-out');
+    const d3Out = document.getElementById('cost-d3'), n3Out = document.getElementById('cost-n3'), rOut = document.getElementById('cost-ratio'), status = document.getElementById('cost-status');
+    const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+    const sup = k => String(k).split('').map(ch => (ch === '-' ? '⁻' : SUP[+ch])).join('');
+    const sci = x => { let e = Math.floor(Math.log10(x)), m = Math.round(x / 10 ** e * 10) / 10; if (m >= 10) { m = 1; e += 1; } return `${m.toFixed(1)} × 10${sup(e)}`; };
+    const ratio = r => (r >= 1000 || r < 0.01 ? sci(r) : r >= 10 ? String(Math.round(r)) : r.toPrecision(2));
+    const round2 = v => Number(v.toPrecision(2));
+    const fmt = v => v.toLocaleString('en-US');
+    /* Left panel: squares with sides to scale. */
+    const BASE = 196, MAXS = 140, XC = 24, XK = 188;
+    mk('text', { x: 20, y: 22, class: 'c-title' }, svg).textContent = 'Matrix sides to scale';
+    const sqC = mk('rect', { x: XC, style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.4' }, svg);
+    const sqK = mk('rect', { x: XK, style: 'fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6' }, svg);
+    mk('text', { x: XC, y: BASE + 20, class: 'c-note' }, svg).textContent = 'C: d × d';
+    mk('text', { x: XK, y: BASE + 20, class: 'c-note' }, svg).textContent = 'K: n × n';
+    const sizeC = mk('text', { x: XC, y: BASE + 36, class: 'c-tick' }, svg), sizeK = mk('text', { x: XK, y: BASE + 36, class: 'c-tick' }, svg);
+    /* Right panel: log-scale bars of d^3 and n^3. */
+    const X0 = 352, PX = 15, ys = { C: 58, K: 118 }, AXY = 168;
+    mk('text', { x: X0, y: 22, class: 'c-title' }, svg).textContent = 'Eigendecomposition cost, log scale';
+    const grid = mk('g', { class: 'c-grid' }, svg);
+    for (let e = 0; e <= 18; e += 3) {
+      mk('line', { x1: X0 + e * PX, x2: X0 + e * PX, y1: 36, y2: AXY }, grid);
+      mk('text', { x: X0 + e * PX, y: AXY + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = '10' + sup(e);
+    }
+    mk('line', { x1: X0, x2: X0 + 18 * PX, y1: AXY, y2: AXY, class: 'c-axis' }, svg);
+    mk('text', { x: X0 + 9 * PX, y: AXY + 34, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = 'operations, order of magnitude';
+    const barC = mk('rect', { x: X0, y: ys.C, height: 24, style: 'fill: var(--ink-2); fill-opacity: .55' }, svg);
+    const barK = mk('rect', { x: X0, y: ys.K, height: 24, style: 'fill: var(--accent)' }, svg);
+    const lblC = mk('text', { x: X0, y: ys.C - 7, class: 'c-note' }, svg), lblK = mk('text', { x: X0, y: ys.K - 7, class: 'c-note' }, svg);
+    const draw = () => {
+      const d = round2(10 ** parseFloat(dIn.value)), n = round2(10 ** parseFloat(nIn.value));
+      dOut.textContent = fmt(d); nOut.textContent = fmt(n);
+      const d3 = d ** 3, n3 = n ** 3, r = d3 / n3;
+      d3Out.textContent = sci(d3); n3Out.textContent = sci(n3); rOut.textContent = ratio(r);
+      const m = Math.max(d, n), sC = Math.max(1.5, MAXS * d / m), sK = Math.max(1.5, MAXS * n / m);
+      sqC.setAttribute('y', BASE - sC); sqC.setAttribute('width', sC); sqC.setAttribute('height', sC);
+      sqK.setAttribute('y', BASE - sK); sqK.setAttribute('width', sK); sqK.setAttribute('height', sK);
+      sizeC.textContent = `${fmt(d)} × ${fmt(d)}`; sizeK.textContent = `${fmt(n)} × ${fmt(n)}`;
+      barC.setAttribute('width', Math.log10(d3) * PX); barK.setAttribute('width', Math.log10(n3) * PX);
+      lblC.textContent = `decompose C: d³ = ${sci(d3)}`; lblK.textContent = `decompose K: n³ = ${sci(n3)}`;
+      if (d > n) status.textContent = `d > n: decompose the n × n matrix K, about ${ratio(r)} times less work than decomposing C.`;
+      else if (d < n) status.textContent = `n > d: decompose the covariance matrix C directly. The route through K would cost ${ratio(1 / r)} times more.`;
+      else status.textContent = 'd = n: both matrices are the same size, so neither route saves time.';
+    };
+    draw();
+    dIn.addEventListener('input', draw); nIn.addEventListener('input', draw);
+    const go = (dt, nt) => { const d0 = parseFloat(dIn.value), n0 = parseFloat(nIn.value); tween(0, 1, k => { dIn.value = (d0 + (dt - d0) * k).toFixed(3); nIn.value = (n0 + (nt - n0) * k).toFixed(3); draw(); }); };
+    document.getElementById('cost-faces').addEventListener('click', () => go(4.505, 4.301));
+    document.getElementById('cost-swap').addEventListener('click', () => go(parseFloat(nIn.value), parseFloat(dIn.value)));
+  })();
+})();
+</script>
+</body>
+</html>

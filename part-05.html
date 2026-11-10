@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 5 · Feature maps, kernels and kernel PCA · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 5: lectures 10–12 on feature maps for non-linear structure, kernel functions and Mercer's theorem, and kernel PCA.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<style>
+/* Part 5: keep each slider with its label in the kernel calculator. */
+.ctl { display: inline-flex; align-items: center; gap: 8px; }
+#kc-fig .controls input[type="range"] { width: min(130px, 100%); }
+</style>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 5 of 18</span><span class="sep">·</span><a href="part-04.html">← Part 4</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Feature maps, kernels and kernel PCA</h1>
+    <p class="lede">Notes for lectures 10 to 12. A relationship that is curved in the original features becomes linear after a feature map \(\phi\), and because PCA needs only dot products, a kernel can supply \(\phi(\mathbf{x})^\top\phi(\mathbf{x}')\) without ever computing \(\phi\). Mercer's theorem says which functions qualify as kernels, and kernel PCA puts the pieces together into one algorithm.</p>
+    <div class="meta">
+      <span><b>Part 5</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>70 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L10 · 18:47</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L11 · 30:00</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L12 · 21:28</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 10</h4>
+      <ul>
+        <li><a href="#issue-two">Issue 2: non-linearity</a></li>
+        <li><a href="#circle">PCA on a circle</a></li>
+        <li><a href="#lift">Lift to six dimensions</a></li>
+        <li><a href="#map-then-pca">Map, then run PCA</a></li>
+        <li><a href="#blow-up">The dimension explodes</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 11</h4>
+      <ul>
+        <li><a href="#only-dots">Only dot products needed</a></li>
+        <li><a href="#quadratic">A dot product in ℝ⁶</a></li>
+        <li><a href="#polynomial-kernel">Polynomial kernels</a></li>
+        <li><a href="#rbf">The RBF kernel</a></li>
+        <li><a href="#kernel-functions">Kernel functions</a></li>
+        <li><a href="#mercer">Mercer's theorem</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 12</h4>
+      <ul>
+        <li><a href="#kpca-steps">Eigenvectors of K</a></li>
+        <li><a href="#projections">Projections, not wₖ</a></li>
+        <li><a href="#centring">Centring the kernel</a></li>
+        <li><a href="#kpca-algorithm">The full algorithm</a></li>
+        <li><a href="#kernel-trick">Two issues, one trick</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>PCA only finds <b>linear</b> structure. Points on a circle obey one simple equation, yet PCA splits the variance about 50/50 and keeps both directions.</li>
+        <li>A <dfn>feature map</dfn> \(\phi(\mathbf{x}) = [1, f_1^2, f_2^2, f_1f_2, f_1, f_2]\) turns the circle equation into \(\phi(\mathbf{x})^\top\mathbf{u} = 0\), a linear relationship in \(\mathbb{R}^6\). The plan: map up, then run linear PCA there.</li>
+        <li>The catch is size: capturing every relationship up to power \(p\) in \(d\) features needs roughly \(d^p\) coordinates. But PCA through the \(n\times n\) matrix needs only the dot products \(\phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_j)\).</li>
+        <li>A <dfn>kernel</dfn> computes those dot products directly: polynomial \((\mathbf{x}^\top\mathbf{x}'+1)^p\), or RBF \(\exp(-\lVert\mathbf{x}-\mathbf{x}'\rVert^2/(2\sigma^2))\) with an infinite-dimensional \(\phi\). Mercer: \(k\) is a valid kernel exactly when it is symmetric and every kernel matrix is positive semi-definite.</li>
+        <li><b>Kernel PCA</b>: build and centre \(K\), take eigenvectors \(\boldsymbol\beta_k\) with eigenvalues \(n\lambda_k\), set \(\boldsymbol\alpha_k = \boldsymbol\beta_k/\sqrt{n\lambda_k}\), and represent \(\mathbf{x}_i\) by \(\sum_j \alpha_{kj}K_{ij}\). The directions \(\mathbf{w}_k\) and reconstructions are out of reach; the projections are not.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 10 ============ -->
+    <section id="issue-two">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=13s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 0:13 recap</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=77s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 1:17 issue 2</a>
+        </div>
+        <h2>Issue 2: relationships that are not linear</h2>
+      </div>
+      <p><a href="part-04.html">Part 4</a> raised two issues with PCA. Issue 1 was cost. Finding the eigenvectors of the \(d \times d\) covariance matrix takes about \(O(d^3)\) time, which hurts when \(d \gg n\). The fix was to work with the \(n \times n\) matrix \(X^\top X\) instead and convert its eigenvectors into those of the covariance matrix.</p>
+      <p>These lectures take up issue 2, which Part 4 also flagged. PCA is good at finding <i>linear</i> relationships among features, and only those. What if the features are related non-linearly?</p>
+    </section>
+
+    <section id="circle">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=113s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 1:53</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=242s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 4:02 the 95% rule</a>
+        </div>
+        <h2>What PCA does with points on a circle</h2>
+      </div>
+      <p>Take two-dimensional data in which every point lies on a circle centred at \((a, b)\). Run standard PCA. It first centres the data, which moves \((a, b)\) to the origin. Then it looks for the direction along which the projected points have the largest variance, which is the same as the smallest reconstruction error.</p>
+      <p>On a circle no direction stands out. Projecting onto any direction gives roughly the same variance. Which direction wins depends only on exactly how the points happen to sit around the circle. Say PCA picks some \(\mathbf{w}_1\); then \(\mathbf{w}_2\) is the perpendicular direction.</p>
+      <p>The eigenvalues are the variances along these directions. Here \(\mathbf{w}_1\) captures slightly more than 50% of the variance and \(\mathbf{w}_2\) slightly less. With the rule of thumb from <a href="part-03.html">Part 3</a> (keep enough directions to explain 95% of the variance), PCA says both directions are needed. There is no compression.</p>
+      <p>Yet the data is obviously simple. Do we really need two numbers per point to describe it? That question drives the rest of the lecture.</p>
+
+      <figure id="circle-fig">
+        <div class="controls">
+          <label for="circ-th">Direction \(\mathbf{w}\) of the line through the mean</label>
+          <input type="range" id="circ-th" min="0" max="179" step="1" value="20">
+          <output id="circ-th-out" for="circ-th">20°</output>
+          <button class="btn" id="circ-snap" type="button">Snap to PCA's w₁</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Variance along w (share)</span><span class="v mine" id="circ-share">–</span></div>
+          <div><span class="k">PCA's w₁ keeps</span><span class="v" id="circ-w1">–</span></div>
+          <div><span class="k">Largest |φ(xᵢ)ᵀu| after lifting</span><span class="v" id="circ-u">–</span></div>
+        </div>
+        <div class="status" id="circ-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="circ-svg" viewBox="0 0 400 400" role="img" aria-label="Thirty synthetic points on a circle centred at (3.5, 3) with radius 2.5. A rotatable line passes through the mean with each point's projection and residual drawn. The share of variance along the line stays near 50 percent at every angle."></svg></div>
+        <figcaption><b>Synthetic data: 30 points on a circle</b> with centre \((3.5, 3)\) and radius \(2.5\), generated for this page. Rotate the line: the share of variance along it barely moves from 50%, so no single direction summarizes the data and PCA keeps both. The last readout lifts every point with the map \(\phi\) of the next section and checks \(\phi(\mathbf{x}_i)^\top\mathbf{u}\): it is zero for all 30 points.</figcaption>
+      </figure>
+    </section>
+
+    <section id="lift">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=338s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 5:38</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=438s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 7:18 the map φ</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=542s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 9:02 φ(x)ᵀu = 0</a>
+        </div>
+        <h2>The circle is linear in the right features</h2>
+      </div>
+      <p>Call the two features \(f_1\) and \(f_2\). Every data point lies on the circle of radius \(r\) centred at \((a, b)\), so it satisfies \((f_1 - a)^2 + (f_2 - b)^2 = r^2\). Expanding the squares:</p>
+      <div class="eq">\[ f_1^2 + f_2^2 - 2af_1 - 2bf_2 + a^2 + b^2 - r^2 = 0 \qquad (\star) \]</div>
+      <p>This relationship is not linear: it contains \(f_1^2\) and \(f_2^2\). The picture says the same. Now map each two-dimensional point to a six-dimensional one:</p>
+      <div class="eq">\[ \phi : \mathbb{R}^2 \to \mathbb{R}^6, \qquad \phi\!\left(\begin{bmatrix} f_1 \\ f_2 \end{bmatrix}\right) = \begin{bmatrix} 1 & f_1^2 & f_2^2 & f_1f_2 & f_1 & f_2 \end{bmatrix}^\top \]</div>
+      <p>Also fix one vector in \(\mathbb{R}^6\):</p>
+      <div class="eq">\[ \mathbf{u} = \begin{bmatrix} a^2 + b^2 - r^2 & 1 & 1 & 0 & -2a & -2b \end{bmatrix}^\top \]</div>
+      <p>\(\mathbf{u}\) is built from the circle's centre and radius only. No individual data point, no \(f_1\) or \(f_2\), was used to define it. Its dot product with a lifted point is exactly the left side of \((\star)\):</p>
+      <div class="eq">\[ \phi(\mathbf{x})^\top\mathbf{u} = (a^2+b^2-r^2)\cdot 1 + 1\cdot f_1^2 + 1\cdot f_2^2 + 0\cdot f_1f_2 - 2a\, f_1 - 2b\, f_2 \]</div>
+      <p>So a point satisfies \((\star)\) exactly when \(\phi(\mathbf{x})^\top\mathbf{u} = 0\). Every data point, once mapped, is orthogonal to \(\mathbf{u}\).</p>
+      <div class="result">
+        <span class="lbl">In the feature space the relationship is linear</span>
+        \[ \phi(\mathbf{x}_i)^\top\mathbf{u} = 0 \quad \text{for every data point } \mathbf{x}_i \]
+        <p>This is a linear equation in \(\phi(\mathbf{x})\). The mapped points lie in a lower-dimensional linear subspace of \(\mathbb{R}^6\) (the vectors orthogonal to \(\mathbf{u}\)). The data was curved in \(\mathbb{R}^2\); it is flat in \(\mathbb{R}^6\).</p>
+      </div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 280" role="img" aria-label="Left: points on a circle centred at (a, b) with radius r in the f1, f2 plane. Middle: the map phi sends each point to six numbers. Right: in six dimensions the lifted points all lie on a flat subspace, drawn as a plane, orthogonal to the fixed vector u.">
+            <defs><marker id="p05a-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="20" y="22">In ℝ²: a circle</text>
+            <line class="d-rule" x1="30" y1="220" x2="232" y2="220"/>
+            <line class="d-rule" x1="40" y1="40" x2="40" y2="230"/>
+            <text class="d-al" x="232" y="236" text-anchor="end">f₁</text>
+            <text class="d-al" x="46" y="48">f₂</text>
+            <circle class="d-ln" cx="135" cy="130" r="60"/>
+            <line class="d-ln d-dash" x1="135" y1="130" x2="195" y2="130"/>
+            <text class="d-s" x="165" y="124" text-anchor="middle">r</text>
+            <circle class="pt-plain" cx="195" cy="130" r="4.5"/>
+            <circle class="pt-plain" cx="180.96" cy="91.43" r="4.5"/>
+            <circle class="pt-plain" cx="145.42" cy="70.91" r="4.5"/>
+            <circle class="pt-plain" cx="105" cy="78.04" r="4.5"/>
+            <circle class="pt-plain" cx="78.62" cy="109.48" r="4.5"/>
+            <circle class="pt-plain" cx="78.62" cy="150.52" r="4.5"/>
+            <circle class="pt-plain" cx="105" cy="181.96" r="4.5"/>
+            <circle class="pt-plain" cx="145.42" cy="189.09" r="4.5"/>
+            <circle class="pt-plain" cx="180.96" cy="168.57" r="4.5"/>
+            <circle class="pt-new" cx="135" cy="130" r="3.5"/>
+            <text class="d-s" x="128" y="148" text-anchor="end">(a, b)</text>
+            <text class="d-s" x="20" y="252">(f₁ − a)² + (f₂ − b)² = r²</text>
+            <text class="d-s" x="20" y="270">quadratic, so no line describes it</text>
+
+            <line class="d-ln-acc" x1="250" y1="130" x2="410" y2="130" marker-end="url(#p05a-ah)"/>
+            <text class="d-t" x="330" y="118" text-anchor="middle" style="fill: var(--accent)">φ</text>
+            <text class="d-al" x="330" y="154" text-anchor="middle">φ(x) = [1, f₁², f₂²,</text>
+            <text class="d-al" x="330" y="170" text-anchor="middle">f₁f₂, f₁, f₂]</text>
+            <text class="d-s" x="330" y="196" text-anchor="middle">ℝ² → ℝ⁶</text>
+
+            <text class="d-h" x="430" y="22">In ℝ⁶: a flat subspace</text>
+            <path class="d-plot" d="M450 200 L610 200 L680 120 L520 120 Z" style="fill: var(--accent-soft); fill-opacity: .7"/>
+            <line class="d-ln-acc" x1="565" y1="162" x2="565" y2="54" marker-end="url(#p05a-ah)"/>
+            <path class="d-ln" d="M565 150 L575 150 L575 162"/>
+            <text class="d-t" x="573" y="62" style="fill: var(--accent)">u</text>
+            <circle class="pt-tree" cx="480" cy="188" r="4.5"/>
+            <circle class="pt-tree" cx="532" cy="191" r="4.5"/>
+            <circle class="pt-tree" cx="592" cy="186" r="4.5"/>
+            <circle class="pt-tree" cx="626" cy="176" r="4.5"/>
+            <circle class="pt-tree" cx="508" cy="162" r="4.5"/>
+            <circle class="pt-tree" cx="540" cy="144" r="4.5"/>
+            <circle class="pt-tree" cx="612" cy="152" r="4.5"/>
+            <circle class="pt-tree" cx="652" cy="132" r="4.5"/>
+            <circle class="pt-tree" cx="600" cy="128" r="4.5"/>
+            <circle class="pt-tree" cx="530" cy="127" r="4.5"/>
+            <text class="d-s" x="430" y="228">u = [a² + b² − r², 1, 1, 0, −2a, −2b]</text>
+            <text class="d-s" x="430" y="246">φ(xᵢ)ᵀu = 0 for every data point</text>
+            <text class="d-s" x="430" y="264">a linear relation (6-D drawn as 3-D)</text>
+          </svg>
+        </div>
+        <figcaption><b>Lifting the circle (schematic).</b> In \(\mathbb{R}^2\) the points obey a quadratic equation. After \(\phi\), every point is orthogonal to the one fixed vector \(\mathbf{u}\), so the lifted data sits on a flat subspace, the kind of structure PCA can find.</figcaption>
+      </figure>
+      <p class="note">\(\phi\) is defined for every point of \(\mathbb{R}^2\). Only points that lie on this particular circle land orthogonal to \(\mathbf{u}\).</p>
+    </section>
+
+    <section id="map-then-pca">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=704s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 11:44</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=803s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 13:23 use the n × n matrix</a>
+        </div>
+        <h2>The idea: map up, then run PCA</h2>
+      </div>
+      <p>Turn the example into a method. Choose a map \(\phi : \mathbb{R}^d \to \mathbb{R}^D\) into a higher dimension, \(D > d\), in the hope that the mapped data lies in a low-dimensional <i>linear</i> subspace of \(\mathbb{R}^D\). Finding the important directions of such a subspace is exactly what PCA does.</p>
+      <p>Mapping up makes \(D\) large, possibly much larger than \(n\). That is issue 1 again, and Part 4 already solved it: instead of the \(D \times D\) matrix built from \(\phi(X)\phi(X)^\top\), work with the \(n \times n\) matrix \(\phi(X)^\top\phi(X)\).</p>
+      <div class="eq">\[ \phi(X) = \big[\,\phi(\mathbf{x}_1)\ \ \phi(\mathbf{x}_2)\ \cdots\ \phi(\mathbf{x}_n)\,\big] \in \mathbb{R}^{D \times n}, \qquad \phi(X)^\top\phi(X) \in \mathbb{R}^{n \times n} \]</div>
+      <p class="note">Writing \(\phi(X)\) for a matrix is a slight abuse of notation: it means \(\phi\) applied to each column (each data point) of \(X\).</p>
+      <p>Where did the non-linearity go? Into \(\phi\). The map holds whatever non-linear functions of the features we want to allow. After mapping, PCA only has to find linear structure, which it does well.</p>
+      <p class="rule-of-thumb">Curved in \(\mathbb{R}^d\) can be flat in \(\mathbb{R}^D\). Map with \(\phi\), then run ordinary PCA through the \(n \times n\) matrix.</p>
+    </section>
+
+    <section id="blow-up">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=907s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 15:07</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=zcxnCyVSh70&amp;t=1033s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L10 · 17:13 growth like dᵖ</a>
+        </div>
+        <h2>The catch: the feature space explodes</h2>
+      </div>
+      <p>The idea is sound, but it runs into a bottleneck at once. Suppose there are four features (say height, weight, age and gender) and we want \(\phi\) to capture every cubic relationship, such as height × weight × age or height × weight², all combinations whose powers add up to at most 3.</p>
+      <p>The lecture tallies the coordinates by degree: a constant, the 4 features themselves, the \(\binom{4}{2} = 6\) pairs \(f_1f_2, f_1f_3, \dots, f_3f_4\), and the \(\binom{4}{3} = 4\) triples. That gives \(1 + 4 + 6 + 4 = 15\) coordinates. With \(d\) features and relationships up to power \(p\):</p>
+      <div class="eq">\[ D = \sum_{i=0}^{p} \binom{d}{i} \quad \text{which grows roughly like } d^{\,p} \]</div>
+      <p>The lecture's illustrations: with \(d = 10\) and 15th-power relationships, \(\phi\) would have about \(10^{15}\) coordinates instead of 10. Even two features with 20th-power relationships would need about \(2^{20}\). Spaces like that are simply too large to work with, and the problem gets worse as either \(d\) or \(p\) grows.</p>
+      <p class="callout"><b>Standard counts, not from the lecture.</b> The tally above counts products of <i>distinct</i> features only. Counting every monomial of degree at most \(p\), including powers such as weight² that the lecture also mentions, gives \(\binom{d+p}{p}\). \(d^p\) counts ordered products (\(f_1f_2\) and \(f_2f_1\) separately). For fixed \(p\) and large \(d\), all three grow like a constant times \(d^p\), which is the lecture's point. When \(p\) exceeds \(d\), as in the two extreme examples, \(d^p\) overstates the count by a lot.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">d</th><th class="num">p</th><th class="num">Distinct products, Σ C(d, i)</th><th class="num">All monomials, C(d+p, p)</th><th class="num">dᵖ</th></tr></thead>
+          <tbody>
+            <tr><td class="num">2</td><td class="num">2</td><td class="num">4</td><td class="num">6</td><td class="num">4</td></tr>
+            <tr><td class="num">4</td><td class="num">3</td><td class="num">15</td><td class="num">35</td><td class="num">64</td></tr>
+            <tr><td class="num">10</td><td class="num">3</td><td class="num">176</td><td class="num">286</td><td class="num">1,000</td></tr>
+            <tr><td class="num">100</td><td class="num">3</td><td class="num">166,751</td><td class="num">176,851</td><td class="num">10⁶</td></tr>
+            <tr><td class="num">100</td><td class="num">5</td><td class="num">79,375,496</td><td class="num">96,560,646</td><td class="num">10¹⁰</td></tr>
+            <tr><td class="num">1000</td><td class="num">3</td><td class="num">166,667,501</td><td class="num">167,668,501</td><td class="num">10⁹</td></tr>
+            <tr><td class="num">10</td><td class="num">15</td><td class="num">1,024</td><td class="num">3,268,760</td><td class="num">10¹⁵</td></tr>
+            <tr><td class="num">2</td><td class="num">20</td><td class="num">4</td><td class="num">231</td><td class="num">1,048,576</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">The first row is the circle example: the map \(\phi\) above, with its 6 coordinates, is exactly the list of all monomials of degree at most 2 in two features. With a thousand features and cubic relationships, each point would need over \(10^8\) coordinates.</p>
+      <p>Whichever way the coordinates are counted, computing \(\phi(\mathbf{x})\) explicitly soon becomes impractical. Lecture 11 starts from this bottleneck.</p>
+    </section>
+
+    <!-- ============ LECTURE 11 ============ -->
+    <section id="only-dots">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=13s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 0:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=46s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 0:46 pairwise dot products</a>
+        </div>
+        <h2>PCA only needs dot products</h2>
+      </div>
+      <p>\(\phi(\mathbf{x}) \in \mathbb{R}^D\) may be too expensive to compute. The obstacle is size: there are simply too many coordinates. Without \(\phi(\mathbf{x})\), is PCA in the feature space doomed?</p>
+      <p>Look at what the \(n \times n\) route actually uses. Its eigenvectors come from \(\phi(X)^\top\phi(X)\), and entry \((i, j)\) of that matrix is a dot product of two mapped points:</p>
+      <div class="eq">\[ K = \phi(X)^\top\phi(X), \qquad K_{ij} = \phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_j) \]</div>
+      <p>So we need the pairwise dot products, not the mapped vectors themselves. The obvious route is to map \(\mathbf{x}_i\) and \(\mathbf{x}_j\) with \(\phi\) and then take the dot product. The question is whether there is a direct route from \(\mathbf{x}_i, \mathbf{x}_j\) to the number \(\phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_j)\) that never computes \(\phi\). The lecturer admits this "sounds like magic". Without such a route, capturing complicated \(p\)-th power relationships would be out of reach.</p>
+    </section>
+
+    <section id="quadratic">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=210s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 3:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=312s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 5:12 collect terms</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=511s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 8:31 no φ computed</a>
+        </div>
+        <h2>One function, a dot product in \(\mathbb{R}^6\)</h2>
+      </div>
+      <p>Let \(\mathbf{x} = [f_1, f_2]^\top\) and \(\mathbf{x}' = [g_1, g_2]^\top\), and consider a function pulled out of a hat: \((\mathbf{x}^\top\mathbf{x}' + 1)^2\). Expand it:</p>
+      <div class="eq">\[ (\mathbf{x}^\top\mathbf{x}' + 1)^2 = (f_1g_1 + f_2g_2 + 1)^2 = f_1^2g_1^2 + f_2^2g_2^2 + 1 + 2f_1g_1f_2g_2 + 2f_1g_1 + 2f_2g_2 \]</div>
+      <p>Each term is a product of something that depends only on \(\mathbf{x}\) and something that depends only on \(\mathbf{x}'\). Collect the \(\mathbf{x}\) parts into one vector and the \(\mathbf{x}'\) parts into another. A factor of 2 is split as \(\sqrt2 \cdot \sqrt2\), one \(\sqrt2\) on each side:</p>
+      <div class="eq">\[ (\mathbf{x}^\top\mathbf{x}' + 1)^2 = \begin{bmatrix} f_1^2 \\ f_2^2 \\ 1 \\ \sqrt2 f_1f_2 \\ \sqrt2 f_1 \\ \sqrt2 f_2 \end{bmatrix}^\top \begin{bmatrix} g_1^2 \\ g_2^2 \\ 1 \\ \sqrt2 g_1g_2 \\ \sqrt2 g_1 \\ \sqrt2 g_2 \end{bmatrix} \]</div>
+      <p>The two vectors have the same functional form: the same recipe applied to \(\mathbf{x}\) and to \(\mathbf{x}'\). That recipe is a feature map.</p>
+      <div class="result">
+        <span class="lbl">The quadratic example</span>
+        \[ \phi\!\left(\begin{bmatrix} a \\ b \end{bmatrix}\right) = \begin{bmatrix} a^2 & b^2 & 1 & \sqrt2\,ab & \sqrt2\,a & \sqrt2\,b \end{bmatrix}^\top, \qquad (\mathbf{x}^\top\mathbf{x}' + 1)^2 = \phi(\mathbf{x})^\top\phi(\mathbf{x}') \]
+        <p>The calculation on the left is two-dimensional: one dot product in \(\mathbb{R}^2\), add 1, square. The number it produces is a dot product in \(\mathbb{R}^6\). We computed \(\phi(\mathbf{x})^\top\phi(\mathbf{x}')\) without computing \(\phi(\mathbf{x})\).</p>
+      </div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 250" role="img" aria-label="Two routes from x and x prime in R2 to the same number. Route 1 maps both points to R6 with phi and takes a six-term dot product. Route 2 computes x transpose x prime plus one, squared, staying in R2.">
+            <defs>
+              <marker id="p05b-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p05b-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <text class="d-row" x="85" y="88" text-anchor="middle">inputs in ℝ²</text>
+            <rect class="d-box" x="20" y="96" width="130" height="58" rx="8"/>
+            <text class="d-t" x="85" y="120" text-anchor="middle">x = [f₁, f₂]</text>
+            <text class="d-t" x="85" y="141" text-anchor="middle">x′ = [g₁, g₂]</text>
+
+            <text class="d-row" x="190" y="20">Route 1 · map, then dot product</text>
+            <rect class="d-box" x="190" y="30" width="240" height="58" rx="8"/>
+            <text class="d-t" x="310" y="54" text-anchor="middle">φ(x), φ(x′) ∈ ℝ⁶</text>
+            <text class="d-al" x="310" y="74" text-anchor="middle">[f₁², f₂², 1, √2f₁f₂, √2f₁, √2f₂]</text>
+            <path class="d-ln" d="M150 112 L188 70" marker-end="url(#p05b-ah)"/>
+            <path class="d-ln" d="M430 59 L557 111" marker-end="url(#p05b-ah)"/>
+            <text class="d-s" x="470" y="58">6 products, then add</text>
+
+            <rect class="d-box-acc" x="190" y="162" width="240" height="58" rx="8"/>
+            <text class="d-t" x="310" y="186" text-anchor="middle">(xᵀx′ + 1)²</text>
+            <text class="d-al" x="310" y="206" text-anchor="middle">(f₁g₁ + f₂g₂ + 1)²</text>
+            <text class="d-row" x="190" y="242">Route 2 · kernel formula, stays in ℝ²</text>
+            <path class="d-ln-acc" d="M150 138 L188 182" marker-end="url(#p05b-ah-acc)"/>
+            <path class="d-ln-acc" d="M430 191 L557 141" marker-end="url(#p05b-ah-acc)"/>
+            <text class="d-s" x="470" y="214">2 products, add 1, square</text>
+
+            <rect class="b-ok" x="560" y="96" width="120" height="58" rx="8"/>
+            <text class="d-t" x="620" y="120" text-anchor="middle">k(x, x′)</text>
+            <text class="d-s" x="620" y="140" text-anchor="middle">same number</text>
+          </svg>
+        </div>
+        <figcaption><b>Two routes to one number.</b> Route 1 builds both six-dimensional vectors and dots them. Route 2 never leaves \(\mathbb{R}^2\), yet returns the same value, the dot product in the feature space.</figcaption>
+      </figure>
+
+      <p>Mapping from 2 to 6 dimensions is not much of a saving; we could just compute \(\phi\) and work in \(\mathbb{R}^6\). The trick matters when \(d\) is large and the power \(p\) is high. The calculator below does both routes for any two points in \(\mathbb{R}^2\) and powers up to 4.</p>
+
+      <figure id="kc-fig">
+        <div class="controls">
+          <span class="ctl"><label for="kc-f1">f₁</label><input type="range" id="kc-f1" min="-2" max="2" step="0.1" value="1"><output id="kc-f1-out" for="kc-f1">1.0</output></span>
+          <span class="ctl"><label for="kc-f2">f₂</label><input type="range" id="kc-f2" min="-2" max="2" step="0.1" value="0.5"><output id="kc-f2-out" for="kc-f2">0.5</output></span>
+          <span class="ctl"><label for="kc-g1">g₁</label><input type="range" id="kc-g1" min="-2" max="2" step="0.1" value="2"><output id="kc-g1-out" for="kc-g1">2.0</output></span>
+          <span class="ctl"><label for="kc-g2">g₂</label><input type="range" id="kc-g2" min="-2" max="2" step="0.1" value="-1"><output id="kc-g2-out" for="kc-g2">-1.0</output></span>
+          <span class="ctl"><label for="kc-p">Power p</label><input type="range" id="kc-p" min="1" max="4" step="1" value="2"><output id="kc-p-out" for="kc-p">2</output></span>
+          <button class="btn" id="kc-rand" type="button">Random pair</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Route 1: φ(x)ᵀφ(x′)</span><span class="v" id="kc-exp">–</span></div>
+          <div><span class="k">Route 2: (xᵀx′ + 1)ᵖ</span><span class="v mine" id="kc-ker">–</span></div>
+          <div><span class="k">Dimension of φ(x)</span><span class="v" id="kc-dim">–</span></div>
+        </div>
+        <div class="status" id="kc-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="kc-svg" viewBox="0 0 560 320" role="img" aria-label="Waterfall chart. Each bar is one coordinate product phi_m of x times phi_m of x prime, stacked from zero. The final bar is their sum, and a dashed line marks the kernel value computed directly; the two always meet."></svg></div>
+        <figcaption><b>A kernel value computed two ways.</b> \(\mathbf{x} = [f_1, f_2]\), \(\mathbf{x}' = [g_1, g_2]\). Each bar adds one coordinate's product \(\phi_m(\mathbf{x})\,\phi_m(\mathbf{x}')\) to a running total (filled bars add, hollow bars subtract); the last bar is the total, and the dashed line is \((\mathbf{x}^\top\mathbf{x}'+1)^p\) computed directly. At \(p = 2\) the six bars are the six terms of the expansion above, in the same order. Raising \(p\) shows how the length of \(\phi(\mathbf{x})\) grows.</figcaption>
+      </figure>
+    </section>
+
+    <section id="polynomial-kernel">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=656s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 10:56</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=719s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 11:59 what "valid" means</a>
+        </div>
+        <h2>Polynomial kernels, and what "valid" means</h2>
+      </div>
+      <p>The same works in general. For \(\mathbf{x}, \mathbf{x}' \in \mathbb{R}^d\) and any power \(p \ge 1\), consider</p>
+      <div class="eq">\[ k(\mathbf{x}, \mathbf{x}') = (\mathbf{x}^\top\mathbf{x}' + 1)^p \]</div>
+      <p>The lecture states, without proof, that this is a <dfn>valid</dfn> function. Valid has a precise meaning here:</p>
+      <div class="eq">\[ k \text{ is valid} \iff \text{there is a map } \phi : \mathbb{R}^d \to \mathbb{R}^D \text{ with } k(\mathbf{x}, \mathbf{x}') = \phi(\mathbf{x})^\top\phi(\mathbf{x}') \text{ for all } \mathbf{x}, \mathbf{x}' \]</div>
+      <p>Validity is what lets us trust \(k\). If such a \(\phi\) exists, the matrix with entries \(k(\mathbf{x}_i, \mathbf{x}_j)\) really is \(\phi(X)^\top\phi(X)\), and its eigenvectors give PCA in the feature space. If no such \(\phi\) exists, that matrix means nothing for PCA. Not every function computes dot products in some space; an arbitrary formula usually does not.</p>
+      <p>One way to convince yourself that \(k\) is valid is to write the map down. An explicit \(\phi\) is a <i>certificate</i> of validity, exactly as for \(p = 2\) with two features.</p>
+      <p class="callout"><b>Exercise from the lecture</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=751s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:31</a>. Write out \(\phi\) explicitly for \(p = 3\) and \(p = 4\), and watch how its dimension grows with \(d\) and \(p\). A check (standard result): \((\mathbf{x}^\top\mathbf{x}'+1)^p\) needs one coordinate per monomial of degree at most \(p\), so \(\binom{d+p}{p}\) coordinates. For \(d = 2\) that is 3, 6, 10 and 15 for \(p = 1, \dots, 4\), which the calculator shows.</p>
+    </section>
+
+    <section id="rbf">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=853s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 14:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=921s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 15:21 infinite dimensions</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=1120s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 18:40 power series</a>
+        </div>
+        <h2>The radial basis function kernel</h2>
+      </div>
+      <p>A second famous example, widely used in machine learning:</p>
+      <div class="eq">\[ k(\mathbf{x}, \mathbf{x}') = \exp\!\left(-\frac{\lVert\mathbf{x} - \mathbf{x}'\rVert^2}{2\sigma^2}\right), \qquad \sigma > 0 \]</div>
+      <p>It looks like the Gaussian density, so it is sometimes called the <dfn>Gaussian kernel</dfn>; the standard name is the <dfn>radial basis function (RBF) kernel</dfn>. It is also valid: there is a \(\phi\) for which it computes dot products.</p>
+      <p>What is surprising is the dimension of that \(\phi\). For the polynomial kernel, \(D\) grew like \(d^p\). For the RBF kernel, \(\phi\) maps each point into an <b>infinite-dimensional</b> space. Infinity brings technicalities that the course sets aside. The working picture:</p>
+      <ul>
+        <li><b>A point becomes a function.</b> A function takes any real input and returns a number, so you can think of it as an infinitely long vector, one coordinate per input (uncountably many). The RBF map sends each data point to such a function.</li>
+        <li><b>Dot products become integrals.</b> A dot product sums coordinate-by-coordinate products. For functions the sum over coordinates becomes an integral.</li>
+        <li><b>Another way to see it.</b> \(e^z\) has a power series containing every power of \(z\), with shrinking weights. So the RBF kernel mixes in polynomial relationships of every degree, each contributing a little less than the last.</li>
+      </ul>
+      <p class="callout"><b>Standard expansion, not worked in the lecture.</b> For \(d = 1\) and \(\sigma = 1\): \(e^{-(x-x')^2/2} = e^{-x^2/2}\,e^{-x'^2/2}\,e^{xx'}\) and \(e^{xx'} = \sum_{m=0}^{\infty} \frac{x^m}{\sqrt{m!}}\cdot\frac{x'^m}{\sqrt{m!}}\). So \(\phi(x) = e^{-x^2/2}\,\big[1,\ x,\ \tfrac{x^2}{\sqrt{2!}},\ \tfrac{x^3}{\sqrt{3!}},\ \dots\big]\) works, with one coordinate for every power \(m\).</p>
+    </section>
+
+    <section id="kernel-functions">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=1152s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 19:12</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=1290s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 21:30 is it a kernel?</a>
+        </div>
+        <h2>Kernel functions</h2>
+      </div>
+      <p>Valid functions get a name. "Kernel" means several things in mathematics; in machine learning it means this:</p>
+      <div class="result">
+        <span class="lbl">Definition</span>
+        <p>A function \(k : \mathbb{R}^d \times \mathbb{R}^d \to \mathbb{R}\) is a <dfn>kernel function</dfn> if it is valid: there is a map \(\phi : \mathbb{R}^d \to \mathbb{R}^D\) (\(D\) may be infinite) such that</p>
+        \[ k(\mathbf{x}, \mathbf{x}') = \phi(\mathbf{x})^\top\phi(\mathbf{x}') \quad \text{for all } \mathbf{x}, \mathbf{x}' \in \mathbb{R}^d \]
+      </div>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Name</th><th>\(k(\mathbf{x}, \mathbf{x}')\)</th><th>Dimension of \(\phi\)</th></tr></thead>
+          <tbody>
+            <tr><td>Polynomial kernel of power \(p\)</td><td>\((\mathbf{x}^\top\mathbf{x}' + 1)^p\)</td><td>Finite, grows fast with \(d\) and \(p\)</td></tr>
+            <tr><td>RBF (Gaussian) kernel</td><td>\(\exp\!\big(-\lVert\mathbf{x}-\mathbf{x}'\rVert^2 / (2\sigma^2)\big)\)</td><td>Infinite</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>These are two examples among many. A different non-linear function may suit a given problem better. So the general question is: given some \(k : \mathbb{R}^d \times \mathbb{R}^d \to \mathbb{R}\) and the claim that it is a kernel, how would you check?</p>
+      <p><b>Method 1: exhibit \(\phi\).</b> Find a map \(\phi\) explicitly and show \(k(\mathbf{x}, \mathbf{x}') = \phi(\mathbf{x})^\top\phi(\mathbf{x}')\), as we did for the quadratic kernel. This is the standard method, but coming up with the map can be hard. Since not every function is a kernel, we want a test that does not require finding \(\phi\).</p>
+    </section>
+
+    <section id="mercer">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=1393s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 23:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=1466s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 24:26 symmetry</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=1533s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 25:33 PSD</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G6rMGLhw3IQ&amp;t=1677s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L11 · 27:57 necessity</a>
+        </div>
+        <h2>Mercer's theorem: which functions are kernels</h2>
+      </div>
+      <p><b>Method 2</b> is <dfn>Mercer's theorem</dfn>. The course states an informal, machine-learning version rather than the fully rigorous one, and does not prove it.</p>
+      <div class="result">
+        <span class="lbl">Mercer's theorem (informal)</span>
+        <p>A function \(k : \mathbb{R}^d \times \mathbb{R}^d \to \mathbb{R}\) is a valid kernel <b>if and only if</b> both of these hold:</p>
+        <ol>
+          <li><b>Symmetry.</b> \(k(\mathbf{x}, \mathbf{x}') = k(\mathbf{x}', \mathbf{x})\) for all \(\mathbf{x}, \mathbf{x}'\).</li>
+          <li><b>Positive semi-definite kernel matrices.</b> For <i>any</i> data set \(\{\mathbf{x}_1, \dots, \mathbf{x}_n\}\) (any \(n\), any points), the \(n \times n\) matrix \(K\) with \(K_{ij} = k(\mathbf{x}_i, \mathbf{x}_j)\) is positive semi-definite: all of its eigenvalues are \(\ge 0\).</li>
+        </ol>
+      </div>
+      <p>The "if and only if" is what makes the theorem powerful: it characterizes validity completely. \(K\) is symmetric automatically once \(k\) is, so condition (b) is about the signs of its eigenvalues.</p>
+      <h3>Why symmetry is necessary</h3>
+      <p>If \(k\) is valid, \(k(\mathbf{x}, \mathbf{x}') = \phi(\mathbf{x})^\top\phi(\mathbf{x}')\). The dot product is symmetric, so this equals \(\phi(\mathbf{x}')^\top\phi(\mathbf{x}) = k(\mathbf{x}', \mathbf{x})\). So if you can find a single pair with \(k(\mathbf{x}, \mathbf{x}') \ne k(\mathbf{x}', \mathbf{x})\), the claim that \(k\) is a kernel is dead. A symmetric function, though, is not automatically a kernel; condition (b) must also hold.</p>
+      <h3>Why non-negative eigenvalues are necessary</h3>
+      <p>If \(k\) is valid then \(K_{ij} = \phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_j)\), so \(K = \phi(X)^\top\phi(X)\) for some \(\phi\), even if we do not know which. From Part 4, the non-zero eigenvalues of \(\phi(X)^\top\phi(X)\) are the same as those of \(\phi(X)\phi(X)^\top\). That matrix is \(n\) times the covariance matrix in the feature space, and its eigenvalues are \(n\) times the variance along the corresponding eigenvectors. A variance cannot be negative. So every eigenvalue of \(K\) is \(\ge 0\). Zero is allowed; negative is not.</p>
+      <p class="note">The same fact in one line (standard): for any \(\mathbf{v} \in \mathbb{R}^n\), \(\mathbf{v}^\top K\mathbf{v} = \mathbf{v}^\top\phi(X)^\top\phi(X)\mathbf{v} = \lVert\phi(X)\mathbf{v}\rVert^2 \ge 0\), and \(\mathbf{v}^\top K\mathbf{v} \ge 0\) for all \(\mathbf{v}\) is the usual definition of positive semi-definite.</p>
+      <p>So both conditions are <b>necessary</b>, and that direction is easy. Mercer's theorem adds that together they are also <b>sufficient</b>. That direction is more involved and is not proved in the course, but it is the part that lets you certify a kernel without ever finding \(\phi\).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 296" role="img" aria-label="Flow for checking a candidate function k. Method 1 goes straight to valid by exhibiting phi. Method 2, Mercer: check symmetry, then check that every kernel matrix has non-negative eigenvalues; failing either means not a kernel, passing both means valid.">
+            <defs><marker id="p05c-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-s" x="82" y="56">Method 1 · exhibit φ explicitly: a certificate of validity</text>
+            <path class="d-ln d-dash" d="M70 110 L70 64 L615 64 L615 97" marker-end="url(#p05c-ah)"/>
+
+            <rect class="d-box" x="10" y="110" width="120" height="70" rx="8"/>
+            <text class="d-t" x="70" y="140" text-anchor="middle">Candidate k</text>
+            <text class="d-s" x="70" y="160" text-anchor="middle">k : ℝᵈ × ℝᵈ → ℝ</text>
+            <path class="d-ln" d="M130 145 L157 145" marker-end="url(#p05c-ah)"/>
+
+            <rect class="d-box-acc" x="160" y="100" width="160" height="90" rx="8"/>
+            <text class="d-t" x="240" y="126" text-anchor="middle">(a) Symmetric?</text>
+            <text class="d-s" x="240" y="148" text-anchor="middle">k(x, x′) = k(x′, x)</text>
+            <text class="d-s" x="240" y="166" text-anchor="middle">for all x, x′</text>
+            <path class="d-ln" d="M320 145 L347 145" marker-end="url(#p05c-ah)"/>
+            <text class="d-s" x="334" y="137" text-anchor="middle">yes</text>
+
+            <rect class="d-box-acc" x="350" y="100" width="160" height="90" rx="8"/>
+            <text class="d-t" x="430" y="126" text-anchor="middle">(b) PSD?</text>
+            <text class="d-s" x="430" y="148" text-anchor="middle">every data set gives a K</text>
+            <text class="d-s" x="430" y="166" text-anchor="middle">with eigenvalues ≥ 0</text>
+            <path class="d-ln" d="M510 145 L537 145" marker-end="url(#p05c-ah)"/>
+            <text class="d-s" x="524" y="137" text-anchor="middle">yes</text>
+
+            <rect class="b-ok" x="540" y="100" width="150" height="90" rx="8"/>
+            <text class="d-t" x="615" y="126" text-anchor="middle">Valid kernel</text>
+            <text class="d-s" x="615" y="148" text-anchor="middle">some φ has</text>
+            <text class="d-s" x="615" y="166" text-anchor="middle">k(x, x′) = φ(x)ᵀφ(x′)</text>
+
+            <path class="d-ln" d="M240 190 L240 227" marker-end="url(#p05c-ah)"/>
+            <text class="d-s" x="248" y="214">no</text>
+            <rect class="b-bad" x="180" y="230" width="120" height="34" rx="8"/>
+            <text class="d-s" x="240" y="251" text-anchor="middle">not a kernel</text>
+            <path class="d-ln" d="M430 190 L430 227" marker-end="url(#p05c-ah)"/>
+            <text class="d-s" x="438" y="214">no</text>
+            <rect class="b-bad" x="370" y="230" width="120" height="34" rx="8"/>
+            <text class="d-s" x="430" y="251" text-anchor="middle">not a kernel</text>
+
+            <text class="d-s" x="20" y="288">Method 2 · Mercer: (a) and (b) are necessary (easy to show) and together sufficient (not proved in the course)</text>
+          </svg>
+        </div>
+        <figcaption><b>Two ways to settle "is k a kernel?".</b> Exhibiting \(\phi\) proves validity directly. Mercer's theorem replaces the search for \(\phi\) with two checks on \(k\) itself: symmetry, and non-negative eigenvalues for every kernel matrix it can produce.</figcaption>
+      </figure>
+      <p class="rule-of-thumb">To rule a function out, one counterexample is enough: one asymmetric pair, or one data set whose kernel matrix has a negative eigenvalue.</p>
+    </section>
+
+    <!-- ============ LECTURE 12 ============ -->
+    <section id="kpca-steps">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=13s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 0:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=93s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 1:33 compute K</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=135s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 2:15 normalize</a>
+        </div>
+        <h2>Kernel PCA: the eigenvectors of \(K\)</h2>
+      </div>
+      <p>Lecture 12 puts everything together into <dfn>kernel PCA</dfn>: PCA that can capture non-linear relationships between features, with kernels doing the mapping. The input is the data set \(\{\mathbf{x}_1, \dots, \mathbf{x}_n\}\), \(\mathbf{x}_i \in \mathbb{R}^d\), together with a kernel \(k : \mathbb{R}^d \times \mathbb{R}^d \to \mathbb{R}\) already known to be valid (say, checked with Mercer's theorem). The kernel fixes some \(\phi : \mathbb{R}^d \to \mathbb{R}^D\), which we never compute.</p>
+      <h3>Why the eigenvectors of \(K\) are enough</h3>
+      <p>This is the argument of <a href="part-04.html">Part 4</a> with \(\phi(\mathbf{x}_i)\) in place of \(\mathbf{x}_i\). For now assume the mapped points are centred (fixed <a href="#centring">below</a>). PCA in the feature space wants the eigenvectors of the feature-space covariance matrix:</p>
+      <div class="eq">\[ C = \frac1n\sum_{i=1}^n \phi(\mathbf{x}_i)\phi(\mathbf{x}_i)^\top = \frac1n\,\phi(X)\phi(X)^\top \in \mathbb{R}^{D\times D}, \qquad C\mathbf{w}_k = \lambda_k\mathbf{w}_k, \quad \lVert\mathbf{w}_k\rVert = 1 \]</div>
+      <ol>
+        <li><b>\(\mathbf{w}_k\) is a combination of the mapped points.</b> Substitute the sum for \(C\) and move \(\lambda_k \ne 0\) across: \(\mathbf{w}_k = \sum_i \frac{\phi(\mathbf{x}_i)^\top\mathbf{w}_k}{n\lambda_k}\,\phi(\mathbf{x}_i)\). So \(\mathbf{w}_k = \phi(X)\,\boldsymbol\alpha_k\) for some weight vector \(\boldsymbol\alpha_k \in \mathbb{R}^n\).</li>
+        <li><b>The weights solve an eigen-equation in \(K\).</b> Put \(\mathbf{w}_k = \phi(X)\boldsymbol\alpha_k\) into \(\phi(X)\phi(X)^\top\mathbf{w}_k = n\lambda_k\mathbf{w}_k\) and multiply on the left by \(\phi(X)^\top\): \(K^2\boldsymbol\alpha_k = n\lambda_k K\boldsymbol\alpha_k\) with \(K = \phi(X)^\top\phi(X)\). Any \(\boldsymbol\alpha_k\) with \(K\boldsymbol\alpha_k = n\lambda_k\boldsymbol\alpha_k\) satisfies it.</li>
+        <li><b>Unit length fixes the scale.</b> \(1 = \mathbf{w}_k^\top\mathbf{w}_k = \boldsymbol\alpha_k^\top\phi(X)^\top\phi(X)\boldsymbol\alpha_k = \boldsymbol\alpha_k^\top K\boldsymbol\alpha_k\).</li>
+        <li><b>Convert the solver's output.</b> An eigen-solver returns unit vectors \(\boldsymbol\beta_k\) with \(K\boldsymbol\beta_k = n\lambda_k\boldsymbol\beta_k\) (the non-zero eigenvalues of \(K\) and \(nC\) agree). Then \(\boldsymbol\beta_k^\top K\boldsymbol\beta_k = n\lambda_k\), so dividing by \(\sqrt{n\lambda_k}\) gives \(\boldsymbol\alpha_k^\top K\boldsymbol\alpha_k = n\lambda_k / n\lambda_k = 1\).</li>
+        <li><b>The kernel supplies \(K\).</b> \(K_{ij} = \phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_j) = k(\mathbf{x}_i, \mathbf{x}_j)\). Nothing so far needs \(\phi\).</li>
+      </ol>
+      <ol class="algo">
+        <li class="algo-title">Kernel PCA, steps 1 and 2</li>
+        <li><b>Kernel matrix.</b> Compute \(K \in \mathbb{R}^{n\times n}\) with \(K_{ij} = k(\mathbf{x}_i, \mathbf{x}_j)\) for all \(i, j\).</li>
+        <li><b>Eigen-decompose and normalize.</b> Find unit eigenvectors \(\boldsymbol\beta_1, \dots, \boldsymbol\beta_l\) of \(K\) with eigenvalues \(n\lambda_1 \ge \dots \ge n\lambda_l\), for as many directions \(l\) as you want. Set \(\boldsymbol\alpha_k = \boldsymbol\beta_k / \sqrt{n\lambda_k}\).</li>
+      </ol>
+      <p class="note">The lecture briefly renames the component index to avoid a clash with the kernel \(k\). Here \(k\) as a subscript always counts components; \(k(\cdot, \cdot)\) is the kernel.</p>
+    </section>
+
+    <section id="projections">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=206s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 3:26 wₖ needs φ</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=306s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 5:06 projections still work</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=571s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 9:31 modified step 3</a>
+        </div>
+        <h2>Step 3: projections without the eigenvectors</h2>
+      </div>
+      <p>In Part 4, step 3 rebuilt the directions as \(\mathbf{w}_k = X\boldsymbol\alpha_k\). Here it would be \(\mathbf{w}_k = \phi(X)\boldsymbol\alpha_k\): combine the mapped points with the weights \(\boldsymbol\alpha_k\). That needs \(\phi(\mathbf{x})\), which defeats the purpose. The whole point of going through the kernel matrix was to avoid computing \(\phi\). When \(\phi\) maps into an infinite-dimensional space, as for the RBF kernel, it cannot be computed at all. So we do not compute \(\mathbf{w}_k\), and the eigenvectors of the feature-space covariance matrix stay out of reach.</p>
+      <p>What we can still compute is the <b>compressed representation</b>. In PCA, compressing a point means storing its projection on each important direction, \(\phi(\mathbf{x}_i)^\top\mathbf{w}_k\) for the \(k\)-th direction. Expand \(\mathbf{w}_k\) and move \(\phi(\mathbf{x}_i)\) inside the sum:</p>
+      <div class="eq">\[ \phi(\mathbf{x}_i)^\top\mathbf{w}_k = \phi(\mathbf{x}_i)^\top\sum_{j=1}^n \alpha_{kj}\,\phi(\mathbf{x}_j) = \sum_{j=1}^n \alpha_{kj}\,\phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_j) = \sum_{j=1}^n \alpha_{kj}\,K_{ij} \]</div>
+      <p>The projection depends only on dot products among the data points, and the kernel computes those. The direction itself stays unknown, yet the value of every projection is computable.</p>
+      <div class="result">
+        <span class="lbl">Modified step 3: the new representation</span>
+        \[ \mathbf{x}_i \;\longmapsto\; \Big(\, \sum_{j=1}^n \alpha_{1j}K_{ij},\ \ \sum_{j=1}^n \alpha_{2j}K_{ij},\ \ \dots,\ \ \sum_{j=1}^n \alpha_{lj}K_{ij} \Big) \in \mathbb{R}^l \]
+        <p>Entry \(k\) is the projection of \(\phi(\mathbf{x}_i)\) on the \(k\)-th principal direction in the feature space. With centring (next section), \(K\) here is the centred matrix \(K^c\).</p>
+      </div>
+      <p>There is a nice reading of this <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=644s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:44</a>. The numbers \(K_{i1}, \dots, K_{in}\) are row \(i\) of the kernel matrix: how similar point \(i\) is to each data point, as measured by the kernel. Each new coordinate weights those similarities by one \(\boldsymbol\alpha_k\) and adds them up.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 220" role="img" aria-label="An n by n kernel matrix with row i highlighted, multiplied by the column vector alpha k, gives a column whose entry i is highlighted: z i k, the sum over j of alpha k j times K i j.">
+            <text class="d-t" x="138" y="40" text-anchor="middle">Kᶜ (n × n)</text>
+            <rect class="d-box" x="60" y="52" width="156" height="156"/>
+            <rect class="d-box-acc" x="60" y="104" width="156" height="26"/>
+            <path class="d-rule" d="M86 52 V208 M112 52 V208 M138 52 V208 M164 52 V208 M190 52 V208 M60 78 H216 M60 104 H216 M60 130 H216 M60 156 H216 M60 182 H216"/>
+            <text class="d-s" x="52" y="121" text-anchor="end">row i</text>
+            <text class="d-t" x="234" y="135" text-anchor="middle">×</text>
+            <text class="d-t" x="265" y="40" text-anchor="middle">αₖ</text>
+            <rect class="d-box-acc" x="252" y="52" width="26" height="156"/>
+            <path class="d-rule" d="M252 78 H278 M252 104 H278 M252 130 H278 M252 156 H278 M252 182 H278"/>
+            <text class="d-t" x="296" y="135" text-anchor="middle">=</text>
+            <text class="d-t" x="327" y="40" text-anchor="middle">Kᶜαₖ</text>
+            <rect class="d-box" x="314" y="52" width="26" height="156"/>
+            <rect class="d-box-acc" x="314" y="104" width="26" height="26"/>
+            <path class="d-rule" d="M314 78 H340 M314 156 H340 M314 182 H340"/>
+            <line class="d-ln d-dash" x1="344" y1="117" x2="370" y2="117"/>
+            <text class="d-t" x="378" y="122">zᵢₖ = Σⱼ αₖⱼ Kᶜᵢⱼ</text>
+            <text class="d-s" x="378" y="66">row i: similarities of xᵢ to all n points</text>
+            <text class="d-s" x="378" y="84">αₖ: weights from eigenvector k</text>
+            <text class="d-s" x="378" y="160">one new coordinate of xᵢ;</text>
+            <text class="d-s" x="378" y="178">repeat for k = 1, …, l to get</text>
+            <text class="d-s" x="378" y="196">(zᵢ₁, …, zᵢₗ)</text>
+          </svg>
+        </div>
+        <figcaption><b>A new coordinate is a weighted row of the kernel matrix.</b> Row \(i\) of the (centred) kernel matrix, weighted by \(\boldsymbol\alpha_k\), gives point \(i\)'s \(k\)-th coordinate. Only kernel values enter; \(\phi\) and \(\mathbf{w}_k\) never appear.</figcaption>
+      </figure>
+      <p class="note">A quick check, not made in the lecture: since \(K\boldsymbol\alpha_k = n\lambda_k\boldsymbol\alpha_k\), the coordinate simplifies to \(\sum_j \alpha_{kj}K_{ij} = n\lambda_k\,\alpha_{ki} = \sqrt{n\lambda_k}\,\beta_{ki}\).</p>
+
+      <h3>What the projections are for <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=441s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 7:21</a></h3>
+      <p>The usual reason to run (kernel) PCA is to compute these projections, throw away the original points, and keep only the top few projections per point. A 100-dimensional point becomes, say, the 5 numbers giving its projections on the 5 most important directions. That is where the dimensionality reduction happens. The projections then serve as the data for a downstream task, typically a supervised learning problem later in the course. For that use, the projections are usually good enough.</p>
+      <p>What is lost is <b>reconstruction</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=539s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:59</a>. A proxy is built by multiplying each projection by its eigenvector and adding up, and that needs \(\mathbf{w}_k\), hence \(\phi\). So kernel PCA cannot rebuild proxies in the feature space. In practice step 3 is simply replaced by the projection formula above.</p>
+      <h3>The dimension can go up <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=677s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 11:17</a></h3>
+      <p>The final representation has \(l\) numbers per point, and \(l\) may be larger than the original \(d\). For example, 2-D data might be mapped (implicitly) to a 100-dimensional space and reduced to 10 dimensions there. That looks like an increase from 2 to 10. It is still a low-dimensional representation of the <i>mapped</i> data, and the extra room is what lets it capture the non-linear structure.</p>
+    </section>
+
+    <section id="centring">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=708s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 11:48</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=843s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 14:03 centring without φ</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=1034s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 17:14 the four terms</a>
+        </div>
+        <h2>Centring the kernel</h2>
+      </div>
+      <p>One important detail is still missing. PCA centres the data before forming the covariance matrix, because the directions only make sense for centred data (<a href="part-02.html">Part 2</a>). Even if the original \(\mathbf{x}_i\) are centred, the mapped points \(\phi(\mathbf{x}_1), \dots, \phi(\mathbf{x}_n)\) may not be. That depends on the map, and nothing about a valid kernel guarantees it. So the data must be centred in the feature space, where we cannot compute anything except kernel values.</p>
+      <p>The question becomes: can one function do both jobs, mapping with \(\phi\) and then centring? We want a new kernel matrix \(K^c\) whose entries are dot products of the <i>centred</i> mapped points. The good news is that it can be built from \(K\) alone.</p>
+      <div class="eq">\[ \boldsymbol\mu = \frac1n\sum_{m=1}^n \phi(\mathbf{x}_m), \qquad K^c_{ij} = \big(\phi(\mathbf{x}_i) - \boldsymbol\mu\big)^\top\big(\phi(\mathbf{x}_j) - \boldsymbol\mu\big) = \phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_j) - \boldsymbol\mu^\top\phi(\mathbf{x}_j) - \phi(\mathbf{x}_i)^\top\boldsymbol\mu + \boldsymbol\mu^\top\boldsymbol\mu \]</div>
+      <p>There are four terms. The first is \(K_{ij}\). The lecture leaves the rest as routine algebra. Written out, each is an average of kernel entries:</p>
+      <div class="eq">\[ \phi(\mathbf{x}_i)^\top\boldsymbol\mu = \frac1n\sum_{m=1}^n K_{im}, \qquad \boldsymbol\mu^\top\phi(\mathbf{x}_j) = \frac1n\sum_{m=1}^n K_{mj}, \qquad \boldsymbol\mu^\top\boldsymbol\mu = \frac1{n^2}\sum_{m=1}^n\sum_{m'=1}^n K_{mm'} \]</div>
+      <div class="result">
+        <span class="lbl">Centred kernel matrix</span>
+        \[ K^c_{ij} = K_{ij} - \frac1n\sum_{m} K_{im} - \frac1n\sum_{m} K_{mj} + \frac1{n^2}\sum_{m,m'} K_{mm'} \]
+        <p>Subtract the average of row \(i\) and the average of column \(j\), and add back the average of all entries. In matrix form (standard): \(K^c = \big(I - \tfrac1n\mathbf{1}\mathbf{1}^\top\big)\,K\,\big(I - \tfrac1n\mathbf{1}\mathbf{1}^\top\big)\), where \(\mathbf{1}\) is the all-ones vector in \(\mathbb{R}^n\).</p>
+      </div>
+      <p class="note">The lecture writes the formula with \(\theta_i\), the average row sum of \(K\) for point \(i\), and indicator vectors \(\mathbf{1}_i\), and does not derive it. The captions do not capture that expression cleanly, so the form above is derived from the four-term expansion the lecture gives; it is the same subtraction.</p>
+      <p>The important news is that a kernel can be centred without computing \(\phi\). From here on, use \(K^c\) wherever \(K\) appeared: its eigenvectors in step 2 and its rows in the projection step.</p>
+    </section>
+
+    <section id="kpca-algorithm">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=1114s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 18:34</a>
+        <h2>Kernel PCA, the whole algorithm</h2>
+      </div>
+      <ol class="algo">
+        <li class="algo-title">Kernel PCA</li>
+        <li><b>Input:</b> \(\{\mathbf{x}_1, \dots, \mathbf{x}_n\}\), \(\mathbf{x}_i \in \mathbb{R}^d\), and a valid kernel \(k : \mathbb{R}^d \times \mathbb{R}^d \to \mathbb{R}\).</li>
+        <li><b>Kernel matrix.</b> \(K_{ij} = k(\mathbf{x}_i, \mathbf{x}_j)\) for all \(i, j\); \(K\) is \(n \times n\).</li>
+        <li><b>Centre.</b> Form \(K^c\) from \(K\) with the formula above.</li>
+        <li><b>Eigen-decompose \(K^c\).</b> Unit eigenvectors \(\boldsymbol\beta_1, \dots, \boldsymbol\beta_l\) with eigenvalues \(n\lambda_1 \ge \dots \ge n\lambda_l\) (the top \(l\), all non-zero).</li>
+        <li><b>Normalize.</b> \(\boldsymbol\alpha_k = \boldsymbol\beta_k / \sqrt{n\lambda_k}\) for \(k = 1, \dots, l\).</li>
+        <li><b>Project.</b> Do not build \(\mathbf{w}_k = \phi(X)\boldsymbol\alpha_k\). Represent each point by \(\mathbf{z}_i = \big(\sum_j \alpha_{1j}K^c_{ij}, \dots, \sum_j \alpha_{lj}K^c_{ij}\big)\).</li>
+        <li><b>Output:</b> \(\mathbf{z}_1, \dots, \mathbf{z}_n \in \mathbb{R}^l\), the kernel PCA representation of the data.</li>
+      </ol>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 296" role="img" aria-label="Kernel PCA pipeline. From the input data and kernel, build the n by n kernel matrix, centre it, eigen-decompose it and normalize the eigenvectors. The path to the eigenvectors w k is blocked because it needs phi; the path to the projections z i k uses only the centred kernel matrix.">
+            <defs>
+              <marker id="p05d-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p05d-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <rect class="d-box" x="10" y="40" width="160" height="70" rx="8"/>
+            <text class="d-t" x="90" y="64" text-anchor="middle">1 · Kernel matrix</text>
+            <text class="d-s" x="90" y="84" text-anchor="middle">Kᵢⱼ = k(xᵢ, xⱼ)</text>
+            <text class="d-al" x="90" y="101" text-anchor="middle">n × n</text>
+            <path class="d-ln" d="M170 75 L187 75" marker-end="url(#p05d-ah)"/>
+
+            <rect class="d-box" x="190" y="40" width="150" height="70" rx="8"/>
+            <text class="d-t" x="265" y="64" text-anchor="middle">2 · Centre</text>
+            <text class="d-s" x="265" y="84" text-anchor="middle">Kᶜ built from K</text>
+            <text class="d-al" x="265" y="101" text-anchor="middle">no φ needed</text>
+            <path class="d-ln" d="M340 75 L357 75" marker-end="url(#p05d-ah)"/>
+
+            <rect class="d-box" x="360" y="40" width="160" height="70" rx="8"/>
+            <text class="d-t" x="440" y="64" text-anchor="middle">3 · Eigenvectors</text>
+            <text class="d-s" x="440" y="84" text-anchor="middle">Kᶜβₖ = nλₖβₖ</text>
+            <text class="d-al" x="440" y="101" text-anchor="middle">unit βₖ, top l</text>
+            <path class="d-ln" d="M520 75 L537 75" marker-end="url(#p05d-ah)"/>
+
+            <rect class="d-box" x="540" y="40" width="150" height="70" rx="8"/>
+            <text class="d-t" x="615" y="64" text-anchor="middle">4 · Normalize</text>
+            <text class="d-s" x="615" y="84" text-anchor="middle">αₖ = βₖ / √(nλₖ)</text>
+            <text class="d-al" x="615" y="101" text-anchor="middle">so that ‖wₖ‖ = 1</text>
+
+            <rect class="d-box" x="10" y="190" width="240" height="70" rx="8"/>
+            <text class="d-row" x="22" y="208">Input</text>
+            <text class="d-t" x="130" y="226" text-anchor="middle">x₁, …, xₙ ∈ ℝᵈ</text>
+            <text class="d-s" x="130" y="246" text-anchor="middle">and a valid kernel k</text>
+            <path class="d-ln" d="M90 190 L90 113" marker-end="url(#p05d-ah)"/>
+
+            <path class="d-ln d-dash" d="M590 110 L452 187" marker-end="url(#p05d-ah)"/>
+            <path class="k-bad" d="M513 141 L529 157 M529 141 L513 157"/>
+            <rect class="d-off" x="290" y="190" width="190" height="70" rx="8"/>
+            <text class="d-t t-off" x="385" y="218" text-anchor="middle">wₖ = φ(X)αₖ</text>
+            <text class="d-s t-off" x="385" y="240" text-anchor="middle">needs φ(x): skipped</text>
+
+            <path class="d-ln-acc" d="M640 110 L640 187" marker-end="url(#p05d-ah-acc)"/>
+            <rect class="b-ok" x="520" y="190" width="170" height="70" rx="8"/>
+            <text class="d-t" x="605" y="218" text-anchor="middle">5 · Project</text>
+            <text class="d-s" x="605" y="240" text-anchor="middle">zᵢₖ = Σⱼ αₖⱼ Kᶜᵢⱼ</text>
+            <text class="d-s" x="605" y="284" text-anchor="middle">output: xᵢ ↦ (zᵢ₁, …, zᵢₗ)</text>
+          </svg>
+        </div>
+        <figcaption><b>Kernel PCA end to end.</b> Every step from the kernel matrix to the projections uses only kernel values. The one step that would need \(\phi\), rebuilding the directions \(\mathbf{w}_k\), is skipped, and with it the ability to reconstruct proxies.</figcaption>
+      </figure>
+
+      <p>How the three versions of PCA in this block compare:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>PCA</th><th>PCA via the n × n matrix</th><th>Kernel PCA</th></tr></thead>
+          <tbody>
+            <tr><td>Where</td><td><a href="part-03.html">Part 3</a></td><td><a href="part-04.html">Part 4</a></td><td>This part</td></tr>
+            <tr><td>Matrix decomposed</td><td>\(\tfrac1n XX^\top\), \(d\times d\)</td><td>\(X^\top X\), \(n\times n\)</td><td>\(K^c\), \(n\times n\)</td></tr>
+            <tr><td>Eigen cost</td><td>\(O(d^3)\)</td><td>\(O(n^3)\)</td><td>\(O(n^3)\)</td></tr>
+            <tr><td>Eigen step needs</td><td>the points</td><td>dot products \(\mathbf{x}_i^\top\mathbf{x}_j\)</td><td>kernel values \(k(\mathbf{x}_i, \mathbf{x}_j)\)</td></tr>
+            <tr><td>Directions \(\mathbf{w}_k\)</td><td>Yes</td><td>Yes, \(\mathbf{w}_k = X\boldsymbol\alpha_k\)</td><td>No, needs \(\phi\)</td></tr>
+            <tr><td>Projections</td><td>\(\mathbf{x}_i^\top\mathbf{w}_k\)</td><td>\(\mathbf{x}_i^\top\mathbf{w}_k\)</td><td>\(\sum_j \alpha_{kj}K^c_{ij}\)</td></tr>
+            <tr><td>Proxies (reconstruction)</td><td>Yes</td><td>Yes</td><td>No</td></tr>
+            <tr><td>Structure it can find</td><td>Linear</td><td>Linear</td><td>Non-linear in \(\mathbf{x}\), linear in \(\phi(\mathbf{x})\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="kernel-trick">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=1176s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 19:36</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=K46tdjqxM0w&amp;t=1208s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L12 · 20:08 kernelizing</a>
+        </div>
+        <h2>Two issues, one trick</h2>
+      </div>
+      <p>Kernel PCA settles both issues raised in <a href="part-04.html">Part 4</a>. High dimensionality is handled by working with an \(n \times n\) matrix. Non-linearity is handled by mapping to a higher dimension through a kernel. Surprisingly, the same object does both jobs: the kernel matrix.</p>
+      <p>The trick works because the PCA algorithm depends only on pairwise dot products between data points, not on the points themselves. Given the dot products, we can run it, and a kernel supplies dot products in a high-dimensional space.</p>
+      <p class="rule-of-thumb">To kernelize an algorithm: solve the easier linear problem first, check that the algorithm uses the data only through pairwise dot products, then replace each \(\mathbf{x}_i^\top\mathbf{x}_j\) by \(k(\mathbf{x}_i, \mathbf{x}_j)\).</p>
+      <p>The kernel matrix comes back again and again in the course. Later algorithms will be checked for the same property and kernelized when they have it: kernel regression in <a href="part-11.html">Part 11</a> and support vector machines in <a href="part-16.html">Part 16</a>.</p>
+      <p>This closes the representation-learning block: PCA and its kernel version, kernel PCA. Next come other kinds of unsupervised learning, starting with clustering in <a href="part-06.html">Part 6</a> and then estimation in <a href="part-08.html">Part 8</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Non-linear relationship</dt><dd>Features tied by an equation with powers or products, like a circle; PCA's issue 2.</dd></div>
+        <div><dt>Feature map \(\phi\)</dt><dd>A map \(\mathbb{R}^d \to \mathbb{R}^D\) that adds non-linear functions of the features as new coordinates.</dd></div>
+        <div><dt>Feature space</dt><dd>The space \(\mathbb{R}^D\) that \(\phi\) maps into, where the relationship should become linear.</dd></div>
+        <div><dt>Kernel function</dt><dd>A valid \(k : \mathbb{R}^d\times\mathbb{R}^d \to \mathbb{R}\): \(k(\mathbf{x},\mathbf{x}') = \phi(\mathbf{x})^\top\phi(\mathbf{x}')\) for some \(\phi\).</dd></div>
+        <div><dt>Valid</dt><dd>Having such a \(\phi\). An explicit \(\phi\) is a certificate of validity.</dd></div>
+        <div><dt>Kernel matrix \(K\)</dt><dd>The \(n\times n\) matrix \(K_{ij} = k(\mathbf{x}_i, \mathbf{x}_j)\) of pairwise feature-space dot products.</dd></div>
+        <div><dt>Polynomial kernel</dt><dd>\((\mathbf{x}^\top\mathbf{x}' + 1)^p\): all relationships up to power \(p\), with a finite but fast-growing \(\phi\).</dd></div>
+        <div><dt>RBF (Gaussian) kernel</dt><dd>\(\exp(-\lVert\mathbf{x}-\mathbf{x}'\rVert^2/(2\sigma^2))\), \(\sigma > 0\); its \(\phi\) is infinite-dimensional.</dd></div>
+        <div><dt>Positive semi-definite</dt><dd>A symmetric matrix whose eigenvalues are all \(\ge 0\).</dd></div>
+        <div><dt>Mercer's theorem</dt><dd>\(k\) is a valid kernel exactly when it is symmetric and every kernel matrix it produces is positive semi-definite.</dd></div>
+        <div><dt>Kernel PCA</dt><dd>PCA in the feature space computed from \(K^c\) alone; outputs projections, not directions.</dd></div>
+        <div><dt>Centred kernel \(K^c\)</dt><dd>Dot products of mean-subtracted mapped points, computed from \(K\) by subtracting row and column averages and adding back the overall average.</dd></div>
+        <div><dt>Kernel trick</dt><dd>Replacing every dot product in an algorithm by a kernel value, so it runs in the feature space without \(\phi\).</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Data lies on the circle with centre \((1, 2)\) and radius 3. Write \(\mathbf{u}\) and check \(\phi(\mathbf{x})^\top\mathbf{u} = 0\) for the point \((4, 2)\).</span><span class="tog"></span></summary>
+          <p>\(\mathbf{u} = [a^2+b^2-r^2, 1, 1, 0, -2a, -2b] = [1+4-9, 1, 1, 0, -2, -4] = [-4, 1, 1, 0, -2, -4]\). For \((4, 2)\), \(\phi = [1, 16, 4, 8, 4, 2]\), and \(\phi^\top\mathbf{u} = -4 + 16 + 4 + 0 - 8 - 8 = 0\).</p></details>
+        <details><summary><span class="q">Q2</span><span>Why does PCA keep both directions for points on a circle, under the 95% rule?</span><span class="tog"></span></summary>
+          <p>All directions have about the same variance, so \(\mathbf{w}_1\) explains only slightly more than 50% and \(\mathbf{w}_2\) the rest. Reaching 95% needs both. PCA only looks for linear structure and the circle has none.</p></details>
+        <details><summary><span class="q">Q3</span><span>For \(\mathbf{x} = [1, 2]\) and \(\mathbf{x}' = [3, -1]\), compute \((\mathbf{x}^\top\mathbf{x}'+1)^2\) directly and as \(\phi(\mathbf{x})^\top\phi(\mathbf{x}')\).</span><span class="tog"></span></summary>
+          <p>Directly: \(\mathbf{x}^\top\mathbf{x}' = 3 - 2 = 1\), so the value is \(2^2 = 4\). Explicitly: \(\phi(\mathbf{x}) = [1, 4, 1, 2\sqrt2, \sqrt2, 2\sqrt2]\), \(\phi(\mathbf{x}') = [9, 1, 1, -3\sqrt2, 3\sqrt2, -\sqrt2]\). Products: \(9 + 4 + 1 - 12 + 6 - 4 = 4\).</p></details>
+        <details><summary><span class="q">Q4</span><span>With \(d = 3\) features and relationships up to power 2, how many coordinates does the lecture's tally give, and how many if squares like \(f_1^2\) are included?</span><span class="tog"></span></summary>
+          <p>Lecture's tally: \(1 + 3 + 3 = 7\) (constant, \(f_1, f_2, f_3\), and \(f_1f_2, f_1f_3, f_2f_3\)). Adding \(f_1^2, f_2^2, f_3^2\) gives 10, which is \(\binom{3+2}{2}\).</p></details>
+        <details><summary><span class="q">Q5</span><span>Is \(k(\mathbf{x}, \mathbf{x}') = \lVert\mathbf{x} - \mathbf{x}'\rVert^2\) a valid kernel?</span><span class="tog"></span></summary>
+          <p>No. It is symmetric, but take two distinct points with \(\lVert\mathbf{x}_1 - \mathbf{x}_2\rVert^2 = c > 0\). The kernel matrix is \(\begin{bmatrix}0 & c\\ c & 0\end{bmatrix}\), with eigenvalues \(c\) and \(-c\). A negative eigenvalue breaks Mercer's condition (b).</p></details>
+        <details><summary><span class="q">Q6</span><span>The eigen-solver returns a unit \(\boldsymbol\beta\) with \(K\boldsymbol\beta = 4\boldsymbol\beta\). What is \(\boldsymbol\alpha\), and why does it give a unit-length \(\mathbf{w}\)?</span><span class="tog"></span></summary>
+          <p>\(n\lambda = 4\), so \(\boldsymbol\alpha = \boldsymbol\beta/\sqrt4 = \boldsymbol\beta/2\). Then \(\lVert\mathbf{w}\rVert^2 = \boldsymbol\alpha^\top K\boldsymbol\alpha = \tfrac14\,\boldsymbol\beta^\top K\boldsymbol\beta = \tfrac14 \cdot 4 = 1\).</p></details>
+        <details><summary><span class="q">Q7</span><span>Kernel PCA gives each point's projections. Why can it not give the principal directions or reconstruct proxies?</span><span class="tog"></span></summary>
+          <p>The directions are \(\mathbf{w}_k = \phi(X)\boldsymbol\alpha_k\), which needs \(\phi(\mathbf{x}_j)\) explicitly, possibly infinite-dimensional. A proxy is a sum of projections times \(\mathbf{w}_k\), so it needs \(\phi\) too. The projections \(\sum_j\alpha_{kj}K_{ij}\) need only kernel values.</p></details>
+        <details><summary><span class="q">Q8</span><span>Centre the kernel matrix \(K = \begin{bmatrix}2 & 1\\ 1 & 2\end{bmatrix}\) (\(n = 2\)).</span><span class="tog"></span></summary>
+          <p>Row and column averages are all 1.5, and the overall average is 1.5. So \(K^c_{11} = 2 - 1.5 - 1.5 + 1.5 = 0.5\) and \(K^c_{12} = 1 - 1.5 - 1.5 + 1.5 = -0.5\): \(K^c = \begin{bmatrix}0.5 & -0.5\\ -0.5 & 0.5\end{bmatrix}\). Check: the centred points are \(\pm\tfrac12(\phi(\mathbf{x}_1) - \phi(\mathbf{x}_2))\), with squared length \(\tfrac14(2 + 2 - 2) = 0.5\).</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-04.html"><span class="dir">← Part 4</span><span class="nm">Issues with PCA, and computing it fast</span></a><a class="next" href="index.html"><span class="dir">Part 6 · coming</span><span class="nm">K-means: the algorithm and its convergence</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+
+  /* ---------- PCA on synthetic points on a circle ---------- */
+  (() => {
+    const svg = document.getElementById('circ-svg'); if (!svg) return;
+    let seed = 31;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const a = 3.5, b = 3, r = 2.5, n = 30;
+    const pts = [];
+    for (let i = 0; i < n; i++) { const t = 2 * Math.PI * (i + 0.8 * (rand() - 0.5)) / n; pts.push([a + r * Math.cos(t), b + r * Math.sin(t)]); }
+    const m = [pts.reduce((s, p) => s + p[0], 0) / n, pts.reduce((s, p) => s + p[1], 0) / n];
+    const cen = pts.map(p => [p[0] - m[0], p[1] - m[1]]);
+    const A = cen.reduce((s, p) => s + p[0] * p[0], 0) / n, B = cen.reduce((s, p) => s + p[0] * p[1], 0) / n, D = cen.reduce((s, p) => s + p[1] * p[1], 0) / n;
+    const tr = A + D, l1 = tr / 2 + Math.sqrt(tr * tr / 4 - (A * D - B * B));
+    let thBest = 0.5 * Math.atan2(2 * B, A - D) * 180 / Math.PI; if (thBest < 0) thBest += 180;
+    const u = [a * a + b * b - r * r, 1, 1, 0, -2 * a, -2 * b];
+    const lift = p => [1, p[0] * p[0], p[1] * p[1], p[0] * p[1], p[0], p[1]];
+    const maxU = Math.max(...pts.map(p => Math.abs(lift(p).reduce((s, v, i) => s + v * u[i], 0))));
+    const lo = -1, hi = 7, P = 24, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    axes(svg, sx, sy, lo, hi, 1);
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'circ-clip' }, defs); mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P }, cp);
+    mk('circle', { cx: sx(a), cy: sy(b), r: r * S, class: 'c-faint', style: 'fill: none' }, svg);
+    const gRes = mk('g', { class: 'c-resid', 'clip-path': 'url(#circ-clip)' }, svg);
+    const res = pts.map(() => mk('line', {}, gRes));
+    const line = mk('line', { class: 'c-user', 'clip-path': 'url(#circ-clip)' }, svg);
+    const gProj = mk('g', { class: 'c-proj' }, svg);
+    const proj = pts.map(() => mk('circle', { r: 2.6 }, gProj));
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    pts.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.8 }, gDots));
+    mk('circle', { cx: sx(m[0]), cy: sy(m[1]), r: 5, class: 'c-centroid' }, svg);
+    mk('text', { x: sx(m[0]) + 9, y: sy(m[1]) + 16, class: 'c-note' }, svg).textContent = 'mean';
+    const wLbl = mk('text', { class: 'c-lbl', 'text-anchor': 'middle' }, svg);
+    const slider = document.getElementById('circ-th'), out = document.getElementById('circ-th-out');
+    const shOut = document.getElementById('circ-share'), status = document.getElementById('circ-status');
+    document.getElementById('circ-w1').textContent = (100 * l1 / tr).toFixed(1) + '%';
+    document.getElementById('circ-u').textContent = maxU.toFixed(3);
+    let th = parseFloat(slider.value);
+    const draw = () => {
+      const rad = th * Math.PI / 180, w = [Math.cos(rad), Math.sin(rad)];
+      line.setAttribute('x1', sx(m[0] - 10 * w[0])); line.setAttribute('y1', sy(m[1] - 10 * w[1])); line.setAttribute('x2', sx(m[0] + 10 * w[0])); line.setAttribute('y2', sy(m[1] + 10 * w[1]));
+      let v = 0;
+      pts.forEach((p, i) => { const c = cen[i][0] * w[0] + cen[i][1] * w[1]; v += c * c; const q = [m[0] + c * w[0], m[1] + c * w[1]]; res[i].setAttribute('x1', sx(p[0])); res[i].setAttribute('y1', sy(p[1])); res[i].setAttribute('x2', sx(q[0])); res[i].setAttribute('y2', sy(q[1])); proj[i].setAttribute('cx', sx(q[0])); proj[i].setAttribute('cy', sy(q[1])); });
+      v /= n;
+      const lp = [m[0] + 3.4 * w[0] - 0.3 * w[1], m[1] + 3.4 * w[1] + 0.3 * w[0]];
+      wLbl.setAttribute('x', sx(lp[0])); wLbl.setAttribute('y', sy(lp[1]) + 4); wLbl.textContent = 'w';
+      const share = 100 * v / tr;
+      shOut.textContent = share.toFixed(1) + '%'; out.textContent = Math.round(th) + '°';
+      const d = Math.abs(((th - thBest) % 180 + 180) % 180); const near = Math.min(d, 180 - d) < 0.6;
+      status.textContent = near ? `PCA's w₁ (at ${thBest.toFixed(1)}°) keeps ${(100 * l1 / tr).toFixed(1)}% and w₂ the other ${(100 - 100 * l1 / tr).toFixed(1)}%. The 95% rule keeps both.` : '';
+    };
+    draw();
+    slider.addEventListener('input', () => { th = parseFloat(slider.value); draw(); });
+    document.getElementById('circ-snap').addEventListener('click', () => { let target = thBest; if (Math.abs(target - th) > 90) target += target < th ? 180 : -180; tween(th, target, val => { th = ((val % 180) + 180) % 180; slider.value = Math.round(th); draw(); }); });
+  })();
+
+  /* ---------- Polynomial kernel value, two ways ---------- */
+  (() => {
+    const svg = document.getElementById('kc-svg'); if (!svg) return;
+    let seed = 512;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const keys = ['f1', 'f2', 'g1', 'g2', 'p'];
+    const inp = {}, outp = {};
+    keys.forEach(k => { inp[k] = document.getElementById('kc-' + k); outp[k] = document.getElementById('kc-' + k + '-out'); });
+    const fact = q => q <= 1 ? 1 : q * fact(q - 1);
+    const sup = ['', '', '²', '³', '⁴'];
+    const termsFor = p => {
+      let t = [];
+      for (let deg = p; deg >= 0; deg--) for (let a1 = deg; a1 >= 0; a1--) { const a2 = deg - a1; t.push({ a1, a2, coef: fact(p) / (fact(a1) * fact(a2) * fact(p - deg)) }); }
+      if (p === 2) t = [0, 2, 5, 1, 3, 4].map(i => t[i]);
+      return t;
+    };
+    const label = t => { const mono = (t.a1 ? 'f₁' + sup[t.a1] : '') + (t.a2 ? 'f₂' + sup[t.a2] : ''); const s = Math.sqrt(t.coef); const cf = t.coef === 1 ? '' : (Number.isInteger(s) ? String(s) : '√' + t.coef); return (cf + mono) || '1'; };
+    const nice = x => { const e = Math.pow(10, Math.floor(Math.log10(x))); const f = x / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e; };
+    const fmt = v => String(+v.toFixed(4));
+    const L = 56, R = 492, T = 20, Bt = 236;
+    const gGrid = mk('g', {}, svg), gBars = mk('g', {}, svg), gLab = mk('g', {}, svg);
+    const clear = g => { while (g.firstChild) g.removeChild(g.firstChild); };
+    const expOut = document.getElementById('kc-exp'), kerOut = document.getElementById('kc-ker'), dimOut = document.getElementById('kc-dim'), status = document.getElementById('kc-status');
+    const draw = () => {
+      const f1 = +inp.f1.value, f2 = +inp.f2.value, g1 = +inp.g1.value, g2 = +inp.g2.value, p = +inp.p.value;
+      ['f1', 'f2', 'g1', 'g2'].forEach(k => { outp[k].textContent = (+inp[k].value).toFixed(1); }); outp.p.textContent = p;
+      const ts = termsFor(p), Dm = ts.length;
+      const prods = ts.map(t => t.coef * Math.pow(f1 * g1, t.a1) * Math.pow(f2 * g2, t.a2));
+      const sums = [0]; prods.forEach(v => sums.push(sums[sums.length - 1] + v));
+      const explicit = sums[Dm], kern = Math.pow(f1 * g1 + f2 * g2 + 1, p);
+      let ymin = Math.min(0, kern, ...sums), ymax = Math.max(0, kern, ...sums); if (ymax - ymin < 1e-9) ymax = ymin + 1;
+      const step = nice((ymax - ymin) / 5), lo = Math.floor(ymin / step + 1e-9) * step, hi = Math.ceil(ymax / step - 1e-9) * step;
+      const sy = v => Bt - (v - lo) / (hi - lo) * (Bt - T);
+      clear(gGrid); clear(gBars); clear(gLab);
+      for (let v = lo; v <= hi + step * 1e-6; v += step) {
+        mk('line', { x1: L, x2: R, y1: sy(v), y2: sy(v), class: 'c-faint' }, gGrid);
+        mk('text', { x: L - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, gGrid).textContent = fmt(v);
+      }
+      mk('line', { x1: L, x2: R, y1: sy(0), y2: sy(0), class: 'c-axis' }, gGrid);
+      const slots = Dm + 1, sw = (R - L) / slots, bw = sw * 0.62;
+      for (let i = 0; i <= Dm; i++) {
+        const x = L + i * sw + (sw - bw) / 2;
+        const y0 = i < Dm ? sums[i] : 0, y1 = i < Dm ? sums[i + 1] : explicit;
+        const top = Math.min(sy(y0), sy(y1)), h = Math.max(1, Math.abs(sy(y0) - sy(y1)));
+        const style = i === Dm ? 'fill: var(--ok)' : (prods[i] >= 0 ? 'fill: var(--accent)' : 'fill: var(--surface); stroke: var(--accent); stroke-width: 1.5');
+        mk('rect', { x, y: top, width: bw, height: h, style }, gBars);
+        if (i < Dm) mk('line', { x1: x + bw, x2: x + sw, y1: sy(y1), y2: sy(y1), class: 'c-faint' }, gBars);
+        const cx = x + bw / 2, ly = Bt + 14;
+        mk('text', { x: cx, y: ly, 'text-anchor': 'end', class: 'c-tick', transform: `rotate(-40 ${cx} ${ly})` }, gLab).textContent = i === Dm ? 'sum' : label(ts[i]);
+      }
+      mk('line', { x1: L, x2: R + 4, y1: sy(kern), y2: sy(kern), style: 'stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 5 4' }, gLab);
+      mk('text', { x: R + 8, y: sy(kern) + 4, class: 'c-lbl' }, gLab).textContent = 'kernel';
+      expOut.textContent = explicit.toFixed(3); kerOut.textContent = kern.toFixed(3); dimOut.textContent = Dm;
+      const same = Math.abs(explicit - kern) <= 1e-9 * Math.max(1, Math.abs(kern));
+      status.textContent = same ? `Same number both ways: ${kern.toFixed(3)}. Route 1 built two ${Dm}-dimensional vectors and added ${Dm} products; route 2 took one 2-D dot product, added 1 and raised it to the power ${p}.` : '';
+    };
+    draw();
+    keys.forEach(k => inp[k].addEventListener('input', draw));
+    document.getElementById('kc-rand').addEventListener('click', () => { ['f1', 'f2', 'g1', 'g2'].forEach(k => { inp[k].value = (Math.round((rand() * 4 - 2) * 10) / 10).toFixed(1); }); draw(); });
+  })();
+})();
+</script>
+</body>
+</html>
