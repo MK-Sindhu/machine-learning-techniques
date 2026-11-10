@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 2 · Representation learning · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 2: lectures 3–5 on representation learning as compression, projections and the best line.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 2 of 18</span><span class="sep">·</span><a href="part-01.html">← Part 1</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Representation learning: compress, project, find the best line</h1>
+    <p class="lede">Notes for lectures 3 to 5. Learning is treated as compression: store a representative and one coefficient per point, replace points that miss the line by their projections, and choose the line that loses the least. That line turns out to be an eigenvector.</p>
+    <div class="meta">
+      <span><b>Part 2</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>68 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=1V_M4JxygGk&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L3 · 33:07</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=mU6CzvuUM00&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L4 · 17:50</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=t0bA3rsZ6qM&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L5 · 17:10</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 3</h4>
+      <ul>
+        <li><a href="#setup">The problem, precisely</a></li>
+        <li><a href="#compression">Comprehension is compression</a></li>
+        <li><a href="#example">Representative + coefficients</a></li>
+        <li><a href="#off-line">A point off the line</a></li>
+        <li><a href="#projection">The best proxy: projection</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 4</h4>
+      <ul>
+        <li><a href="#which-line">Which line?</a></li>
+        <li><a href="#derivation">From error to wᵀCw</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 5</h4>
+      <ul>
+        <li><a href="#residues">Is one line enough?</a></li>
+        <li><a href="#centering">Centre the data first</a></li>
+        <li><a href="#questions">Open questions</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>Running theme for the whole course: <dfn>comprehension is compression</dfn>. For every algorithm, ask where the compression happens.</li>
+        <li>If all points lie on a line through the origin, store one <b>representative</b> vector plus one <b>coefficient</b> per point: \(d + n\) numbers instead of \(d \times n\), with exact reconstruction.</li>
+        <li>A point off the line is replaced by a <b>proxy</b> on the line. The best proxy is the projection \((\mathbf{x}^\top\mathbf{w})\,\mathbf{w}\) when \(\lVert\mathbf{w}\rVert = 1\).</li>
+        <li>Every line compresses equally well; lines differ in <b>reconstruction error</b>. Minimizing that error is the same as maximizing \(\mathbf{w}^\top C\,\mathbf{w}\), solved by the eigenvector of \(C\) with the largest eigenvalue.</li>
+        <li>Residues can still carry structure, so repeat on the residues to get \(\mathbf{w}_2, \mathbf{w}_3, \dots\). Centre the data first, since every line here passes through the origin.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 3 ============ -->
+    <section id="setup">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=1V_M4JxygGk&amp;t=63s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L3 · 1:03</a>
+        <h2>Unsupervised learning, made precise</h2>
+      </div>
+      <p>The course begins with unsupervised learning, and within it with <dfn>representation learning</dfn>. The starting goal is deliberately vague: given a set of data points, understand something useful about them. Three words need pinning down: <i>data points</i>, <i>understand</i> and <i>useful</i>.</p>
+      <p>Data points are the easy part. Each is a vector of \(d\) real numbers, its <dfn>features</dfn>. Record the height, weight and age of 100 people and each person becomes a point in \(\mathbb{R}^3\), one coordinate per feature.</p>
+      <div class="eq">\[ \text{Input: } \{\mathbf{x}_1, \mathbf{x}_2, \dots, \mathbf{x}_n\}, \quad \mathbf{x}_i \in \mathbb{R}^d \qquad \text{Output: a compressed representation of the data set} \]</div>
+      <p class="note">\(n\) is the number of data points (people, images, …) and \(d\) the number of features recorded for each.</p>
+    </section>
+
+    <section id="compression">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=1V_M4JxygGk&amp;t=233s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L3 · 3:53</a>
+        <h2>Comprehension is compression</h2>
+      </div>
+      <p>The lecture answers "what does it mean to understand?" with a quote from the computer scientist and philosopher Gregory Chaitin: <i>comprehension is compression</i>. Here, comprehending, understanding and learning are treated as the same thing. If you can compress information so that only its important part remains, and that part is enough to explain the data to someone else, you have learnt from the data.</p>
+      <p class="rule-of-thumb">Ask of every algorithm in this course: where exactly is the compression happening?</p>
+    </section>
+
+    <section id="example">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=1V_M4JxygGk&amp;t=435s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L3 · 7:15</a>
+        <h2>One representative, one coefficient per point</h2>
+      </div>
+      <p>How many numbers does it take to store these four points?</p>
+      <div class="eq">\[ \mathbf{x}_1 = \begin{bmatrix}-7\\-14\end{bmatrix},\quad \mathbf{x}_2 = \begin{bmatrix}2.5\\5\end{bmatrix},\quad \mathbf{x}_3 = \begin{bmatrix}0.5\\1\end{bmatrix},\quad \mathbf{x}_4 = \begin{bmatrix}0\\0\end{bmatrix} \]</div>
+      <p>The naive answer is \(4 \times 2 = 8\). But in every point the second coordinate is twice the first. So store one <dfn>representative</dfn> \([1, 2]^\top\) and, for each point, one <dfn>coefficient</dfn>: \(-7,\ 2.5,\ 0.5,\ 0\). That is 6 numbers, and the data comes back exactly: \(\mathbf{x}_2 = 2.5 \times [1, 2]^\top = [2.5, 5]^\top\).</p>
+
+      <figure>
+        <div class="fig-split">
+          <svg class="dg" viewBox="0 0 200 290" role="img" aria-label="The four points lie on the line y equals 2x through the origin; the representative vector (1, 2) points along it.">
+            <defs><marker id="p2a-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <line class="d-rule" x1="30" y1="97" x2="190" y2="97"/>
+            <line class="d-rule" x1="118" y1="14" x2="118" y2="276"/>
+            <text class="d-al" x="186" y="91" text-anchor="end">x₁</text>
+            <text class="d-al" x="124" y="22">x₂</text>
+            <line class="d-ln" x1="35.5" y1="262" x2="151.5" y2="20"/>
+            <text class="d-al" x="150" y="36" text-anchor="end">y = 2x</text>
+            <circle class="pt-plain" cx="41" cy="251" r="4.5"/><text class="d-s" x="50" y="255">[−7, −14]</text>
+            <circle class="pt-plain" cx="145.5" cy="42" r="4.5"/><text class="d-s" x="152" y="56">[2.5, 5]</text>
+            <circle class="pt-plain" cx="123.5" cy="86" r="4.5"/>
+            <circle class="pt-plain" cx="118" cy="97" r="4.5"/>
+            <line class="d-ln-acc" x1="118" y1="97" x2="127.5" y2="78" marker-end="url(#p2a-ah)" style="stroke-width:2.4"/>
+            <text class="d-s" x="132" y="96" style="fill: var(--accent)">[1, 2]</text>
+            <text class="d-s" x="70" y="124">[0, 0], [0.5, 1]</text>
+          </svg>
+          <div class="tbl-wrap">
+            <table class="mini">
+              <thead><tr><th>Stored</th><th class="num">Numbers</th></tr></thead>
+              <tbody>
+                <tr><td>Raw points, \(n \times d\)</td><td class="num">8</td></tr>
+                <tr><td>Representative \([1, 2]\)</td><td class="num">2</td></tr>
+                <tr><td>Coefficients \(-7, 2.5, 0.5, 0\)</td><td class="num">4</td></tr>
+                <tr><td><b>Compressed total</b>, \(d + n\)</td><td class="num"><b>6</b></td></tr>
+                <tr><td>A billion such points</td><td class="num">10⁹ + 2</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <figcaption><b>Four points, one line.</b> All four lie on \(y = 2x\), so one representative along that line plus a coefficient per point rebuilds every point exactly. For a billion points the saving approaches 50%.</figcaption>
+      </figure>
+
+      <p>Two points from this example matter later.</p>
+      <ul>
+        <li><b>The representative is not unique.</b> Any nonzero vector on the line works. With \([1/\sqrt5,\ 2/\sqrt5]^\top\) the coefficients become \(-7\sqrt5,\ 2.5\sqrt5,\ 0.5\sqrt5,\ 0\) and reconstruction is still exact. The zero vector is not allowed, because nothing can be rebuilt from it. <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=1V_M4JxygGk&amp;t=843s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>14:03</a></li>
+        <li><b>The general count.</b> \(n\) points in \(d\) dimensions take \(d \times n\) numbers raw. If they all lie on one line through the origin, \(d + n\) numbers suffice: \(d\) for the representative and one per point.</li>
+      </ul>
+    </section>
+
+    <section id="off-line">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=1V_M4JxygGk&amp;t=1042s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L3 · 17:22</a>
+        <h2>When one point leaves the line</h2>
+      </div>
+      <p>Take four points on \(y = x\), for example \([-5,-5]\), \([1,1]\), \([7,7]\) and \([10,10]\), and add one more, \(\mathbf{x}_5 = [5, 6]\), which is not on the line. One representative can no longer rebuild every point. There are three ways out:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Option</th><th>Exact?</th><th class="num">Numbers for 5 points</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td>Store the raw points</td><td>Yes</td><td class="num">10</td><td>No compression</td></tr>
+            <tr><td>Two representatives \([1,0]\), \([0,1]\), two coefficients per point</td><td>Yes</td><td class="num">4 + 10 = 14</td><td>Worse than raw: \(2n + 4\)</td></tr>
+            <tr><td>One representative; replace \(\mathbf{x}_5\) by a <b>proxy</b> on the line</td><td>No</td><td class="num">2 + 5 = 7</td><td><b>Compresses</b>, at a small loss</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Exact reconstruction and fewer representatives cannot both be kept. The lecture gives up exactness <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=1V_M4JxygGk&amp;t=1286s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:26</a>. Pretend the data set contained a proxy for \(\mathbf{x}_5\) on the line instead of \(\mathbf{x}_5\) itself, and compress as before.</p>
+    </section>
+
+    <section id="projection">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=1V_M4JxygGk&amp;t=1359s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L3 · 22:39</a>
+        <h2>The best proxy is the projection</h2>
+      </div>
+      <p>The best proxy is the point on the line where we lose the least: the error vector we would have to add back to the proxy to recover \(\mathbf{x}\) should be as short as possible. A line through the origin is every multiple \(c\,\mathbf{w}\) of a nonzero representative \(\mathbf{w}\), so we choose the scalar \(c\):</p>
+      <div class="eq">\[ \min_{c \in \mathbb{R}} \; \lVert \mathbf{x} - c\,\mathbf{w} \rVert^2 \;=\; \min_{c}\; (x_1 - c\,w_1)^2 + (x_2 - c\,w_2)^2 \]</div>
+      <p>Setting the derivative with respect to \(c\) to zero (the lecture leaves this as an exercise): \(-2w_1(x_1 - c w_1) - 2w_2(x_2 - c w_2) = 0\), so</p>
+      <div class="eq">\[ c^* = \frac{x_1 w_1 + x_2 w_2}{w_1^2 + w_2^2} = \frac{\mathbf{x}^\top \mathbf{w}}{\lVert \mathbf{w} \rVert^2}, \qquad \text{proxy} = \frac{\mathbf{x}^\top \mathbf{w}}{\lVert \mathbf{w} \rVert^2}\,\mathbf{w} \]</div>
+      <p>The numerator is the dot product of \(\mathbf{x}\) and \(\mathbf{w}\); the denominator is the squared length of \(\mathbf{w}\). The same formula holds in any dimension.</p>
+      <div class="result">
+        <span class="lbl">Convention used from here on</span>
+        <p>Since any vector on the line can represent it, always pick \(\mathbf{w}\) with \(\lVert\mathbf{w}\rVert = 1\) (a point on the unit circle). The denominator disappears:</p>
+        \[ \text{proxy of } \mathbf{x} \text{ on the line } \mathbf{w} = (\mathbf{x}^\top \mathbf{w})\,\mathbf{w}, \qquad \text{coefficient} = \mathbf{x}^\top\mathbf{w} \]
+      </div>
+
+      <figure id="proj-fig">
+        <div class="controls">
+          <label for="proj-c">Coefficient \(c\) of the proxy \(c\,\mathbf{w}\)</label>
+          <input type="range" id="proj-c" min="-3" max="13" step="0.01" value="2.5">
+          <output id="proj-c-out" for="proj-c">2.50</output>
+          <button class="btn" id="proj-snap" type="button">Jump to the projection</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Squared error ‖x₅ − c w‖²</span><span class="v mine" id="proj-err">–</span></div>
+          <div><span class="k">At c* = x₅ᵀw</span><span class="v" id="proj-best">–</span></div>
+        </div>
+        <div class="status" id="proj-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="proj-svg" viewBox="0 0 400 400" role="img" aria-label="Line y equals x with four points on it and the point (5, 6) off it. A movable proxy on the line and its error vector to (5, 6); the error is shortest at the perpendicular foot (5.5, 5.5)."></svg></div>
+        <figcaption><b>Finding the proxy for \(\mathbf{x}_5 = [5, 6]\).</b> The line is \(y = x\) with unit representative \(\mathbf{w} = [1, 1]/\sqrt2\). Slide the proxy along the line: the dashed error vector is shortest at \(c^* = \mathbf{x}_5^\top\mathbf{w} = 11/\sqrt2 \approx 7.78\), the proxy \([5.5, 5.5]\), where it meets the line at a right angle. The squared error there is 0.5.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============ LECTURE 4 ============ -->
+    <section id="which-line">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=mU6CzvuUM00&amp;t=13s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L4 · 0:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=mU6CzvuUM00&amp;t=265s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L4 · 4:25 reconstruction error</a>
+        </div>
+        <h2>Which line?</h2>
+      </div>
+      <p>Nobody tells us which points lie on the line. Off-line points are the rule, not the exception: plot height against weight for a class of 100 people and perhaps no point sits exactly on the line we would draw. An exact linear relationship between features is a myth outside physical laws. So we always use proxies, and the line itself must be found from the data.</p>
+      <p>Any line gives the same compression: one representative plus one coefficient per point. What differs is how much we lose. The red line in the lecture beats the blue one because rebuilding the data from its proxies gives a smaller <dfn>reconstruction error</dfn>.</p>
+      <p class="rule-of-thumb">Goal: find the line through the origin with the least reconstruction error.</p>
+    </section>
+
+    <section id="derivation">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=mU6CzvuUM00&amp;t=334s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L4 · 5:34</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=mU6CzvuUM00&amp;t=856s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L4 · 14:16 the matrix C</a>
+        </div>
+        <h2>From reconstruction error to \(\mathbf{w}^\top C\,\mathbf{w}\)</h2>
+      </div>
+      <p>For a line given by a unit vector \(\mathbf{w}\), add up each point's squared error. The lecture uses the average rather than the sum; the same \(\mathbf{w}\) minimizes both, and the average is easier to interpret later.</p>
+      <div class="eq">\[ f(\mathbf{w}) = \frac{1}{n}\sum_{i=1}^{n} \big\lVert \mathbf{x}_i - (\mathbf{x}_i^\top\mathbf{w})\,\mathbf{w} \big\rVert^2, \qquad \lVert\mathbf{w}\rVert^2 = \mathbf{w}^\top\mathbf{w} = 1 \]</div>
+      <p>Write the squared length as a vector dotted with itself and expand. Using \(\mathbf{w}^\top\mathbf{w} = 1\):</p>
+      <div class="eq">\[ \big(\mathbf{x}_i - (\mathbf{x}_i^\top\mathbf{w})\mathbf{w}\big)^\top\big(\mathbf{x}_i - (\mathbf{x}_i^\top\mathbf{w})\mathbf{w}\big) = \mathbf{x}_i^\top\mathbf{x}_i - 2(\mathbf{x}_i^\top\mathbf{w})^2 + (\mathbf{x}_i^\top\mathbf{w})^2\,\mathbf{w}^\top\mathbf{w} = \lVert\mathbf{x}_i\rVert^2 - (\mathbf{x}_i^\top\mathbf{w})^2 \]</div>
+      <p>The first term does not involve \(\mathbf{w}\), so dropping it does not change the minimizer. Minimizing \(-\tfrac1n\sum(\mathbf{x}_i^\top\mathbf{w})^2\) is the same as maximizing it without the minus sign. Finally, \((\mathbf{x}_i^\top\mathbf{w})^2 = \mathbf{w}^\top\mathbf{x}_i\,\mathbf{x}_i^\top\mathbf{w}\), and \(\mathbf{w}\) does not depend on \(i\), so it comes out of the sum:</p>
+      <div class="eq">\[ \min_{\lVert\mathbf{w}\rVert=1} f(\mathbf{w}) \;\Longleftrightarrow\; \max_{\lVert\mathbf{w}\rVert=1} \frac1n\sum_{i=1}^n (\mathbf{x}_i^\top\mathbf{w})^2 = \max_{\lVert\mathbf{w}\rVert=1} \mathbf{w}^\top \Big(\frac1n\sum_{i=1}^n \mathbf{x}_i\mathbf{x}_i^\top\Big)\mathbf{w} \]</div>
+      <div class="result">
+        <span class="lbl">Result</span>
+        \[ \max_{\lVert\mathbf{w}\rVert = 1} \; \mathbf{w}^\top C\,\mathbf{w}, \qquad C = \frac1n\sum_{i=1}^n \mathbf{x}_i\mathbf{x}_i^\top \in \mathbb{R}^{d\times d} \]
+        <p>\(C\) is an average of \(n\) matrices of size \(d \times d\), one per data point. The lecture calls it the <dfn>covariance matrix</dfn>. The maximizer is the <b>eigenvector of \(C\) with the largest eigenvalue</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=mU6CzvuUM00&amp;t=960s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:00</a>.</p>
+      </div>
+      <p class="callout">\(\frac1n\sum \mathbf{x}_i\mathbf{x}_i^\top\) is the usual covariance matrix only when the data has mean zero. Lecture 5 adds that step (centring) for a different reason. The lecture says more about why a covariance appears in an error-minimization problem later; for now the takeaway is that the problem has a well-understood eigenvector solution.</p>
+
+      <figure id="line-fig">
+        <div class="controls">
+          <label for="line-th">Direction of the line</label>
+          <input type="range" id="line-th" min="0" max="179" step="1" value="110">
+          <output id="line-th-out" for="line-th">110°</output>
+          <button class="btn" id="line-snap" type="button">Snap to the top eigenvector</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Avg reconstruction error f(w)</span><span class="v mine" id="line-err">–</span></div>
+          <div><span class="k">wᵀCw</span><span class="v" id="line-var">–</span></div>
+          <div><span class="k">Sum (fixed)</span><span class="v" id="line-sum">–</span></div>
+        </div>
+        <div class="status" id="line-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="line-svg" viewBox="0 0 400 400" role="img" aria-label="Eighty synthetic centred points in two dimensions with a rotatable line through the origin. Each point's proxy and error segment are drawn. The error is smallest along the long axis of the cloud."></svg></div>
+        <figcaption><b>Synthetic, centred data (80 points)</b>, generated for this page. Rotate the line and watch the two readouts trade off. Their sum is always the average of \(\lVert\mathbf{x}_i\rVert^2\), the constant term dropped in the derivation. So the line with the smallest error is the line with the largest \(\mathbf{w}^\top C\mathbf{w}\): the top eigenvector of \(C\).</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============ LECTURE 5 ============ -->
+    <section id="residues">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=t0bA3rsZ6qM&amp;t=14s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L5 · 0:14</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=t0bA3rsZ6qM&amp;t=317s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L5 · 5:17 residues line up</a>
+        </div>
+        <h2>Is one line enough?</h2>
+      </div>
+      <p>Treat the best-line solver as a black box: data goes in, a line comes out. That line is not always satisfying. Suppose 3-D data points all lie on a plane. The best line will lie in that plane (a line outside it would cost more to project onto), but the plane is the real structure, and a single line misses half of it.</p>
+      <p>The part we have been calling "error" may then carry information. Pure noise would point every which way. Here the error vectors, the <dfn>residues</dfn> \(\mathbf{x}_i - (\mathbf{x}_i^\top\mathbf{w})\mathbf{w}\), all line up along one direction.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 214" role="img" aria-label="Left: points on a tilted plane in three dimensions, the best line w1 in the plane, and dashed residue arrows from each proxy to its point, all parallel. Right: the same residues drawn from one origin all fall on one line, w2.">
+            <defs><marker id="p2r-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="20" y="22">Data on a plane in 3-D</text>
+            <path class="d-plot" d="M20.5 177.8 L280.5 177.8 L379.5 102.2 L119.5 102.2 Z" style="fill: var(--accent-soft); fill-opacity:.45"/>
+            <line class="d-ln" x1="70" y1="140" x2="330" y2="140" style="stroke-width:2"/>
+            <text class="d-t" x="338" y="144">w₁</text>
+            <path class="d-ln-acc d-dash" d="M100 140 L131 116" marker-end="url(#p2r-ah)"/>
+            <path class="d-ln-acc d-dash" d="M160 140 L134.5 159.5" marker-end="url(#p2r-ah)"/>
+            <path class="d-ln-acc d-dash" d="M220 140 L259 110" marker-end="url(#p2r-ah)"/>
+            <path class="d-ln-acc d-dash" d="M270 140 L255.5 151" marker-end="url(#p2r-ah)"/>
+            <path class="d-ln-acc d-dash" d="M310 140 L330 124.6" marker-end="url(#p2r-ah)"/>
+            <circle class="c-proxy" cx="100" cy="140" r="3.5"/><circle class="c-proxy" cx="160" cy="140" r="3.5"/><circle class="c-proxy" cx="220" cy="140" r="3.5"/><circle class="c-proxy" cx="270" cy="140" r="3.5"/><circle class="c-proxy" cx="310" cy="140" r="3.5"/>
+            <circle class="pt-plain" cx="133" cy="114.8" r="4.5"/><circle class="pt-plain" cx="132.5" cy="161" r="4.5"/><circle class="pt-plain" cx="261.25" cy="108.5" r="4.5"/><circle class="pt-plain" cx="253.5" cy="152.6" r="4.5"/><circle class="pt-plain" cx="332" cy="123.2" r="4.5"/>
+            <text class="d-s" x="20" y="202">dots: data · rings: proxies on w₁ · dashes: residues</text>
+
+            <line class="d-rule" x1="420" y1="10" x2="420" y2="206"/>
+
+            <text class="d-h" x="440" y="22">Residues, redrawn from one origin</text>
+            <line class="d-ln" x1="470.5" y1="177.8" x2="569.5" y2="102.2" style="stroke-dasharray: 3 4"/>
+            <text class="d-t" x="576" y="104">w₂</text>
+            <line class="d-ln-acc" x1="520" y1="140" x2="553" y2="114.8"/>
+            <line class="d-ln-acc" x1="520" y1="140" x2="492.5" y2="161"/>
+            <line class="d-ln-acc" x1="520" y1="140" x2="561.25" y2="108.5"/>
+            <line class="d-ln-acc" x1="520" y1="140" x2="503.5" y2="152.6"/>
+            <line class="d-ln-acc" x1="520" y1="140" x2="542" y2="123.2"/>
+            <circle class="pt-tree" cx="553" cy="114.8" r="4"/><circle class="pt-tree" cx="492.5" cy="161" r="4"/><circle class="pt-tree" cx="561.25" cy="108.5" r="4"/><circle class="pt-tree" cx="503.5" cy="152.6" r="4"/><circle class="pt-tree" cx="542" cy="123.2" r="4"/>
+            <circle class="pt-new" cx="520" cy="140" r="4"/>
+            <text class="d-s" x="440" y="202">they all fall on one line: more structure to extract</text>
+          </svg>
+        </div>
+        <figcaption><b>Residues can carry information.</b> When the data really lives on a plane, the leftovers after projecting onto \(\mathbf{w}_1\) all point along a second in-plane direction. Fitting a line to the residues recovers it as \(\mathbf{w}_2\).</figcaption>
+      </figure>
+
+      <h3>A possible algorithm <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=t0bA3rsZ6qM&amp;t=462s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L5 · 7:42</a></h3>
+      <ol class="algo">
+        <li class="algo-title">Repeated best-line fitting</li>
+        <li>Input \(\{\mathbf{x}_1, \dots, \mathbf{x}_n\}\), \(\mathbf{x}_i \in \mathbb{R}^d\).</li>
+        <li>Find the best line \(\mathbf{w}_1\): minimize the reconstruction error, equivalently maximize \(\mathbf{w}^\top C\mathbf{w}\).</li>
+        <li>Replace each point by its residue: \(\mathbf{x}_i \leftarrow \mathbf{x}_i - (\mathbf{x}_i^\top\mathbf{w}_1)\,\mathbf{w}_1\).</li>
+        <li>Repeat on the residue data set to get \(\mathbf{w}_2\), then \(\mathbf{w}_3\), and so on, at most \(d\) times.</li>
+      </ol>
+    </section>
+
+    <section id="centering">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=t0bA3rsZ6qM&amp;t=663s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L5 · 11:03</a>
+        <h2>Centre the data first</h2>
+      </div>
+      <p>Every line here passes through the origin, because a proxy is a coefficient times the representative and a coefficient of 0 must give the origin. If the data sits far from the origin, the best line through the origin can miss the direction in which the data is spread. The lecture's example: the x-axis can beat the line that follows the data.</p>
+      <p>The fix is to <dfn>centre</dfn> the data before anything else: compute the mean and subtract it from every point. The new data set has its mean at the origin, so lines through the origin now follow the spread.</p>
+      <div class="eq">\[ \boldsymbol{\mu} = \frac1n\sum_{i=1}^n \mathbf{x}_i, \qquad \mathbf{x}_i \leftarrow \mathbf{x}_i - \boldsymbol{\mu} \quad \text{for all } i \]</div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 300" role="img" aria-label="Left: an uncentred cloud spread along a descending direction; the best line through the origin points at the mean instead. Right: after subtracting the mean, the best line through the origin follows the spread.">
+            <text class="d-h" x="20" y="18">Not centred</text>
+            <line class="d-rule" x1="30" y1="240" x2="300" y2="240"/><line class="d-rule" x1="60" y1="30" x2="60" y2="270"/>
+            <line class="d-ln-acc" x1="60" y1="240" x2="285" y2="60" style="stroke-width:2"/>
+            <text class="d-s" x="236" y="58" style="fill: var(--accent)">best line through 0</text>
+            <line class="d-ln" x1="150" y1="60" x2="285" y2="195" style="stroke-dasharray: 3 4"/>
+            <text class="d-s" x="232" y="214">direction of spread</text>
+            <circle class="pt-plain" cx="158.25" cy="63.75" r="4"/><circle class="pt-plain" cx="170.4" cy="87.6" r="4"/><circle class="pt-plain" cx="193.5" cy="94.5" r="4"/><circle class="pt-plain" cx="202.65" cy="115.35" r="4"/>
+            <circle class="pt-plain" cx="221.7" cy="126.3" r="4"/><circle class="pt-plain" cx="229.5" cy="148.5" r="4"/><circle class="pt-plain" cx="250.8" cy="157.2" r="4"/><circle class="pt-plain" cx="261.75" cy="176.25" r="4"/>
+            <circle class="pt-new" cx="210" cy="120" r="5"/><text class="d-s" x="176" y="134" text-anchor="end">mean μ</text>
+            <text class="d-al" x="64" y="256">0</text>
+            <text class="d-s" x="20" y="292">the line mostly captures where the mean is</text>
+
+            <line class="d-rule" x1="330" y1="8" x2="330" y2="276"/>
+
+            <text class="d-h" x="350" y="18">Centred: xᵢ − μ</text>
+            <line class="d-rule" x1="370" y1="135" x2="580" y2="135"/><line class="d-rule" x1="475" y1="30" x2="475" y2="240"/>
+            <line class="d-ln-acc" x1="377" y1="32" x2="573" y2="238" style="stroke-width:2"/>
+            <text class="d-s" x="582" y="232" style="fill: var(--accent)">best line</text>
+            <circle class="pt-plain" cx="414.6" cy="69.4" r="4"/><circle class="pt-plain" cx="428.8" cy="97.2" r="4"/><circle class="pt-plain" cx="455.75" cy="105.25" r="4"/><circle class="pt-plain" cx="466.4" cy="129.6" r="4"/>
+            <circle class="pt-plain" cx="488.65" cy="142.35" r="4"/><circle class="pt-plain" cx="497.75" cy="168.25" r="4"/><circle class="pt-plain" cx="522.6" cy="178.4" r="4"/><circle class="pt-plain" cx="535.4" cy="200.6" r="4"/>
+            <text class="d-al" x="480" y="150">0</text>
+            <text class="d-s" x="350" y="292">now the line follows the spread</text>
+          </svg>
+        </div>
+        <figcaption><b>Why centre?</b> The same eight points before and after subtracting their mean (illustrative points). Before centring, the best line through the origin is pulled toward the mean. After centring, it runs along the direction the data actually varies.</figcaption>
+      </figure>
+    </section>
+
+    <section id="questions">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=t0bA3rsZ6qM&amp;t=870s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L5 · 14:30</a>
+        <h2>Open questions, answered in Part 3</h2>
+      </div>
+      <p>L5 ends with four questions. Answering them turns the procedure into the first algorithm of the course, a representation learning algorithm for unsupervised learning.</p>
+      <ol>
+        <li>How do we solve \(\max_{\lVert\mathbf{w}\rVert=1} \mathbf{w}^\top C\mathbf{w}\)? (The hint: an eigenvector.)</li>
+        <li>How many times should the residue step be repeated?</li>
+        <li>Where exactly is the compression happening once there are several lines?</li>
+        <li>With several lines and several coefficients per point, what representation are we actually learning?</li>
+      </ol>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Representation learning</dt><dd>Finding a compact description of data points that keeps what matters.</dd></div>
+        <div><dt>Comprehension is compression</dt><dd>The course's running theme: learning means keeping only the important part of the data.</dd></div>
+        <div><dt>Representative</dt><dd>One vector shared by the whole data set that spans the chosen line.</dd></div>
+        <div><dt>Coefficient</dt><dd>The single number per point that scales the representative, \(\mathbf{x}^\top\mathbf{w}\) for unit \(\mathbf{w}\).</dd></div>
+        <div><dt>Proxy</dt><dd>The point on the line that stands in for an off-line point: its projection \((\mathbf{x}^\top\mathbf{w})\mathbf{w}\).</dd></div>
+        <div><dt>Projection</dt><dd>The closest point on a line to a given point; the error is perpendicular to the line.</dd></div>
+        <div><dt>Reconstruction error</dt><dd>Average squared distance between points and their proxies, \(f(\mathbf{w})\).</dd></div>
+        <div><dt>Covariance matrix \(C\)</dt><dd>\(\frac1n\sum\mathbf{x}_i\mathbf{x}_i^\top\) for centred data; the best line is its top eigenvector.</dd></div>
+        <div><dt>Residue</dt><dd>What is left of a point after removing its proxy: \(\mathbf{x} - (\mathbf{x}^\top\mathbf{w})\mathbf{w}\).</dd></div>
+        <div><dt>Centring</dt><dd>Subtracting the mean from every point so lines through the origin follow the data.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>How many numbers does it take to store 1,000 points in \(\mathbb{R}^{50}\) that all lie on one line through the origin?</span><span class="tog"></span></summary>
+          <p>\(d + n = 50 + 1000 = 1050\), instead of \(d \times n = 50{,}000\).</p></details>
+        <details><summary><span class="q">Q2</span><span>Why is using the two representatives \([1,0]\) and \([0,1]\) a bad way to handle a point that is off the line?</span><span class="tog"></span></summary>
+          <p>It is exact, but every point then needs two coefficients, and the representatives add 4 more numbers: \(2n + 4\), which is more than the raw \(2n\).</p></details>
+        <details><summary><span class="q">Q3</span><span>Project \(\mathbf{x} = [3, 1]\) onto the line spanned by \(\mathbf{w} = [1, 0]\). What is the proxy and the squared error?</span><span class="tog"></span></summary>
+          <p>\(\mathbf{w}\) already has length 1, so the coefficient is \(\mathbf{x}^\top\mathbf{w} = 3\) and the proxy is \([3, 0]\). The error vector is \([0, 1]\), squared error 1.</p></details>
+        <details><summary><span class="q">Q4</span><span>Why can the term \(\frac1n\sum\lVert\mathbf{x}_i\rVert^2\) be dropped when choosing \(\mathbf{w}\)?</span><span class="tog"></span></summary>
+          <p>It does not depend on \(\mathbf{w}\). Adding a constant to every candidate's objective does not change which candidate is smallest.</p></details>
+        <details><summary><span class="q">Q5</span><span>All lines through the origin give the same compression ratio. Then what makes one line better than another?</span><span class="tog"></span></summary>
+          <p>Its reconstruction error: how far the points are from their proxies on that line. The best line minimizes it.</p></details>
+        <details><summary><span class="q">Q6</span><span>Why centre the data before looking for lines?</span><span class="tog"></span></summary>
+          <p>All candidate lines pass through the origin. If the data is far from the origin, the best such line is pulled toward the mean instead of following the direction the data varies in.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-01.html"><span class="dir">← Part 1</span><span class="nm">Introduction and paradigms</span></a><a class="next" href="index.html"><span class="dir">Part 3 · coming</span><span class="nm">Principal component analysis</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+
+  /* ---------- Projection of x5 onto y = x ---------- */
+  (() => {
+    const svg = document.getElementById('proj-svg'); if (!svg) return;
+    const lo = -6, hi = 12, P = 24, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    axes(svg, sx, sy, lo, hi, 2);
+    const r2 = Math.SQRT1_2, x5 = [5, 6], cStar = (x5[0] + x5[1]) * r2;
+    mk('line', { x1: sx(lo), y1: sy(lo), x2: sx(hi), y2: sy(hi), class: 'c-line' }, svg);
+    mk('text', { x: sx(11.6), y: sy(11.6) + 16, 'text-anchor': 'end', class: 'c-note' }, svg).textContent = 'y = x';
+    [[-5, -5], [1, 1], [7, 7], [10, 10]].forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 4.5, class: 'c-dots-pt', style: 'fill: var(--ink-2); stroke: var(--surface); stroke-width: 1.5' }, svg));
+    const defs = mk('defs', {}, svg);
+    const mkr = mk('marker', { id: 'proj-ah', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs);
+    mk('path', { d: 'M0,0 L10,5 L0,10 z', class: 'c-arrowhead' }, mkr);
+    mk('line', { x1: sx(0), y1: sy(0), x2: sx(r2 * 1.9), y2: sy(r2 * 1.9), class: 'c-arrow', 'marker-end': 'url(#proj-ah)' }, svg);
+    mk('text', { x: sx(0.6), y: sy(1.9), class: 'c-note' }, svg).textContent = 'w';
+    const ra = mk('path', { class: 'c-ra' }, svg);
+    const err = mk('line', { class: 'c-err' }, svg);
+    const proxy = mk('circle', { r: 6, class: 'c-proxy' }, svg);
+    mk('circle', { cx: sx(x5[0]), cy: sy(x5[1]), r: 6, class: 'c-pt-hi' }, svg);
+    mk('text', { x: sx(x5[0]) - 10, y: sy(x5[1]) - 10, 'text-anchor': 'end', class: 'c-note' }, svg).textContent = 'x₅ = [5, 6]';
+    const lbl = mk('text', { class: 'c-lbl' }, svg);
+    const slider = document.getElementById('proj-c'), out = document.getElementById('proj-c-out');
+    const eOut = document.getElementById('proj-err'), status = document.getElementById('proj-status');
+    document.getElementById('proj-best').textContent = (x5[0] ** 2 + x5[1] ** 2 - cStar ** 2).toFixed(2);
+    let c = parseFloat(slider.value);
+    const draw = () => {
+      const px = c * r2, py = c * r2;
+      proxy.setAttribute('cx', sx(px)); proxy.setAttribute('cy', sy(py));
+      err.setAttribute('x1', sx(px)); err.setAttribute('y1', sy(py)); err.setAttribute('x2', sx(x5[0])); err.setAttribute('y2', sy(x5[1]));
+      lbl.setAttribute('x', sx(px) + 10); lbl.setAttribute('y', sy(py) + 18); lbl.textContent = 'proxy c·w';
+      const e2 = (x5[0] - px) ** 2 + (x5[1] - py) ** 2;
+      eOut.textContent = e2.toFixed(2); out.textContent = c.toFixed(2);
+      const at = Math.abs(c - cStar) < 0.03;
+      if (at) { const ux = r2, uy = r2, vx = -r2, vy = r2; ra.setAttribute('d', `M${sx(px) - 9 * ux} ${sy(py) + 9 * uy} L${sx(px) - 9 * ux + 9 * vx} ${sy(py) + 9 * uy - 9 * vy} L${sx(px) + 9 * vx} ${sy(py) - 9 * vy}`); } else ra.setAttribute('d', '');
+      status.textContent = at ? 'Projection reached: proxy [5.5, 5.5], and the error meets the line at a right angle.' : '';
+    };
+    draw();
+    slider.addEventListener('input', () => { c = parseFloat(slider.value); draw(); });
+    document.getElementById('proj-snap').addEventListener('click', () => tween(c, cStar, v => { c = v; slider.value = v.toFixed(2); draw(); }));
+  })();
+
+  /* ---------- Best line through centred synthetic data ---------- */
+  (() => {
+    const svg = document.getElementById('line-svg'); if (!svg) return;
+    let seed = 3031;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const ang = 33 * Math.PI / 180, ca = Math.cos(ang), sa = Math.sin(ang);
+    let pts = [];
+    for (let i = 0; i < 80; i++) { const a = 2.3 * normal(), b = 0.75 * normal(); pts.push([a * ca - b * sa, a * sa + b * ca]); }
+    const m0 = pts.reduce((s, p) => s + p[0], 0) / pts.length, m1 = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    pts = pts.map(p => [p[0] - m0, p[1] - m1]);
+    const n = pts.length;
+    const A = pts.reduce((s, p) => s + p[0] * p[0], 0) / n, B = pts.reduce((s, p) => s + p[0] * p[1], 0) / n, D = pts.reduce((s, p) => s + p[1] * p[1], 0) / n;
+    const total = A + D;
+    let thBest = 0.5 * Math.atan2(2 * B, A - D) * 180 / Math.PI; if (thBest < 0) thBest += 180;
+    const lo = -7, hi = 7, P = 22, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    axes(svg, sx, sy, lo, hi, 2);
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'line-clip' }, defs); mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P }, cp);
+    const gRes = mk('g', { class: 'c-resid', 'clip-path': 'url(#line-clip)' }, svg);
+    const res = pts.map(() => mk('line', {}, gRes));
+    const line = mk('line', { class: 'c-user', 'clip-path': 'url(#line-clip)' }, svg);
+    const gProj = mk('g', { class: 'c-proj' }, svg);
+    const proj = pts.map(() => mk('circle', { r: 2.6 }, gProj));
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    pts.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.8 }, gDots));
+    const slider = document.getElementById('line-th'), out = document.getElementById('line-th-out');
+    const eOut = document.getElementById('line-err'), vOut = document.getElementById('line-var'), sOut = document.getElementById('line-sum'), status = document.getElementById('line-status');
+    sOut.textContent = total.toFixed(2);
+    let th = parseFloat(slider.value);
+    const draw = () => {
+      const r = th * Math.PI / 180, w = [Math.cos(r), Math.sin(r)];
+      line.setAttribute('x1', sx(-10 * w[0])); line.setAttribute('y1', sy(-10 * w[1])); line.setAttribute('x2', sx(10 * w[0])); line.setAttribute('y2', sy(10 * w[1]));
+      let v = 0;
+      pts.forEach((p, i) => { const c = p[0] * w[0] + p[1] * w[1]; v += c * c; const q = [c * w[0], c * w[1]]; res[i].setAttribute('x1', sx(p[0])); res[i].setAttribute('y1', sy(p[1])); res[i].setAttribute('x2', sx(q[0])); res[i].setAttribute('y2', sy(q[1])); proj[i].setAttribute('cx', sx(q[0])); proj[i].setAttribute('cy', sy(q[1])); });
+      v /= n;
+      vOut.textContent = v.toFixed(2); eOut.textContent = (total - v).toFixed(2); out.textContent = Math.round(th) + '°';
+      const d = Math.abs(((th - thBest) % 180 + 180) % 180); const near = Math.min(d, 180 - d) < 0.6;
+      status.textContent = near ? `Top eigenvector of C (at ${thBest.toFixed(1)}°): lowest error, highest wᵀCw.` : '';
+    };
+    draw();
+    slider.addEventListener('input', () => { th = parseFloat(slider.value); draw(); });
+    document.getElementById('line-snap').addEventListener('click', () => { let target = thBest; if (Math.abs(target - th) > 90) target += target < th ? 180 : -180; tween(th, target, v => { th = ((v % 180) + 180) % 180; slider.value = Math.round(th); draw(); }); });
+  })();
+})();
+</script>
+</body>
+</html>

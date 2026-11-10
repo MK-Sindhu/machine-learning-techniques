@@ -278,3 +278,21 @@ code, .code { font-family: var(--font-mono); font-size: .88em; background: var(-
 .hub-main { display: grid; gap: 56px; max-width: 880px; }
 .course td a { color: var(--ink); font-weight: 600; font-family: var(--font-head); text-decoration-color: var(--accent); text-underline-offset: 3px; }
 .course td a:hover { color: var(--accent); }
+
+/* Figure layouts for later parts */
+.fig-split { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 20px 28px; align-items: center; }
+.fig-split svg.dg { min-width: 0; width: 100%; }
+.fig-split .tbl-wrap { border-radius: 8px; }
+@media (max-width: 620px) { .fig-split { grid-template-columns: minmax(0, 1fr); } .fig-split svg.dg { max-width: 280px; } }
+.chart-wrap.sq svg { min-width: 0; max-width: 440px; margin: 0 auto; }
+.mini td, .mini th { padding: 8px 12px; font-size: 14px; }
+.mini td.num, .mini th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.c-proxy { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.c-err { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; fill: none; }
+.c-pt-hi { fill: var(--mark); stroke: var(--ink); stroke-width: 1.6; }
+.c-ra { fill: none; stroke: var(--ink-2); stroke-width: 1.2; }
+.c-line { stroke: var(--ink-2); stroke-width: 1.6; }
+.c-faint { stroke: var(--rule); stroke-width: 1; }
+.c-arrow { stroke: var(--ink); stroke-width: 2; }
+.c-arrowhead { fill: var(--ink); }
+.c-proj circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.4; }
