@@ -1,0 +1,1046 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 13 · Classification: k-NN and decision trees · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 13: lectures 41–44 on binary classification and the 0-1 loss, k-nearest neighbours, and decision trees built with entropy and information gain.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<style>
+/* Part 13: two-class marks (+1 accent circles, -1 green squares), decision regions, entropy chart. Theme tokens only. */
+.dg .pt-neg, .c-neg { fill: var(--ok); stroke: var(--surface); stroke-width: 1.5; }
+.c-pos { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+.dg .r-pos { fill: var(--accent); fill-opacity: .14; }
+.dg .r-neg { fill: var(--ok); fill-opacity: .17; }
+.c-regions { opacity: .16; }
+.c-rpos { fill: var(--accent); }
+.c-rneg { fill: var(--ok); }
+.dg .lf-pos { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+.dg .lf-neg { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.5; }
+.c-vpos { fill: none; stroke: var(--accent); stroke-width: 1.3; }
+.c-vneg { fill: none; stroke: var(--ok); stroke-width: 1.3; }
+.c-yes { fill: var(--mark); fill-opacity: .4; }
+.c-chord { stroke: var(--ink-2); stroke-width: 1.4; stroke-dasharray: 5 4; fill: none; }
+.c-gain { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+.c-dot { fill: var(--ink-2); stroke: var(--surface); stroke-width: 1.5; }
+.c-halo { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+</style>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 13 of 18</span><span class="sep">·</span><a href="part-12.html">← Part 12</a><span class="sep">·</span><a href="part-14.html">Part 14 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Classification: nearest neighbours and decision trees</h1>
+    <p class="lede">Notes for lectures 41 to 44: binary classification, why minimizing the 0-1 loss directly is hard, and why least squares is a poor stand-in for it. Then two simple algorithms: k-nearest neighbours, which predicts by majority vote among nearby training points, and decision trees, which learn a short sequence of yes/no questions chosen by information gain.</p>
+    <div class="meta">
+      <span><b>Part 13</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>94 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L41 · 20:45</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L42 · 26:04</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L43 · 25:28</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L44 · 21:47</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 41</h4>
+      <ul>
+        <li><a href="#binary-classification">Binary classification</a></li>
+        <li><a href="#zero-one-loss">The 0-1 loss</a></li>
+        <li><a href="#linear-classifiers">Linear classifiers</a></li>
+        <li><a href="#np-hard">Why the 0-1 loss is hard</a></li>
+        <li><a href="#regression-for-classification">Why not linear regression?</a></li>
+        <li><a href="#many-algorithms">Why so many algorithms</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 42</h4>
+      <ul>
+        <li><a href="#nearest-neighbour">Ask the nearest neighbour</a></li>
+        <li><a href="#knn">k-nearest neighbours</a></li>
+        <li><a href="#decision-boundary">Decision boundaries and k</a></li>
+        <li><a href="#choosing-k">Choosing k</a></li>
+        <li><a href="#knn-issues">Distance and prediction cost</a></li>
+        <li><a href="#no-model">No model is learnt</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 43</h4>
+      <ul>
+        <li><a href="#decision-tree">What a decision tree is</a></li>
+        <li><a href="#questions">Questions, good and bad</a></li>
+        <li><a href="#entropy">Impurity and entropy</a></li>
+        <li><a href="#information-gain">Information gain</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 44</h4>
+      <ul>
+        <li><a href="#tree-algorithm">Growing the tree</a></li>
+        <li><a href="#stopping">When to stop</a></li>
+        <li><a href="#tree-boundaries">Decision boundaries of a tree</a></li>
+        <li><a href="#interpretability">Why trees are popular</a></li>
+        <li><a href="#two-algorithms">Two algorithms, then probability</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li><dfn>Binary classification</dfn>: learn \(h: \mathbb{R}^d \to \{0, 1\}\) (or \(\{-1, +1\}\)) from labelled data. The natural error is the <b>0-1 loss</b>, the fraction of training points \(h\) gets wrong.</li>
+        <li>Over linear classifiers \(\operatorname{sign}(\mathbf{w}^\top\mathbf{x})\), minimizing the 0-1 loss is <b>NP-hard</b> in general. Linear regression plus a threshold does not fix this, because it reacts to <i>where</i> points are: far-away points on the correct side can tilt the line into mistakes.</li>
+        <li><b>k-NN</b> predicts the majority label of the \(k\) closest training points. \(k = 1\) leaves holes around outliers, \(k = n\) predicts the overall majority everywhere; choose \(k\) by cross-validation. Prediction is expensive because <b>no model is learnt</b>.</li>
+        <li>A <b>decision tree</b> is a binary tree of questions "\(f_k \le \theta\)?" with predictions at the leaves. The tree is the model: the data can be thrown away and predictions are fast and easy to explain.</li>
+        <li>Questions are chosen greedily by <b>information gain</b>, the drop from \(\text{Entropy}(D)\) to the size-weighted entropies of \(D_\text{yes}\) and \(D_\text{no}\). Stop at sufficient purity or at a depth chosen by cross-validation. Every question is an axis-parallel cut, so a tree carves the space into rectangles.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 41 ============ -->
+    <section id="binary-classification">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=34s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 0:34</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=98s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 1:38 the setup</a>
+        </div>
+        <h2>Binary classification</h2>
+      </div>
+      <p>About six weeks in, the course has covered unsupervised learning and, within supervised learning, regression: linear, kernel, ridge and LASSO (<a href="part-10.html">Parts 10</a> to <a href="part-12.html">12</a>). The next supervised problem is <dfn>classification</dfn>, which is far more widely applied.</p>
+      <p>Classification comes in two forms: <b>binary</b>, with two classes, and <b>multi-class</b>, with several. The course concentrates on binary classification. It is the most basic form, and once it is understood its ideas usually carry over to the multi-class problem with little change.</p>
+      <div class="eq">\[ \text{Input: } \{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\},\quad \mathbf{x}_i \in \mathbb{R}^d,\ \ y_i \in \{0, 1\} \text{ or } \{-1, +1\} \qquad \text{Goal: } h: \mathbb{R}^d \to \{0, 1\} \]</div>
+      <p>This is the regression setup (<a href="part-10.html">Part 10</a>) with the labels restricted to two values. Which two numbers name the classes does not matter; some algorithms are neater with \(\{0, 1\}\), others with \(\{-1, +1\}\). In spam detection, for example, spam could be 1 and non-spam 0, or the other way round, or \(+1\) and \(-1\).</p>
+    </section>
+
+    <section id="zero-one-loss">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=190s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 3:10</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=257s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 4:17 the indicator</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=317s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 5:17 restrict the functions</a>
+        </div>
+        <h2>The 0-1 loss</h2>
+      </div>
+      <p>Regression measured the error of a function with the squared loss. For classification the intuitive error of a candidate \(h\) is the fraction of training points it gets wrong:</p>
+      <div class="eq">\[ \text{loss}(h) = \frac{1}{n}\sum_{i=1}^{n} \mathbf{1}\big(h(\mathbf{x}_i) \ne y_i\big), \qquad \mathbf{1}(z) = \begin{cases} 1 & \text{if } z \text{ is true} \\ 0 & \text{otherwise} \end{cases} \]</div>
+      <p>Each mistake costs 1 and each correct prediction costs 0, so the lecture names this the <dfn>0-1 loss</dfn>. It suits classification better than the squared loss because all we care about is whether a prediction is right. The real goal is to be right on as many test points as possible; the training error is the proxy we can measure.</p>
+      <p>The overfitting argument from regression (<a href="part-10.html">Part 10</a>) returns unchanged. If \(h\) may be any function, the training error can always be made 0, but such an \(h\) has probably fitted the noise as well. So the search is restricted to a smaller class of functions, and, as in regression, the first choice is the linear ones.</p>
+    </section>
+
+    <section id="linear-classifiers">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=384s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 6:24</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=456s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 7:36 the picture</a>
+        </div>
+        <h2>Linear classifiers</h2>
+      </div>
+      <p>A linear classifier still combines the features linearly, as \(\mathbf{w}^\top\mathbf{x}\), and then thresholds the result at 0. The class of all of them is</p>
+      <div class="eq">\[ \mathcal{H}_\text{linear} = \big\{ h_\mathbf{w} : h_\mathbf{w}(\mathbf{x}) = \operatorname{sign}(\mathbf{w}^\top\mathbf{x}),\ \mathbf{w} \in \mathbb{R}^d \big\}, \qquad \operatorname{sign}(z) = \begin{cases} 1 & z > 0 \\ 0 & \text{otherwise} \end{cases} \]</div>
+      <p>In pictures, \(\mathbf{w}\) defines the hyperplane \(\mathbf{w}^\top\mathbf{x} = 0\) through the origin (a line in two dimensions). Points on the side \(\mathbf{w}\) points towards have \(\mathbf{w}^\top\mathbf{x} > 0\) and are predicted positive; points on the other side are predicted negative.</p>
+      <figure class="narrow">
+        <svg class="dg" viewBox="0 0 340 262" role="img" aria-label="A line through the origin with the vector w perpendicular to it. The half-plane w points into is shaded and labelled w transpose x greater than 0, predict 1; the other half is labelled w transpose x less than 0, predict 0.">
+          <defs><marker id="p13-ah-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+          <polygon class="r-pos" points="94.4,10 330,10 330,226 245.6,226"/>
+          <polygon class="r-neg" points="10,10 94.4,10 245.6,226 10,226"/>
+          <rect class="d-plot" x="10" y="10" width="320" height="216"/>
+          <line class="d-ln" x1="94.4" y1="10" x2="245.6" y2="226" style="stroke-width:2"/>
+          <path class="d-ln" d="M177.4 112.8 L172.2 105.4 L164.8 110.6" style="stroke-width:1"/>
+          <line class="d-ln-acc" x1="170" y1="118" x2="220.8" y2="82.4" marker-end="url(#p13-ah-w)" style="stroke-width:2.4"/>
+          <circle class="pt-plain" cx="170" cy="118" r="3"/>
+          <text class="d-al" x="160" y="136" text-anchor="end">0</text>
+          <text class="d-t" x="228" y="80" style="fill: var(--accent)">w</text>
+          <text class="d-t" x="318" y="38" text-anchor="end">wᵀx &gt; 0</text>
+          <text class="d-s" x="318" y="54" text-anchor="end">predict 1</text>
+          <text class="d-t" x="22" y="194">wᵀx &lt; 0</text>
+          <text class="d-s" x="22" y="210">predict 0</text>
+          <text class="d-al" x="254" y="216">wᵀx = 0</text>
+          <text class="d-s" x="170" y="248" text-anchor="middle">on the line itself: a tie, predicted 0</text>
+        </svg>
+        <figcaption><b>A linear classifier splits space in two.</b> The line \(\mathbf{w}^\top\mathbf{x} = 0\) is perpendicular to \(\mathbf{w}\); the prediction depends only on which side of it a point falls.</figcaption>
+      </figure>
+      <p>A point exactly on the hyperplane has \(\mathbf{w}^\top\mathbf{x} = 0\), a tie between the classes <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=521s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:41</a>. The definition above sends it to the negative class. Calling it positive instead, or tossing a coin, would do just as well. With this class fixed, the learning problem becomes</p>
+      <div class="eq">\[ \min_{h \in \mathcal{H}_\text{linear}} \; \sum_{i=1}^{n} \mathbf{1}\big(h(\mathbf{x}_i) \ne y_i\big) \]</div>
+    </section>
+
+    <section id="np-hard">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=554s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 9:14</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=588s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 9:48 NP-hard</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=653s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 10:53 why</a>
+        </div>
+        <h2>Minimizing the 0-1 loss is NP-hard</h2>
+      </div>
+      <p>For regression we took the gradient of the squared loss, set it to zero and solved (<a href="part-10.html">Part 10</a>). That route does not work here. In general, finding the linear classifier with the smallest 0-1 loss on a given data set is <dfn>NP-hard</dfn>: no efficient algorithm for it is known. "In general" matters. For some data sets the problem is easy, and later lectures use such cases.</p>
+      <p>The difficulty comes from the loss. The squared loss changes smoothly as the prediction moves away from the real-valued label and can take any value from 0 to \(\infty\). Each term of the 0-1 loss takes only the values 0 and 1, so the total jumps between a few levels as \(\mathbf{w}\) changes. It is neither continuous nor differentiable, and minimizing it turns into a discrete search problem.</p>
+      <p class="rule-of-thumb">The 0-1 loss is what we want to minimize, and we cannot minimize it efficiently. Some other route is needed.</p>
+      <p class="note"><a href="part-18.html">Part 18</a> comes back to the 0-1 loss and the surrogate losses that classification algorithms minimize in its place.</p>
+    </section>
+
+    <section id="regression-for-classification">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=687s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 11:27</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=815s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 13:35 the example</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=1047s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 17:27 conclusion</a>
+        </div>
+        <h2>Why not use linear regression?</h2>
+      </div>
+      <p>Regression allows any real-valued label, while classification restricts the labels to two values. So it looks as if regression already solves a broader problem, and we could simply reuse it.</p>
+      <ol class="algo">
+        <li class="algo-title">Least squares as a classifier</li>
+        <li>Input \((\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\) with \(y_i \in \{-1, +1\}\).</li>
+        <li>Run plain (unregularized) linear regression to get \(\mathbf{w} \in \mathbb{R}^d\). Adding regularization (<a href="part-12.html">Part 12</a>) would not change the argument much.</li>
+        <li>Threshold at \(\mathbf{w}^\top\mathbf{x} = 0\): use \(h_\mathbf{w}(\mathbf{x}) = \operatorname{sign}(\mathbf{w}^\top\mathbf{x})\) as the classifier.</li>
+      </ol>
+      <p>This minimizes the squared loss, and that is where it goes wrong. The lecture's example has positive and negative points in two dimensions, and regression returns a \(\mathbf{w}\) whose line separates them well. Now add a bunch of positive points far away on the positive side. For classification they change nothing, because the old line still separates every point.</p>
+      <p>Regression, though, compares \(\mathbf{w}^\top\mathbf{x}\) with the label value itself. For the far points \(\mathbf{w}^\top\mathbf{x}\) is large, so \((\mathbf{w}^\top\mathbf{x} - 1)^2\) is large. To bring it down, least squares tilts \(\mathbf{w}\), and further points elsewhere tilt it again. The tilted line can misclassify points that were right before, even though a line with no mistakes exists.</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 300" role="img" aria-label="Left: sixteen points, eight positive on the right and eight negative on the left; the least-squares line through the origin separates them. Right: the same points plus five positive points far to the lower right. The new least-squares line is tilted and misclassifies one positive and one negative point near the line, while the old line, dashed, still separates everything.">
+            <text class="d-h" x="24" y="30">Least squares on the original points</text>
+            <rect class="d-plot" x="24" y="44" width="288" height="216"/>
+            <line class="d-rule" x1="24" y1="125" x2="312" y2="125"/><line class="d-rule" x1="123" y1="44" x2="123" y2="260"/>
+            <line class="d-ln-acc" x1="93.1" y1="260" x2="140.9" y2="44" style="stroke-width:2"/>
+            <text class="d-s" x="146" y="58" style="fill: var(--accent)">w₀ᵀx = 0</text>
+            <circle class="pt-tree" cx="150" cy="80" r="4.5"/><circle class="pt-tree" cx="168" cy="107" r="4.5"/><circle class="pt-tree" cx="177" cy="134" r="4.5"/><circle class="pt-tree" cx="150" cy="170" r="4.5"/>
+            <circle class="pt-tree" cx="195" cy="98" r="4.5"/><circle class="pt-tree" cx="141" cy="143" r="4.5"/><circle class="pt-tree" cx="177" cy="179" r="4.5"/><circle class="pt-tree" cx="130.2" cy="188" r="4.5"/>
+            <rect class="pt-neg" x="65" y="85" width="8" height="8"/><rect class="pt-neg" x="83" y="112" width="8" height="8"/><rect class="pt-neg" x="47" y="112" width="8" height="8"/><rect class="pt-neg" x="74" y="148" width="8" height="8"/>
+            <rect class="pt-neg" x="56" y="139" width="8" height="8"/><rect class="pt-neg" x="111.8" y="58" width="8" height="8"/><rect class="pt-neg" x="38" y="85" width="8" height="8"/><rect class="pt-neg" x="83" y="175" width="8" height="8"/>
+            <circle class="pt-tree" cx="32" cy="281" r="4.5"/><text class="d-s" x="42" y="285">+1</text>
+            <rect class="pt-neg" x="64" y="277" width="8" height="8"/><text class="d-s" x="78" y="285">−1</text>
+            <text class="d-s" x="110" y="285">0 mistakes</text>
+
+            <text class="d-h" x="372" y="30">After adding five far-away +1 points</text>
+            <rect class="d-plot" x="372" y="44" width="288" height="216"/>
+            <line class="d-rule" x1="372" y1="125" x2="660" y2="125"/><line class="d-rule" x1="471" y1="44" x2="471" y2="260"/>
+            <line class="d-ln d-dash" x1="441.1" y1="260" x2="488.9" y2="44"/>
+            <line class="d-ln-acc" x1="511.5" y1="260" x2="446.7" y2="44" style="stroke-width:2"/>
+            <text class="d-s" x="436" y="254" text-anchor="end">old line</text>
+            <text class="d-s" x="518" y="254" style="fill: var(--accent)">w₁ᵀx = 0</text>
+            <circle class="pt-tree" cx="498" cy="80" r="4.5"/><circle class="pt-tree" cx="516" cy="107" r="4.5"/><circle class="pt-tree" cx="525" cy="134" r="4.5"/><circle class="pt-tree" cx="498" cy="170" r="4.5"/>
+            <circle class="pt-tree" cx="543" cy="98" r="4.5"/><circle class="pt-tree" cx="489" cy="143" r="4.5"/><circle class="pt-tree" cx="525" cy="179" r="4.5"/><circle class="pt-tree" cx="478.2" cy="188" r="4.5"/>
+            <rect class="pt-neg" x="413" y="85" width="8" height="8"/><rect class="pt-neg" x="431" y="112" width="8" height="8"/><rect class="pt-neg" x="395" y="112" width="8" height="8"/><rect class="pt-neg" x="422" y="148" width="8" height="8"/>
+            <rect class="pt-neg" x="404" y="139" width="8" height="8"/><rect class="pt-neg" x="459.8" y="58" width="8" height="8"/><rect class="pt-neg" x="386" y="85" width="8" height="8"/><rect class="pt-neg" x="431" y="175" width="8" height="8"/>
+            <circle class="pt-tree" cx="615" cy="233" r="4.5"/><circle class="pt-tree" cx="633" cy="222.2" r="4.5"/><circle class="pt-tree" cx="624" cy="247.4" r="4.5"/><circle class="pt-tree" cx="640.2" cy="238.4" r="4.5"/><circle class="pt-tree" cx="609.6" cy="216.8" r="4.5"/>
+            <text class="d-s" x="656" y="204" text-anchor="end">far away, correct side</text>
+            <circle class="d-ln-acc" cx="478.2" cy="188" r="9.5"/>
+            <circle class="d-ln-acc" cx="463.8" cy="62" r="9.5"/>
+            <circle class="d-ln-acc" cx="381" cy="281" r="7"/><text class="d-s" x="394" y="285">misclassified by the new line: 2 mistakes</text>
+          </svg>
+        </div>
+        <figcaption><b>Least squares reacts to location.</b> Illustrative points; both lines are the actual least-squares fits for them (lines through the origin, labels \(\pm1\)). The five far points are correctly classified by the old line, yet they tilt the new fit by about 30° and two points near the boundary flip to the wrong side.</figcaption>
+      </figure>
+      <div class="result">
+        <span class="lbl">Conclusion</span>
+        <p>Regression is sensitive to the <b>location</b> of the data points, and not just to the <b>side</b> of the separator on which they lie. For classification only the side, \(\operatorname{sign}(\mathbf{w}^\top\mathbf{x})\), should matter, but least squares looks at the value of \(\mathbf{w}^\top\mathbf{x}\).</p>
+      </div>
+      <p>So applying regression directly to classification and hoping for good test accuracy is not a good idea.</p>
+    </section>
+
+    <section id="many-algorithms">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=1111s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 18:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=1141s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 19:01 why so many</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=_w9irUy_8Cs&amp;t=1206s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L41 · 20:06 a question</a>
+        </div>
+        <h2>Why there are so many classification algorithms</h2>
+      </div>
+      <p>We seem to be stuck. The most natural loss for classification is NP-hard to minimize, and regression is the wrong tool. This is the main reason the course meets so many binary classification algorithms, while regression has one standard method, least squares. Each algorithm gets around the hardness in its own way, by making different assumptions.</p>
+      <p>The next lectures start with the simplest possible classification algorithms and then move to more principled ones. L41 ends with a question to think about before L42: forgetting everything above, given a training set and a new point, what is the simplest way to predict the new point's label?</p>
+    </section>
+
+    <!-- ============ LECTURE 42 ============ -->
+    <section id="nearest-neighbour">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=34s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 0:34</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=98s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 1:38 the rule</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=193s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 3:13 outliers</a>
+        </div>
+        <h2>Ask the nearest neighbour</h2>
+      </div>
+      <p>If a new point were already in the training set, we would just return its label. Test points are almost never in the training set. The simplest alternative is to find the training point that looks most like the test point, the closest one, and copy its label.</p>
+      <ol class="algo">
+        <li class="algo-title">Nearest neighbour</li>
+        <li>Given a test point \(\mathbf{x}_\text{test} \in \mathbb{R}^d\).</li>
+        <li>Find \(\mathbf{x}^*\), the point in the training set closest to \(\mathbf{x}_\text{test}\).</li>
+        <li>Predict \(\hat y_\text{test} = y^*\), the label of \(\mathbf{x}^*\).</li>
+      </ol>
+      <p>What can go wrong? Data sets are always noisy, and we rarely know how one was put together. A point may have been labelled wrongly by a person, or sit where it should not: a \(+1\) point among \(-1\) points, or the reverse. If the nearest neighbour happens to be such an <dfn>outlier</dfn>, the algorithm cannot tell and copies the wrong label.</p>
+      <p class="rule-of-thumb">Nearest-neighbour prediction is affected by outliers.</p>
+    </section>
+
+    <section id="knn">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=270s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 4:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=331s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 5:31 the algorithm</a>
+        </div>
+        <h2>k-nearest neighbours</h2>
+      </div>
+      <p>The fix is to get more than one opinion: ask \(k\) neighbours and take the majority. The hope is that most of the \(k\) neighbours are not outliers. If most of them did carry the "odd" label, they would not really be outliers; they would be the local structure of the data.</p>
+      <ol class="algo">
+        <li class="algo-title">k-NN (k-nearest neighbours)</li>
+        <li>Given \(\mathbf{x}_\text{test}\) and the number of neighbours \(k\).</li>
+        <li>Find the \(k\) training points closest to \(\mathbf{x}_\text{test}\): \(\mathbf{x}_1^*, \mathbf{x}_2^*, \dots, \mathbf{x}_k^*\). They depend on \(\mathbf{x}_\text{test}\).</li>
+        <li>Predict \(\hat y_\text{test} = \text{majority vote of } y_1^*, y_2^*, \dots, y_k^*\).</li>
+      </ol>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 230" role="img" aria-label="Two panels with the same points: a group of negative squares containing one positive outlier, positives further right, and a yellow test point next to the outlier. Left, k equals 1: the nearest point is the outlier, so the prediction is plus 1. Right, k equals 5: the circle through the five nearest points holds the outlier and four negatives, so the prediction is minus 1.">
+            <text class="d-h" x="14" y="16">k = 1</text>
+            <rect class="d-plot" x="14" y="26" width="304" height="172"/>
+            <line class="d-ln" x1="110" y1="94" x2="124" y2="104" style="stroke-width:1"/>
+            <circle class="d-ln-acc d-dash" cx="110" cy="94" r="22.2"/>
+            <rect class="pt-neg" x="40" y="54" width="8" height="8"/><rect class="pt-neg" x="96" y="40" width="8" height="8"/><rect class="pt-neg" x="146" y="74" width="8" height="8"/><rect class="pt-neg" x="80" y="108" width="8" height="8"/><rect class="pt-neg" x="138" y="140" width="8" height="8"/>
+            <rect class="pt-neg" x="56" y="156" width="8" height="8"/><rect class="pt-neg" x="182" y="116" width="8" height="8"/><rect class="pt-neg" x="112" y="180" width="8" height="8"/><rect class="pt-neg" x="196" y="168" width="8" height="8"/><rect class="pt-neg" x="26" y="108" width="8" height="8"/>
+            <circle class="pt-tree" cx="250" cy="52" r="4.5"/><circle class="pt-tree" cx="282" cy="92" r="4.5"/><circle class="pt-tree" cx="262" cy="136" r="4.5"/><circle class="pt-tree" cx="296" cy="36" r="4.5"/><circle class="pt-tree" cx="240" cy="176" r="4.5"/><circle class="pt-tree" cx="292" cy="162" r="4.5"/>
+            <circle class="pt-tree" cx="124" cy="104" r="4.5"/>
+            <circle class="pt-new" cx="110" cy="94" r="5.5"/>
+            <text class="d-s" x="128" y="66" style="fill: var(--accent)">nearest</text>
+            <text class="d-s" x="150" y="110">outlier (+1)</text>
+            <text class="d-s" x="14" y="218">Nearest label is +1 (the outlier): predict +1</text>
+
+            <text class="d-h" x="358" y="16">k = 5</text>
+            <rect class="d-plot" x="358" y="26" width="304" height="172"/>
+            <line class="d-ln" x1="454" y1="94" x2="468" y2="104" style="stroke-width:1"/><line class="d-ln" x1="454" y1="94" x2="428" y2="112" style="stroke-width:1"/><line class="d-ln" x1="454" y1="94" x2="494" y2="78" style="stroke-width:1"/><line class="d-ln" x1="454" y1="94" x2="444" y2="44" style="stroke-width:1"/><line class="d-ln" x1="454" y1="94" x2="486" y2="144" style="stroke-width:1"/>
+            <circle class="d-ln-acc d-dash" cx="454" cy="94" r="63.4"/>
+            <rect class="pt-neg" x="384" y="54" width="8" height="8"/><rect class="pt-neg" x="440" y="40" width="8" height="8"/><rect class="pt-neg" x="490" y="74" width="8" height="8"/><rect class="pt-neg" x="424" y="108" width="8" height="8"/><rect class="pt-neg" x="482" y="140" width="8" height="8"/>
+            <rect class="pt-neg" x="400" y="156" width="8" height="8"/><rect class="pt-neg" x="526" y="116" width="8" height="8"/><rect class="pt-neg" x="456" y="180" width="8" height="8"/><rect class="pt-neg" x="540" y="168" width="8" height="8"/><rect class="pt-neg" x="370" y="108" width="8" height="8"/>
+            <circle class="pt-tree" cx="594" cy="52" r="4.5"/><circle class="pt-tree" cx="626" cy="92" r="4.5"/><circle class="pt-tree" cx="606" cy="136" r="4.5"/><circle class="pt-tree" cx="640" cy="36" r="4.5"/><circle class="pt-tree" cx="584" cy="176" r="4.5"/><circle class="pt-tree" cx="636" cy="162" r="4.5"/>
+            <circle class="pt-tree" cx="468" cy="104" r="4.5"/>
+            <circle class="pt-new" cx="454" cy="94" r="5.5"/>
+            <text class="d-s" x="522" y="40" style="fill: var(--accent)">5 nearest</text>
+            <text class="d-s" x="358" y="218">4 of the 5 nearest are −1: predict −1</text>
+          </svg>
+        </div>
+        <figcaption><b>One opinion versus five.</b> Illustrative points; blue circles are \(+1\), green squares are \(-1\), and the yellow dot is the test point (the lecture's board uses red for \(+1\) and green for \(-1\)). Its single nearest neighbour is a mislabelled point, so 1-NN copies the error. With \(k = 5\) the outlier is outvoted.</figcaption>
+      </figure>
+      <p>This is the first binary classification algorithm of the course, and a very simple one: look at your neighbours and follow the majority. Before trusting any algorithm we should ask what it assumes, what can go wrong, and whether it is practical to run. The rest of L42 asks these questions of k-NN.</p>
+    </section>
+
+    <section id="decision-boundary">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=461s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 7:41</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=529s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 8:49 k = 1</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=845s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 14:05 k = n</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=950s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 15:50 a good k</a>
+        </div>
+        <h2>Decision boundaries: what k does</h2>
+      </div>
+      <p>The algorithm needs \(k\) as an input, and the data does not say what it should be. To see how \(k\) matters, look at the <dfn>decision boundary</dfn>: treat every point of the input space as a potential test point and ask which label the algorithm would predict there. The lecture recommends asking this of every algorithm in the course, since it shows where the algorithm says \(+1\) and where it says \(-1\).</p>
+
+      <h3>k = 1: holes around outliers</h3>
+      <p>In the lecture's two-dimensional picture the \(-1\) points sit in two outer groups with the \(+1\) points between them, plus one stray \(+1\) point among the \(-1\)s on one side and a stray \(-1\) among the \(+1\)s. With \(k = 1\), every location takes the label of its single closest training point. The outer regions come out \(-1\) and the middle \(+1\), except for a <b>hole</b> around each stray point: a \(+1\) island inside a \(-1\) region, and a \(-1\) island inside the \(+1\) region.</p>
+      <p>The real structure has three parts: \(-1\), then \(+1\), then \(-1\). Because of the outliers, \(k = 1\) cuts the space into more pieces than that. This is the outlier sensitivity from before, now visible as holes in the decision boundary.</p>
+      <p class="note">Standard fact, not stated in the lecture: the 1-NN regions are unions of the Voronoi cells of the training points, the same cells that appear for K-means in <a href="part-07.html">Part 7</a>.</p>
+
+      <h3>k = n: one label everywhere</h3>
+      <p>If \(k\) equals the number of training points, every training point votes on every test point. The vote is then the same everywhere: the majority label of the whole training set. In the lecture's picture there are more \(-1\) points (two groups) than \(+1\) points (one group), so all of \(\mathbb{R}^2\) is predicted \(-1\). This is clearly bad too.</p>
+
+      <h3>Somewhere in between</h3>
+      <p>Asking too few neighbours lets outliers through; asking too many drowns out the local structure. Some \(k^*\) in between ignores the outliers and recovers the three-part structure. Too small a \(k\) gives a boundary that is too rugged, with holes, and too large a \(k\) gives one that is too smooth. In general, the smaller the \(k\), the more complicated the decision boundary.</p>
+
+      <figure id="knn-fig">
+        <div class="controls">
+          <label for="knn-k">Neighbours \(k\) (odd)</label>
+          <input type="range" id="knn-k" min="1" max="61" step="2" value="1">
+          <output id="knn-k-out" for="knn-k">k = 1</output>
+          <button class="btn" id="knn-best" type="button">Choose k by validation</button>
+          <label class="check" for="knn-val"><input type="checkbox" id="knn-val"> Show validation points</label>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Training error</span><span class="v" id="knn-train">–</span></div>
+          <div><span class="k">Validation error</span><span class="v mine" id="knn-valerr">–</span></div>
+        </div>
+        <div class="status" id="knn-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="knn-svg" viewBox="0 0 400 400" role="img" aria-label="Sixty-one synthetic training points in a square: positive circles in a slanted middle band, negative squares on both sides, a few labels flipped. The background shows the label k-NN predicts at each location for the chosen k. With k equal to 1 small islands form around flipped points; with k equal to 61 the whole square is negative."></svg></div>
+        <figcaption><b>Synthetic data, generated for this page:</b> 61 training points drawn uniformly in a square. The true label is \(+1\) inside a slanted middle band and \(-1\) on both sides, and each label is flipped with probability 0.1 to create outliers. The tinted background is the k-NN prediction at each location. Training error counts each training point as one of its own neighbours, so 1-NN scores 0. The validation error uses 200 further points from the same process. Only odd \(k\) are offered so the vote cannot tie.</figcaption>
+      </figure>
+    </section>
+
+    <section id="choosing-k">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=1055s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 17:35</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=1090s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 18:10 cross-validate</a>
+        </div>
+        <h2>Choosing k by cross-validation</h2>
+      </div>
+      <p>\(k\) is supplied to the algorithm, which then runs with it. That makes it a <dfn>hyperparameter</dfn>: something passed into the algorithm rather than learnt by it, exactly as in regression (cross-validation in <a href="part-11.html">Part 11</a>, the regularization strength in <a href="part-12.html">Part 12</a>).</p>
+      <p>The solution is to <b>cross-validate for \(k\)</b>. Try several values of \(k\), measure the accuracy of each on held-out validation data, and keep the \(k\) with the best validation accuracy. The hope is that this \(k\) captures the structure in the data and not the outliers. The "Choose k by validation" button in the figure above does exactly this on its synthetic validation set.</p>
+    </section>
+
+    <section id="knn-issues">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=1150s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 19:10</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=1184s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 19:44 distance</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=1250s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 20:50 prediction time</a>
+        </div>
+        <h2>Two practical issues: distance and prediction cost</h2>
+      </div>
+      <p>With \(k\) settled, is k-NN the answer to binary classification? It has several issues.</p>
+      <h3>Which distance?</h3>
+      <p>Why should Euclidean distance decide who counts as a neighbour? Different features may need different notions of closeness: some measured one way, some with the L2 distance, and so on. The lecture sets this aside by supposing that a domain expert can design a distance that suits the data at hand.</p>
+      <h3>Prediction is expensive</h3>
+      <p>The more pressing problem shows up at prediction time. To predict for one \(\mathbf{x}_\text{test}\), the algorithm must find its \(k\) nearest training points. With a billion training points, that means computing a billion distances and sorting them, on the order of \(n \log n\) work. Hashing tricks or properties of the distance function can cut this down, but the cost still grows with the size of the data set, and the whole job is repeated for every new test point.</p>
+      <p class="rule-of-thumb">Prediction with k-NN is computationally expensive. This is its most visible problem.</p>
+    </section>
+
+    <section id="no-model">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=1345s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 22:25</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=1473s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 24:33 compression</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=H-Y_A7HvBqk&amp;t=1503s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L42 · 25:03 what next</a>
+        </div>
+        <h2>The deeper problem: no model is learnt</h2>
+      </div>
+      <p>Why is prediction so expensive? Because k-NN does not actually learn anything. Every prediction needs the entire data set; nothing useful is extracted from the data and kept. The extracted useful information is what we call a <dfn>model</dfn>, and k-NN has none. So the data can never be thrown away after "learning".</p>
+      <p>This is the fundamental issue, and it remains even with a well-chosen \(k\), a good distance function and plenty of computing power. The course opened with <i>comprehension is compression</i> (<a href="part-02.html">Part 2</a>): you have learnt from data once its structure is captured in a succinct model and the data itself is no longer needed. k-NN extracts no compressed information at all.</p>
+      <p class="rule-of-thumb">Every algorithm from here on extracts a model from the data. Which model depends on what we assume about the data, and different assumptions lead to different algorithms.</p>
+      <p>The next algorithm is still simple and very popular, but it extracts a compact, interpretable model and does not need the data set at prediction time.</p>
+    </section>
+
+    <!-- ============ LECTURE 43 ============ -->
+    <section id="decision-tree">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=32s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 0:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=127s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 2:07 the structure</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=290s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 4:50 prediction</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=387s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 6:27 the model</a>
+        </div>
+        <h2>What a decision tree is</h2>
+      </div>
+      <p>We want an algorithm that learns a model from the data, so that the data can be discarded and only the model used for test points. The <dfn>decision tree</dfn> is such an algorithm. It is simple and very popular, and several more complicated algorithms later in the course are built on it (<a href="part-17.html">Part 17</a>).</p>
+      <div class="eq">\[ \text{Input: } \{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\},\ \ \mathbf{x}_i \in \mathbb{R}^d,\ \ y_i \in \{+1, -1\} \qquad \text{Output: a decision tree} \]</div>
+      <p>The tree is a rooted binary tree in the computer-science sense. Each <b>internal node</b> holds a question with a yes/no answer and has two children, one per answer. Each <b>leaf</b> holds a decision, 1 or 0; for this algorithm the lecture writes 0 for the negative class. Leaves are also called <dfn>prediction nodes</dfn>.</p>
+      <p>Prediction is easy. Pass \(\mathbf{x}_\text{test}\) in at the root and answer the questions in turn: yes takes you to the left child, no to the right. The answers trace out a path, every path ends at a leaf, and the value in that leaf is \(\hat y_\text{test}\).</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 322" role="img" aria-label="A binary decision tree with internal question nodes Q1 to Q5 and six leaves holding 1 or 0. Yes goes left and no goes right. A test point enters at Q1, answers yes, then no at Q2, then yes at Q5, and reaches a leaf with value 0.">
+            <defs><marker id="p13-ah-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <line class="d-ln-acc" x1="340" y1="57" x2="190" y2="103" marker-end="url(#p13-ah-t)" style="stroke-width:2.4"/>
+            <line class="d-ln" x1="340" y1="57" x2="500" y2="103"/>
+            <line class="d-ln" x1="190" y1="137" x2="100" y2="183"/>
+            <line class="d-ln-acc" x1="190" y1="137" x2="280" y2="183" marker-end="url(#p13-ah-t)" style="stroke-width:2.4"/>
+            <line class="d-ln" x1="500" y1="137" x2="450" y2="185"/>
+            <line class="d-ln" x1="500" y1="137" x2="550" y2="185"/>
+            <line class="d-ln" x1="100" y1="217" x2="55" y2="267"/>
+            <line class="d-ln" x1="100" y1="217" x2="145" y2="267"/>
+            <line class="d-ln-acc" x1="280" y1="217" x2="235" y2="265" marker-end="url(#p13-ah-t)" style="stroke-width:2.4"/>
+            <line class="d-ln" x1="280" y1="217" x2="325" y2="267"/>
+            <text class="d-al" x="252" y="76" text-anchor="end">yes</text><text class="d-al" x="432" y="76">no</text>
+            <text class="d-al" x="134" y="160" text-anchor="end">yes</text><text class="d-al" x="246" y="160">no</text>
+            <text class="d-al" x="464" y="160" text-anchor="end">yes</text><text class="d-al" x="536" y="160">no</text>
+            <text class="d-al" x="68" y="246" text-anchor="end">yes</text><text class="d-al" x="130" y="246">no</text>
+            <text class="d-al" x="248" y="246" text-anchor="end">yes</text><text class="d-al" x="310" y="246">no</text>
+            <rect class="d-box-acc" x="292" y="23" width="96" height="34" rx="6"/><text class="d-t" x="340" y="45" text-anchor="middle">Q1</text>
+            <rect class="d-box-acc" x="142" y="103" width="96" height="34" rx="6"/><text class="d-t" x="190" y="125" text-anchor="middle">Q2</text>
+            <rect class="d-box" x="452" y="103" width="96" height="34" rx="6"/><text class="d-t" x="500" y="125" text-anchor="middle">Q3</text>
+            <rect class="d-box" x="52" y="183" width="96" height="34" rx="6"/><text class="d-t" x="100" y="205" text-anchor="middle">Q4</text>
+            <rect class="d-box-acc" x="232" y="183" width="96" height="34" rx="6"/><text class="d-t" x="280" y="205" text-anchor="middle">Q5</text>
+            <rect class="lf-pos" x="424" y="185" width="52" height="30" rx="15"/><text class="d-t" x="450" y="205" text-anchor="middle">1</text>
+            <rect class="lf-neg" x="524" y="185" width="52" height="30" rx="15"/><text class="d-t" x="550" y="205" text-anchor="middle">0</text>
+            <rect class="lf-pos" x="29" y="267" width="52" height="30" rx="15"/><text class="d-t" x="55" y="287" text-anchor="middle">1</text>
+            <rect class="lf-neg" x="119" y="267" width="52" height="30" rx="15"/><text class="d-t" x="145" y="287" text-anchor="middle">0</text>
+            <rect class="lf-neg" x="209" y="267" width="52" height="30" rx="15" style="stroke-width:2.6"/><text class="d-t" x="235" y="287" text-anchor="middle">0</text>
+            <rect class="lf-pos" x="299" y="267" width="52" height="30" rx="15"/><text class="d-t" x="325" y="287" text-anchor="middle">1</text>
+            <text class="d-t" x="235" y="315" text-anchor="middle" style="fill: var(--accent)">ŷ = 0</text>
+            <line class="d-ln-acc" x1="434" y1="40" x2="392" y2="40" marker-end="url(#p13-ah-t)" style="stroke-width:2.4"/>
+            <circle class="pt-new" cx="444" cy="40" r="6"/>
+            <text class="d-s" x="456" y="44">test point enters at the root</text>
+            <rect class="d-box" x="420" y="246" width="34" height="20" rx="4"/><text class="d-s" x="464" y="260">internal node: a yes/no question</text>
+            <rect class="lf-pos" x="420" y="278" width="34" height="20" rx="10"/><text class="d-s" x="464" y="292">leaf: the prediction, 1 or 0</text>
+          </svg>
+        </div>
+        <figcaption><b>Prediction is a walk down the tree.</b> The tree shape and leaf values follow the lecture's sketch. A test point that answers yes at Q1, no at Q2 and yes at Q5 lands in a leaf holding 0, so \(\hat y_\text{test} = 0\). It takes three questions and no training data.</figcaption>
+      </figure>
+      <p>The model that k-NN lacked is the <b>tree</b>. Once it is built, it holds everything from the data set that prediction needs, so the data can be thrown away. Prediction is also fast: answer a few questions and read the leaf.</p>
+    </section>
+
+    <section id="questions">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=419s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 6:59</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=586s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 9:46 splitting D</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=685s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 11:25 the ideal question</a>
+        </div>
+        <h2>Questions, and what makes one good</h2>
+      </div>
+      <h3>A question is a feature-value pair</h3>
+      <p>Before building a tree we fix what kind of question it may ask. A question is a <b>feature-value pair</b>. With feature height and value 180 cm, the question is "is height \(\le\) 180 cm?". In general, for feature \(k\) and value \(\theta\), the question is \(f_k \le \theta\)?, and the tree is restricted to questions of this form.</p>
+      <p>The tree is built <b>greedily</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=485s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:05</a>: find the best question to ask first, then expand the tree below it. So we need a way to measure how good a question is. A useful way in is to ask what the best possible question would look like.</p>
+      <h3>What a question does to the data</h3>
+      <p>Put one question, say "height \(\le\) 130 cm?", to every point of the data set \(D\). Each point answers yes or no, so the question <b>partitions</b> \(D\) into two parts: the points that answered yes (perhaps points 1 and 10, and so on) and those that answered no (points 2 and 3, and so on).</p>
+      <div class="eq">\[ D_\text{yes} = \{(\mathbf{x}_i, y_i) \in D : f_k(\mathbf{x}_i) \le \theta\}, \qquad D_\text{no} = \{(\mathbf{x}_i, y_i) \in D : f_k(\mathbf{x}_i) > \theta\} \]</div>
+      <p class="note">\(f_k(\mathbf{x}_i)\) is the value of feature \(k\) for point \(i\).</p>
+      <h3>The ideal question</h3>
+      <p>The best possible question would let us predict from its answer alone. That happens when every point in \(D_\text{yes}\) has label \(+1\) and every point in \(D_\text{no}\) has label \(-1\), or the other way round. One question would then separate the classes in the training set, and we would hope it does the same for test points: ask it, and read off the label. Both parts would be <dfn>pure</dfn>, meaning all the labels on each side are the same.</p>
+      <p>In reality no single question may split the data into pure sets. So we need to measure how impure each side is, and for that we need a <b>measure of impurity for a set of labels</b>.</p>
+    </section>
+
+    <section id="entropy">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=846s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 14:06</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=936s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 15:36 what impurity needs</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=1035s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 17:15 entropy</a>
+        </div>
+        <h2>Impurity and entropy</h2>
+      </div>
+      <p>Take any set of labels \(y_1, \dots, y_k\), each 1 or 0. It could be any size; for instance, the \(k\) points that answered yes. Summarize it by \(p\), the <b>fraction of 1s</b>, a number between 0 and 1. A measure of impurity should behave as follows.</p>
+      <ul>
+        <li><b>Zero at the ends.</b> At \(p = 1\) every label is 1, and at \(p = 0\) every label is 0. Both sets are clean, so the impurity is 0.</li>
+        <li><b>Largest at \(p = \tfrac12\).</b> With half the labels 1 and half 0 we are most uncertain about the label, so this is the worst case.</li>
+        <li><b>Symmetric about \(\tfrac12\).</b> A set with 25% ones and 75% zeros is as confusing as one with 75% ones and 25% zeros; neither label is special. So the impurity at \(\lambda\) must equal the impurity at \(1 - \lambda\).</li>
+      </ul>
+      <p>Many functions have these properties. A popular choice is the entropy. The entropy of a set of labels is the entropy of its fraction of 1s, since that fraction is what decides how pure the set is.</p>
+      <div class="result">
+        <span class="lbl">Entropy</span>
+        \[ \text{Entropy}(p) = -\big[\, p \log p + (1 - p)\log(1 - p) \,\big], \qquad \text{with the convention } 0 \log 0 = 0 \]
+        <p>As a function of \(p\) it is concave, 0 at both ends and largest at \(p = \tfrac12\). The lecture does not fix the base of the logarithm. This page uses base 2, which makes the peak value 1.</p>
+      </div>
+      <figure>
+        <div class="fig-split">
+          <svg class="dg" viewBox="0 0 260 232" role="img" aria-label="The entropy curve against p, the fraction of ones: zero at p equals 0 and 1, peak 1 at p equals one half. The points at p equals one quarter and three quarters are at the same height, 0.811, joined by a dashed line.">
+            <line class="d-rule" x1="44" y1="108" x2="244" y2="108"/><line class="d-rule" x1="44" y1="30" x2="244" y2="30"/>
+            <line class="d-ln" x1="44" y1="186" x2="244" y2="186"/><line class="d-ln" x1="44" y1="186" x2="44" y2="26"/>
+            <text class="d-al" x="44" y="202" text-anchor="middle">0</text><text class="d-al" x="144" y="202" text-anchor="middle">0.5</text><text class="d-al" x="244" y="202" text-anchor="middle">1</text>
+            <text class="d-al" x="38" y="190" text-anchor="end">0</text><text class="d-al" x="38" y="112" text-anchor="end">0.5</text><text class="d-al" x="38" y="34" text-anchor="end">1</text>
+            <text class="d-s" x="144" y="224" text-anchor="middle">p, the fraction of 1s</text>
+            <text class="d-s" x="12" y="108" text-anchor="middle" transform="rotate(-90 12 108)">entropy (bits)</text>
+            <path class="d-ln-acc" d="M44 186 L46 173.4 L48 163.9 L50 155.7 L52 148.2 L54 141.3 L56 134.9 L58 128.9 L60 123.3 L62 117.9 L64 112.8 L66 108 L68 103.4 L70 99 L72 94.9 L74 90.9 L76 87 L78 83.4 L80 79.9 L82 76.6 L84 73.4 L86 70.3 L88 67.4 L90 64.6 L92 62 L94 59.4 L96 57 L98 54.7 L100 52.5 L102 50.5 L104 48.5 L106 46.7 L108 44.9 L110 43.3 L112 41.7 L114 40.3 L116 38.9 L118 37.7 L120 36.5 L122 35.5 L124 34.5 L126 33.7 L128 32.9 L130 32.2 L132 31.6 L134 31.1 L136 30.7 L138 30.4 L140 30.2 L142 30 L144 30 L146 30 L148 30.2 L150 30.4 L152 30.7 L154 31.1 L156 31.6 L158 32.2 L160 32.9 L162 33.7 L164 34.5 L166 35.5 L168 36.5 L170 37.7 L172 38.9 L174 40.3 L176 41.7 L178 43.3 L180 44.9 L182 46.7 L184 48.5 L186 50.5 L188 52.5 L190 54.7 L192 57 L194 59.4 L196 62 L198 64.6 L200 67.4 L202 70.3 L204 73.4 L206 76.6 L208 79.9 L210 83.4 L212 87 L214 90.9 L216 94.9 L218 99 L220 103.4 L222 108 L224 112.8 L226 117.9 L228 123.3 L230 128.9 L232 134.9 L234 141.3 L236 148.2 L238 155.7 L240 163.9 L242 173.4 L244 186" style="stroke-width:2.2"/>
+            <line class="d-ln d-dash" x1="94" y1="59.4" x2="194" y2="59.4"/>
+            <circle class="pt-plain" cx="94" cy="59.4" r="4"/><circle class="pt-plain" cx="194" cy="59.4" r="4"/>
+            <circle class="pt-tree" cx="144" cy="30" r="4.5"/>
+            <text class="d-s" x="88" y="52" text-anchor="end">p = ¼</text>
+            <text class="d-s" x="200" y="52">p = ¾</text>
+            <text class="d-s" x="144" y="78" text-anchor="middle">both 0.811</text>
+            <text class="d-s" x="152" y="20">peak at p = ½</text>
+          </svg>
+          <div class="tbl-wrap">
+            <table class="mini">
+              <thead><tr><th>Fraction of ones, \(p\)</th><th class="num">Entropy (bits)</th></tr></thead>
+              <tbody>
+                <tr><td>0 or 1</td><td class="num">0</td></tr>
+                <tr><td>0.01 or 0.99</td><td class="num">0.081</td></tr>
+                <tr><td>0.1 or 0.9</td><td class="num">0.469</td></tr>
+                <tr><td>0.2 or 0.8</td><td class="num">0.722</td></tr>
+                <tr><td>0.25 or 0.75</td><td class="num">0.811</td></tr>
+                <tr><td>0.5</td><td class="num">1</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <figcaption><b>Entropy as impurity.</b> Computed with base-2 logs. The curve is 0 for clean sets, peaks at an even split and is symmetric, so \(p\) and \(1 - p\) are equally impure. The table values are computed for these notes.</figcaption>
+      </figure>
+      <p>Entropy has information-theoretic justifications, which the lecture skips. Its roots are in statistical physics and thermodynamics, which is where the name comes from, and Shannon borrowed it for information theory. For our purposes it is simply a function that measures impurity.</p>
+    </section>
+
+    <section id="information-gain">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=1142s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 19:02</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=1284s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 21:24 the formula</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=gXbAJGd8fO0&amp;t=1348s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L43 · 22:28 why weight by size</a>
+        </div>
+        <h2>Information gain: the goodness of a question</h2>
+      </div>
+      <p>A question \(f_k \le \theta\) splits \(D\) into \(D_\text{yes}\) and \(D_\text{no}\), and each of the three sets has an entropy: \(\text{Entropy}(D)\), \(\text{Entropy}(D_\text{yes})\) and \(\text{Entropy}(D_\text{no})\). Here the entropy of a set means the entropy of the fraction of 1s among its labels. These three numbers say how impure the data was before the question and how impure each side is after it.</p>
+      <p>To score the question with one number, ask how much impurity it removes. Start from the impurity we had, \(\text{Entropy}(D)\), and subtract a combination of the impurities of the two sides, weighted by the fraction of points that went to each side.</p>
+      <div class="result">
+        <span class="lbl">Information gain of the question \(f_k \le \theta\)</span>
+        \[ \text{IG}(f_k, \theta) = \text{Entropy}(D) - \Big[\, \gamma\, \text{Entropy}(D_\text{yes}) + (1 - \gamma)\, \text{Entropy}(D_\text{no}) \,\Big], \qquad \gamma = \frac{|D_\text{yes}|}{|D|} \]
+        <p>The best question is the one with the largest information gain.</p>
+      </div>
+      <h3>Why weight by the number of points?</h3>
+      <p>Entropy looks only at the fraction of 1s and ignores how many points there are. Suppose a question sends a set of points to \(D_\text{yes}\) and 80% of them are 1s. If \(D_\text{yes}\) holds 10,000 points (8,000 of them 1s), that should give us more confidence in the prediction after asking the question than if it holds 100 points (80 of them 1s). Yet both sides have the same entropy. Likewise, 9,900 ones out of 10,000 is exactly as impure by entropy as 99 out of 100, but the first question classifies far more points. Weighting by \(\gamma\) and \(1 - \gamma\) builds this in.</p>
+      <p class="note">With base-2 logs, the 80% sets have entropy 0.722 and the 99% sets 0.081, whatever their size.</p>
+      <h3>The perfect question</h3>
+      <p>If a question makes both sides pure, both entropies are 0 and the gain is the whole of \(\text{Entropy}(D)\): all the impurity we started with is removed. The more the impurity drops, the more we learn about the label by asking, which is why the drop is called a gain in information.</p>
+      <p>A small example, computed for these notes: \(D\) has 8 points, 4 ones and 4 zeros, so \(\text{Entropy}(D) = 1\).</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Question</th><th>\(D_\text{yes}\) ones, zeros</th><th>\(D_\text{no}\) ones, zeros</th><th class="num">\(\gamma\)</th><th class="num">Weighted entropy</th><th class="num">Gain</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>3, 1</td><td>1, 3</td><td class="num">0.5</td><td class="num">0.5·0.811 + 0.5·0.811 = 0.811</td><td class="num">0.189</td></tr>
+            <tr><td>B</td><td>4, 0</td><td>0, 4</td><td class="num">0.5</td><td class="num">0</td><td class="num"><b>1</b></td></tr>
+            <tr><td>C</td><td>1, 0</td><td>3, 4</td><td class="num">0.125</td><td class="num">0.875·0.985 = 0.862</td><td class="num">0.138</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>B is the perfect question. C makes one side pure, but that side holds a single point, so it earns less than A.</p>
+    </section>
+
+    <!-- ============ LECTURE 44 ============ -->
+    <section id="tree-algorithm">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=37s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 0:37</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=112s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 1:52 recurse</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=179s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 2:59 useless questions</a>
+        </div>
+        <h2>Growing the tree</h2>
+      </div>
+      <p>Information gain scores one feature-value pair. The features come with the data, but which values \(\theta\) should be tried? The natural choice is to <b>discretize each feature over its [min, max] range</b> in the data. If the heights in the data run from 100 to 200, cut that range into 10 partitions, which gives the questions height \(\le\) 100, height \(\le\) 110, height \(\le\) 120, …, height \(\le\) 200.</p>
+      <ol class="algo">
+        <li class="algo-title">Decision tree (greedy, by information gain)</li>
+        <li>For each feature, discretize its [min, max] range in the current data set into a set of values \(\theta\). Every pair \(f_k \le \theta\) is a candidate question.</li>
+        <li>Pick the candidate with the largest information gain.</li>
+        <li>It splits the data into \(D_\text{yes}\) and \(D_\text{no}\). Each is a new data set: the points that answered yes, and the points that answered no.</li>
+        <li>Repeat the procedure on \(D_\text{yes}\) and on \(D_\text{no}\) separately. Say the best question on the yes side is \(f_l \le \theta_l\) and on the no side \(f_r \le \theta_r\); each splits its set again, and so on.</li>
+        <li>Stop growing a branch when one of the stopping rules in the next section applies, and make that node a leaf.</li>
+      </ol>
+      <p>Some candidates can be dropped along the way. Suppose the root asks \(f_k \le \theta_k\). Every point in \(D_\text{yes}\) already satisfies \(f_k \le \theta_k\), so on that side a question \(f_k \le \theta\) with \(\theta\) larger than \(\theta_k\) gets "yes" from everyone and splits nothing. Such questions are useless there and can be left out. The best question is then found among the remaining ones.</p>
+
+      <figure id="split-fig">
+        <div class="controls">
+          <button class="btn" id="split-feat" type="button">Ask about f₂ instead</button>
+          <label for="split-th">Threshold θ</label>
+          <input type="range" id="split-th" min="0" max="10" step="1" value="2">
+          <output id="split-th-out" for="split-th">f₁ ≤ –</output>
+          <button class="btn" id="split-best" type="button">Find the best question</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Entropy(D)</span><span class="v" id="split-hd">–</span></div>
+          <div><span class="k">Entropy(D_yes)</span><span class="v" id="split-hy">–</span></div>
+          <div><span class="k">Entropy(D_no)</span><span class="v" id="split-hn">–</span></div>
+          <div><span class="k">γ = |D_yes| / |D|</span><span class="v" id="split-g">–</span></div>
+          <div><span class="k">Information gain</span><span class="v mine" id="split-ig">–</span></div>
+        </div>
+        <div class="status" id="split-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="split-svg" viewBox="0 0 680 330" role="img" aria-label="Left: 41 synthetic points with two features, coloured by class, and the current question drawn as a vertical or horizontal line with the yes side shaded. Right: the entropy curve with the entropies of D yes and D no marked and joined by a dashed chord; at the fraction of ones in D, the vertical gap between the curve and the chord is the information gain."></svg></div>
+        <figcaption><b>Synthetic data, generated for this page:</b> 40 points drawn uniformly in a square and labelled by the example tree of the next-but-one section, plus one class-0 outlier at (7, 5.6). Each feature's candidate thresholds are its min, its max and 9 evenly spaced values between, as in the lecture, giving 22 candidate questions. In the right panel the yellow dot is \(\text{Entropy}(D_\text{yes})\), the ring \(\text{Entropy}(D_\text{no})\), the large grey dot \(\text{Entropy}(D)\) and the small grey dot the weighted entropy; the blue bar between the grey dots is the gain. The fraction of 1s in \(D\) equals \(\gamma\, p_\text{yes} + (1-\gamma)\, p_\text{no}\), so the weighted entropy lies on the dashed chord exactly at that \(p\), and the gain is the vertical gap up to the curve. This picture is not in the lecture. Because entropy is concave (see Jensen's inequality, <a href="part-09.html">Part 9</a>), the chord never rises above the curve, so the gain is never negative.</figcaption>
+      </figure>
+    </section>
+
+    <section id="stopping">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=243s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 4:03</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=274s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 4:34 purity</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=342s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 5:42 depth</a>
+        </div>
+        <h2>When to stop growing</h2>
+      </div>
+      <p>The greedy procedure can keep building the tree as far as we let it. The lecture gives two points to keep in mind while growing it, and a remark on the impurity measure.</p>
+      <h3>Stop when a node is pure enough</h3>
+      <p>Complete purity is not required. If the fraction of 1s at a node is above 0.9, make the node a leaf with label 1; if it is below 0.1, make it a leaf with label 0. The thresholds are chosen heuristically.</p>
+      <h3>Limit the depth</h3>
+      <p>Even with a purity threshold, the tree may need many questions before a node becomes pure enough, and pushing for more and more purity tends to fit the noise. The <dfn>depth</dfn> of the tree is the number of questions asked before answering 1 or 0 for a test point, or equivalently the longest path from the root to a leaf. Treat it as a hyperparameter and do not grow the tree beyond it.</p>
+      <p>A branch that becomes pure enough before the depth limit stops there. A branch that does not is still cut off at the limit rather than allowed to grow forever. To choose the limit, cut the tree at different depths, measure the accuracy on a validation set, and keep the depth with the highest validation accuracy. In other words, cross-validate the depth.</p>
+      <p class="rule-of-thumb">Depth plays the role for a decision tree that \(k\) plays for k-NN: it controls how smooth the decision boundary is.</p>
+      <p class="note">The lecture does not say which label a leaf gets when it is cut off by the depth limit. The usual choice is the majority label of the points that reach it.</p>
+      <h3>Other impurity measures <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=434s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 7:14</a></h3>
+      <p>Entropy is one popular measure of the goodness of a question. Another popular one is the <dfn>Gini index</dfn>. They come from different motivations, but for our purposes any reasonable function works if it is 0 at \(p = 0\) and \(p = 1\), peaks at \(p = \tfrac12\) and is symmetric about \(\tfrac12\).</p>
+      <p class="note">The lecture does not write the Gini index down. Its standard two-class form is \(\text{Gini}(p) = 1 - p^2 - (1-p)^2 = 2p(1-p)\), which has all three properties.</p>
+    </section>
+
+    <section id="tree-boundaries">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=507s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 8:27</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=703s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 11:43 a feature repeats</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=864s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 14:24 rectangles</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=967s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 16:07 a validation point</a>
+        </div>
+        <h2>Decision boundaries of a tree</h2>
+      </div>
+      <p>What decision boundary comes out of a tree? The lecture's example has two features, \(f_1\) = height and \(f_2\) = weight, and a tree built from some data set:</p>
+      <ul>
+        <li>Root: \(f_1 \le 5\)? If no, predict 1.</li>
+        <li>If yes, ask \(f_2 \le 7\)? If no, predict 0.</li>
+        <li>If yes, ask \(f_1 \le 3\)? If yes, predict 1; if no, predict 0.</li>
+      </ul>
+      <p>The first question cuts the plane at \(f_1 = 5\), and the whole region to the right is class 1 at once. To the left, the second question cuts at \(f_2 = 7\), and the part above is class 0. Below that, the third question asks about height again. A feature can repeat further down the tree, but only with a smaller value here: after \(f_1 \le 5\), asking \(f_1 \le 6\) would be pointless, while \(f_1 \le 3\) still splits.</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 346" role="img" aria-label="Left: the example tree with questions f1 at most 5, f2 at most 7 and f1 at most 3, and leaves A, B, C, D holding 1, 0, 1, 0. Right: the f1, f2 plane cut by the same questions into four rectangles A to D, shaded by predicted class, with synthetic points. Region A holds one class-0 outlier; a dashed box around it shows the extra cuts a tree chasing purity would add, and a class-1 validation point falls inside that box.">
+            <line class="d-ln" x1="200" y1="57" x2="140" y2="103"/><line class="d-ln" x1="200" y1="57" x2="310" y2="105"/>
+            <line class="d-ln" x1="140" y1="137" x2="90" y2="183"/><line class="d-ln" x1="140" y1="137" x2="240" y2="185"/>
+            <line class="d-ln" x1="90" y1="217" x2="50" y2="265"/><line class="d-ln" x1="90" y1="217" x2="130" y2="265"/>
+            <text class="d-al" x="160" y="76" text-anchor="end">yes</text><text class="d-al" x="264" y="76">no</text>
+            <text class="d-al" x="106" y="158" text-anchor="end">yes</text><text class="d-al" x="198" y="158">no</text>
+            <text class="d-al" x="62" y="240" text-anchor="end">yes</text><text class="d-al" x="118" y="240">no</text>
+            <rect class="d-box" x="148" y="23" width="104" height="34" rx="6"/><text class="d-t" x="200" y="45" text-anchor="middle">f₁ ≤ 5 ?</text>
+            <rect class="d-box" x="88" y="103" width="104" height="34" rx="6"/><text class="d-t" x="140" y="125" text-anchor="middle">f₂ ≤ 7 ?</text>
+            <rect class="d-box" x="38" y="183" width="104" height="34" rx="6"/><text class="d-t" x="90" y="205" text-anchor="middle">f₁ ≤ 3 ?</text>
+            <rect class="lf-pos" x="280" y="105" width="60" height="30" rx="15"/><text class="d-t" x="310" y="125" text-anchor="middle">A · 1</text>
+            <rect class="lf-neg" x="210" y="185" width="60" height="30" rx="15"/><text class="d-t" x="240" y="205" text-anchor="middle">B · 0</text>
+            <rect class="lf-pos" x="20" y="265" width="60" height="30" rx="15"/><text class="d-t" x="50" y="285" text-anchor="middle">C · 1</text>
+            <rect class="lf-neg" x="100" y="265" width="60" height="30" rx="15"/><text class="d-t" x="130" y="285" text-anchor="middle">D · 0</text>
+
+            <rect class="r-pos" x="524" y="36" width="120" height="240"/>
+            <rect class="r-neg" x="404" y="36" width="120" height="72"/>
+            <rect class="r-pos" x="404" y="108" width="72" height="168"/>
+            <rect class="r-neg" x="476" y="108" width="48" height="168"/>
+            <rect class="d-plot" x="404" y="36" width="240" height="240"/>
+            <line class="d-ln" x1="524" y1="36" x2="524" y2="276" style="stroke-width:2"/>
+            <line class="d-ln" x1="404" y1="108" x2="524" y2="108" style="stroke-width:2"/>
+            <line class="d-ln" x1="476" y1="108" x2="476" y2="276" style="stroke-width:2"/>
+            <text class="d-t" x="530" y="270">A</text>
+            <text class="d-t" x="514" y="54" text-anchor="end">B</text>
+            <text class="d-t" x="412" y="128">C</text>
+            <text class="d-t" x="500" y="128" text-anchor="middle">D</text>
+            <text class="d-al" x="404" y="292" text-anchor="middle">0</text><text class="d-al" x="476" y="292" text-anchor="middle">3</text><text class="d-al" x="524" y="292" text-anchor="middle">5</text><text class="d-al" x="644" y="292" text-anchor="middle">10</text>
+            <text class="d-al" x="398" y="280" text-anchor="end">0</text><text class="d-al" x="398" y="112" text-anchor="end">7</text><text class="d-al" x="398" y="40" text-anchor="end">10</text>
+            <text class="d-s" x="524" y="310" text-anchor="middle">f₁ (height)</text>
+            <text class="d-s" x="374" y="156" text-anchor="middle" transform="rotate(-90 374 156)">f₂ (weight)</text>
+            <circle class="pt-tree" cx="623.1" cy="132" r="4"/>
+            <rect class="pt-neg" x="481" y="158.9" width="7.2" height="7.2"/>
+            <circle class="pt-tree" cx="430.4" cy="157.9" r="4"/>
+            <circle class="pt-tree" cx="410" cy="145.7" r="4"/>
+            <circle class="pt-tree" cx="532.4" cy="138.5" r="4"/>
+            <circle class="pt-tree" cx="605.1" cy="263.5" r="4"/>
+            <rect class="pt-neg" x="440.7" y="94.8" width="7.2" height="7.2"/>
+            <circle class="pt-tree" cx="612.3" cy="90.2" r="4"/>
+            <rect class="pt-neg" x="510.1" y="209.8" width="7.2" height="7.2"/>
+            <circle class="pt-tree" cx="425.8" cy="200.6" r="4"/>
+            <circle class="pt-tree" cx="587.4" cy="180.2" r="4"/>
+            <rect class="pt-neg" x="406.6" y="50.6" width="7.2" height="7.2"/>
+            <circle class="pt-tree" cx="566" cy="218.9" r="4"/>
+            <rect class="pt-neg" x="498.1" y="229.9" width="7.2" height="7.2"/>
+            <circle class="pt-tree" cx="619.5" cy="247.2" r="4"/>
+            <circle class="pt-tree" cx="585.2" cy="84.5" r="4"/>
+            <circle class="pt-tree" cx="628.9" cy="257.8" r="4"/>
+            <circle class="pt-tree" cx="625.3" cy="207.4" r="4"/>
+            <rect class="pt-neg" x="428" y="64.6" width="7.2" height="7.2"/>
+            <circle class="pt-tree" cx="588.6" cy="268.1" r="4"/>
+            <rect class="pt-neg" x="429.9" y="65.5" width="7.2" height="7.2"/>
+            <rect class="pt-neg" x="507.9" y="167.5" width="7.2" height="7.2"/>
+            <circle class="pt-tree" cx="591.4" cy="119.3" r="4"/>
+            <circle class="pt-tree" cx="602.5" cy="154.3" r="4"/>
+            <circle class="pt-tree" cx="627.2" cy="51.6" r="4"/>
+            <circle class="pt-tree" cx="577.8" cy="68.9" r="4"/>
+            <circle class="pt-tree" cx="539.8" cy="87.4" r="4"/>
+            <circle class="pt-tree" cx="453.2" cy="178.8" r="4"/>
+            <circle class="pt-tree" cx="535.8" cy="199.7" r="4"/>
+            <circle class="pt-tree" cx="418.9" cy="220.3" r="4"/>
+            <rect class="pt-neg" x="434.5" y="46.1" width="7.2" height="7.2"/>
+            <rect class="pt-neg" x="497.8" y="195.1" width="7.2" height="7.2"/>
+            <rect class="pt-neg" x="494.5" y="226.6" width="7.2" height="7.2"/>
+            <circle class="pt-tree" cx="587.4" cy="228.2" r="4"/>
+            <circle class="pt-tree" cx="627.2" cy="61.7" r="4"/>
+            <circle class="pt-tree" cx="441.2" cy="156.7" r="4"/>
+            <circle class="pt-tree" cx="559.5" cy="247" r="4"/>
+            <circle class="pt-tree" cx="563.6" cy="167.8" r="4"/>
+            <circle class="pt-tree" cx="547.3" cy="90.2" r="4"/>
+            <circle class="pt-tree" cx="442.2" cy="204.7" r="4"/>
+            <rect class="pt-neg" x="568.4" y="138" width="7.2" height="7.2"/>
+            <rect class="d-ln-acc d-dash" x="555.2" y="124.8" width="36" height="33.6"/>
+            <circle class="d-ln-acc" cx="582.8" cy="150" r="4.5" style="stroke-width:2"/>
+
+            <circle class="pt-tree" cx="24" cy="330" r="4"/><text class="d-s" x="34" y="334">class 1</text>
+            <rect class="pt-neg" x="80.4" y="326.4" width="7.2" height="7.2"/><text class="d-s" x="94" y="334">class 0</text>
+            <circle class="d-ln-acc" cx="154" cy="330" r="4.5" style="stroke-width:2"/><text class="d-s" x="164" y="334">validation point, class 1</text>
+            <rect class="d-ln-acc d-dash" x="316" y="323" width="16" height="14"/><text class="d-s" x="340" y="334">extra cuts a tree chasing purity would add</text>
+          </svg>
+        </div>
+        <figcaption><b>Each leaf is a rectangle.</b> The lecture's example tree with the synthetic points from the split explorer above. Each question is a cut parallel to an axis, and each leaf owns one rectangle. A, B, C and D are pure except for the single class-0 outlier in A. Boxing that point off would fit the noise: the validation point in the dashed box would then be predicted 0, wrongly.</figcaption>
+      </figure>
+      <p>Three of the four regions are pure. Region A still contains one class-0 point. A carefully cross-validated tree stops here and treats that point as an outlier. A tree that demands complete purity would not stop. It would keep asking questions about this region, cutting it into smaller pieces until the outlier sits in a box of its own labelled 0. That is overfitting.</p>
+      <h3>Trees cut space into rectangles</h3>
+      <p>Each question "feature \(\le\) value" divides a region in two with a line parallel to one of the axes. So a decision tree carves the space into rectangles. However intermingled the two classes are, rectangles small enough can enclose each point, and the number of points reaching a node shrinks with every question. In the worst case a leaf ends up with a single point, which is pure by default. So a tree grown long enough always makes every node completely pure, unless the same data point appears with both labels, which we assume does not happen.</p>
+      <p>Seeking purity is therefore a bad idea, because it fits the noise. A \(k\) that is too small made the k-NN boundary non-smooth; a tree grown too deep leaves small holes in the same way. Cross-validation catches this. In the lecture's illustration a validation point falls in the region around the outlier. The overgrown tree predicts it wrongly, while a smoother tree with a cross-validated depth predicts it correctly and is preferred. The hope is that the cross-validated depth captures the structure of the data much better.</p>
+    </section>
+
+    <section id="interpretability">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=1035s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 17:15</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=1066s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 17:46 the doctor</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=1131s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 18:51 short trees</a>
+        </div>
+        <h2>Why decision trees are popular</h2>
+      </div>
+      <p>The main reason is that trees are <dfn>interpretable</dfn>. Picture a doctor using a tree on a patient's vital parameters, such as blood pressure and temperature, to decide whether the patient has a particular disease. If the system says yes, the doctor has to act on it, and so wants to know why the system said so.</p>
+      <p>A tree gives that explanation directly. The patient was predicted to have the disease because the temperature was above some value, the blood pressure was below some value, and so on: the questions along the path to the leaf. The doctor can then bring in his or her own domain expertise to make further inferences.</p>
+      <p>This works only when the path is short. A list of 100 conditions explains nothing to anyone, so shorter trees are better for explaining. In most real-world data sets one hopefully does not need more than about 10 questions, which a person can still follow.</p>
+      <p>And unlike k-NN, a tree is a model derived from the data. Once it is built, the data points are no longer needed.</p>
+    </section>
+
+    <section id="two-algorithms">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=1198s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 19:58</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=5rnu6Hvbt8I&amp;t=1230s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L44 · 20:30 assumptions</a>
+        </div>
+        <h2>Two algorithms so far, and what comes next</h2>
+      </div>
+      <p>Binary classification now has two simple algorithms.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>k-nearest neighbours</th><th>Decision tree</th></tr></thead>
+          <tbody>
+            <tr><td><b>Model learnt</b></td><td>None; prediction needs the whole training set</td><td>The tree; the data can be thrown away</td></tr>
+            <tr><td><b>Cost of one prediction</b></td><td>Distances to all \(n\) points, then a sort</td><td>One question per level of the tree</td></tr>
+            <tr><td><b>Smoothness knob</b></td><td>\(k\), chosen by cross-validation</td><td>Depth, chosen by cross-validation</td></tr>
+            <tr><td><b>When it fits noise</b></td><td>Small \(k\): holes around outliers</td><td>Deep trees: boxes around outliers</td></tr>
+            <tr><td><b>Decision boundary</b></td><td>Follows the training points</td><td>Axis-parallel rectangles</td></tr>
+            <tr><td><b>Assumptions about the data</b></td><td>None</td><td>None</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Both are reasonable, and the decision tree is a good algorithm because it gives a model. But neither makes any assumption about the data: give either one any data and it will try to produce a good answer. If we can make reasonable assumptions about the data, we can design algorithms better suited to them.</p>
+      <p>Making assumptions about data means understanding the structure in it and the noise in it, and reasoning about noise means reasoning about probabilities. Probability has not appeared at all in the classification algorithms so far. The next lectures model how the data itself is generated, in two different ways, and each way leads to a family of classification algorithms. <a href="part-14.html">Part 14</a> starts with generative and discriminative models.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Binary classification</dt><dd>Supervised learning with two classes, labelled \(\{0, 1\}\) or \(\{-1, +1\}\).</dd></div>
+        <div><dt>0-1 loss</dt><dd>The fraction of training points misclassified, \(\frac1n\sum_i \mathbf{1}(h(\mathbf{x}_i) \ne y_i)\). NP-hard to minimize over linear classifiers in general.</dd></div>
+        <div><dt>Linear classifier</dt><dd>\(h_\mathbf{w}(\mathbf{x}) = \operatorname{sign}(\mathbf{w}^\top\mathbf{x})\): predicts by the side of the hyperplane \(\mathbf{w}^\top\mathbf{x} = 0\) a point lies on.</dd></div>
+        <div><dt>Outlier</dt><dd>A point whose label disagrees with its surroundings, for example through a labelling error.</dd></div>
+        <div><dt>k-nearest neighbours (k-NN)</dt><dd>Predict the majority label of the \(k\) training points closest to the test point.</dd></div>
+        <div><dt>Decision boundary</dt><dd>The map of which label an algorithm predicts at every location of the input space, and where that label changes.</dd></div>
+        <div><dt>Hyperparameter</dt><dd>A setting passed into an algorithm rather than learnt, such as \(k\) or the tree depth; chosen by cross-validation.</dd></div>
+        <div><dt>Decision tree</dt><dd>A binary tree with a yes/no question at each internal node and a prediction at each leaf; the tree is the model.</dd></div>
+        <div><dt>Question</dt><dd>A feature-value pair, "\(f_k \le \theta\)?"; it splits a data set \(D\) into \(D_\text{yes}\) and \(D_\text{no}\).</dd></div>
+        <div><dt>Pure set</dt><dd>A set of points that all have the same label.</dd></div>
+        <div><dt>Entropy</dt><dd>Impurity of a set with fraction \(p\) of 1s: \(-[p\log p + (1-p)\log(1-p)]\). Zero for pure sets, largest at \(p = \tfrac12\).</dd></div>
+        <div><dt>Information gain</dt><dd>\(\text{Entropy}(D)\) minus the size-weighted entropies of \(D_\text{yes}\) and \(D_\text{no}\); the goodness of a question.</dd></div>
+        <div><dt>Depth</dt><dd>The longest root-to-leaf path in a tree: the most questions asked before a prediction.</dd></div>
+        <div><dt>Gini index</dt><dd>Another popular impurity measure; any function that is 0 at \(p = 0, 1\), peaks at \(\tfrac12\) and is symmetric will do.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Take \(\mathbf{w} = [2, -1]\). What does \(h_\mathbf{w}(\mathbf{x}) = \operatorname{sign}(\mathbf{w}^\top\mathbf{x})\) predict for \([1, 1]\), \([1, 2]\) and \([0, 3]\)? If their labels are 1, 1 and 0, what is the 0-1 loss?</span><span class="tog"></span></summary>
+          <p>\(\mathbf{w}^\top\mathbf{x}\) is \(1\), \(0\) and \(-3\), so the predictions are 1, 0 (a tie goes to 0 under the lecture's sign) and 0. Only \([1, 2]\) is wrong, so the loss is \(1/3\).</p></details>
+        <details><summary><span class="q">Q2</span><span>Why can't the 0-1 loss be minimized the way the squared loss was, by setting a gradient to zero?</span><span class="tog"></span></summary>
+          <p>Each term is 0 or 1, so the total jumps between a few values as \(\mathbf{w}\) changes. It is neither continuous nor differentiable, minimizing it is a discrete search, and that search is NP-hard in general.</p></details>
+        <details><summary><span class="q">Q3</span><span>You add many \(+1\) points far from the least-squares line, all on its correct side. Why can the refitted line now misclassify points it got right before?</span><span class="tog"></span></summary>
+          <p>Least squares tries to make \(\mathbf{w}^\top\mathbf{x}\) equal the label 1. The far points have large \(\mathbf{w}^\top\mathbf{x}\), so \((\mathbf{w}^\top\mathbf{x} - 1)^2\) is large and the fit tilts \(\mathbf{w}\) to reduce it. Regression responds to where points are; classification only needs the side they are on.</p></details>
+        <details><summary><span class="q">Q4</span><span>A training set has 12 points, 7 labelled \(+1\) and 5 labelled \(-1\). What does k-NN predict for a new point with \(k = 12\)? What is the training error of 1-NN?</span><span class="tog"></span></summary>
+          <p>With \(k = n = 12\) every point votes, so every test point gets the majority label \(+1\) and the decision boundary disappears. 1-NN has zero training error, because each training point is its own nearest neighbour (assuming no point appears with both labels). That says nothing about test error.</p></details>
+        <details><summary><span class="q">Q5</span><span>Why is k-NN said to learn no model, and what does that cost?</span><span class="tog"></span></summary>
+          <p>Nothing is extracted from the data; every prediction uses the whole training set, so the data can never be discarded. Each prediction computes \(n\) distances and sorts them (about \(n\log n\) work), and this is repeated for every test point.</p></details>
+        <details><summary><span class="q">Q6</span><span>A node holds 8 points, 6 labelled 1 and 2 labelled 0. A question sends four of the 1s to \(D_\text{yes}\) and the remaining two 1s and two 0s to \(D_\text{no}\). What is its information gain (base-2 logs)?</span><span class="tog"></span></summary>
+          <p>\(\text{Entropy}(D) = \text{Entropy}(0.75) = 0.811\). \(D_\text{yes}\) is pure (entropy 0); \(D_\text{no}\) has \(p = 0.5\) (entropy 1). With \(\gamma = 4/8 = 0.5\), the weighted entropy is \(0.5 \cdot 0 + 0.5 \cdot 1 = 0.5\), so the gain is \(0.811 - 0.5 = 0.311\).</p></details>
+        <details><summary><span class="q">Q7</span><span>On the yes side of the question \(f_3 \le 4\), why is \(f_3 \le 6\) useless while \(f_3 \le 2\) is not?</span><span class="tog"></span></summary>
+          <p>Every point there has \(f_3 \le 4\), hence \(f_3 \le 6\): all answer yes, nothing is split and the gain is 0. \(f_3 \le 2\) can still separate points with \(f_3 \le 2\) from those with \(2 < f_3 \le 4\).</p></details>
+        <details><summary><span class="q">Q8</span><span>Why does a tree grown until every leaf is pure reach zero training error, and how do we keep it from overfitting?</span><span class="tog"></span></summary>
+          <p>Axis-parallel cuts can keep shrinking the rectangles until each holds points of one label, at worst a single point, unless the same point carries both labels. Such a tree boxes off outliers and fits the noise. Stop at a purity threshold (fraction of 1s above 0.9 or below 0.1) and cap the depth, choosing the depth by cross-validation.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-12.html"><span class="dir">← Part 12</span><span class="nm">Ridge and LASSO</span></a><a class="next" href="part-14.html"><span class="dir">Part 14 →</span><span class="nm">Generative models and Naive Bayes</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the course's own English captions (IITM-OD) for these lectures. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes. Not an official IIT Madras resource.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const set = (e, attrs) => { for (const k in attrs) e.setAttribute(k, attrs[k]); };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const prng = s => { let seed = s; return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+
+  /* ---------- k-NN decision regions and the choice of k ---------- */
+  (() => {
+    const svg = document.getElementById('knn-svg'); if (!svg) return;
+    const rand = prng(4116);
+    const truth = (x, y) => Math.abs(x - 5 - 0.35 * (y - 5)) < 1.7 ? 1 : -1;
+    const gen = (m, flip) => { const a = []; for (let i = 0; i < m; i++) { const x = 0.3 + 9.4 * rand(), y = 0.3 + 9.4 * rand(); let l = truth(x, y); if (rand() < flip) l = -l; a.push([x, y, l]); } return a; };
+    const tr = gen(61, 0.1), va = gen(200, 0.1), n = tr.length;
+    /* For a location p: running sums of neighbour labels, nearest first. Entry k is the k-NN vote. */
+    const sums = p => { const d = tr.map(q => [(q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2, q[2]]).sort((a, b) => a[0] - b[0]); const s = new Int16Array(n + 1); for (let i = 0; i < n; i++) s[i + 1] = s[i] + d[i][1]; return s; };
+    const G = 80, cell = 10 / G, grid = [];
+    for (let r = 0; r < G; r++) { const row = []; for (let c = 0; c < G; c++) row.push(sums([(c + 0.5) * cell, 10 - (r + 0.5) * cell])); grid.push(row); }
+    const trS = tr.map(sums), vaS = va.map(sums);
+    const err = (S, data, k) => data.reduce((e, p, i) => e + ((S[i][k] > 0 ? 1 : -1) !== p[2] ? 1 : 0), 0) / data.length;
+    let kBest = 1, vBest = 2;
+    for (let k = 1; k <= n; k += 2) { const v = err(vaS, va, k); if (v < vBest - 1e-12) { vBest = v; kBest = k; } }
+
+    const P = 34, S = (400 - 2 * P) / 10;
+    const sx = x => P + x * S, sy = y => 400 - P - y * S;
+    const gReg = mk('g', { class: 'c-regions' }, svg);
+    mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P, class: 'c-axis', fill: 'none' }, svg);
+    for (let v = 0; v <= 10; v += 2) {
+      mk('text', { x: sx(v), y: 400 - P + 15, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+      mk('text', { x: P - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+    }
+    mk('text', { x: sx(5), y: 397, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'x₁';
+    mk('text', { x: 10, y: sy(5), 'text-anchor': 'middle', class: 'c-title', transform: `rotate(-90 10 ${sy(5)})` }, svg).textContent = 'x₂';
+    const gVal = mk('g', { display: 'none' }, svg);
+    va.forEach(p => p[2] > 0 ? mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 2.8, class: 'c-vpos' }, gVal) : mk('rect', { x: sx(p[0]) - 2.6, y: sy(p[1]) - 2.6, width: 5.2, height: 5.2, class: 'c-vneg' }, gVal));
+    const gTr = mk('g', {}, svg);
+    tr.forEach(p => p[2] > 0 ? mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 4.6, class: 'c-pos' }, gTr) : mk('rect', { x: sx(p[0]) - 4, y: sy(p[1]) - 4, width: 8, height: 8, class: 'c-neg' }, gTr));
+
+    const drawRegions = k => {
+      while (gReg.firstChild) gReg.removeChild(gReg.firstChild);
+      const h = cell * S;
+      for (let r = 0; r < G; r++) {
+        let start = 0, cur = grid[r][0][k] > 0;
+        for (let c = 1; c <= G; c++) {
+          const v = c < G ? grid[r][c][k] > 0 : null;
+          if (c === G || v !== cur) { mk('rect', { x: sx(start * cell), y: P + r * h, width: (c - start) * h + 0.6, height: h + 0.6, class: cur ? 'c-rpos' : 'c-rneg' }, gReg); start = c; cur = v; }
+        }
+      }
+    };
+    const slider = document.getElementById('knn-k'), out = document.getElementById('knn-k-out');
+    const trOut = document.getElementById('knn-train'), vaOut = document.getElementById('knn-valerr'), status = document.getElementById('knn-status');
+    const pct = v => (100 * v).toFixed(1) + '%';
+    let k = parseInt(slider.value, 10);
+    const draw = () => {
+      drawRegions(k);
+      out.textContent = 'k = ' + k;
+      trOut.textContent = pct(err(trS, tr, k)); vaOut.textContent = pct(err(vaS, va, k));
+      status.textContent = k === kBest ? `k = ${kBest} has the lowest validation error of all odd k.`
+        : k === 1 ? 'k = 1: no training errors, but every outlier carves out its own hole.'
+        : k === n ? `k = n = ${n}: every location gets the training-set majority, −1.` : '';
+    };
+    draw();
+    slider.addEventListener('input', () => { k = parseInt(slider.value, 10); draw(); });
+    document.getElementById('knn-best').addEventListener('click', () => tween(k, kBest, v => { const kk = 2 * Math.round((v - 1) / 2) + 1; if (kk !== k) { k = kk; slider.value = k; draw(); } }));
+    document.getElementById('knn-val').addEventListener('change', e => gVal.setAttribute('display', e.target.checked ? 'inline' : 'none'));
+  })();
+
+  /* ---------- Information gain of one question ---------- */
+  (() => {
+    const svg = document.getElementById('split-svg'); if (!svg) return;
+    const rand = prng(5348);
+    const tree = (a, b) => a > 5 ? 1 : (b > 7 ? 0 : (a <= 3 ? 1 : 0));
+    const pts = [];
+    for (let i = 0; i < 40; i++) { const a = 0.2 + 9.6 * rand(), b = 0.2 + 9.6 * rand(); pts.push([a, b, tree(a, b)]); }
+    pts.push([7.0, 5.6, 0]);
+    const n = pts.length, H = p => (p <= 0 || p >= 1) ? 0 : -(p * Math.log2(p) + (1 - p) * Math.log2(1 - p));
+    const ones = pts.filter(p => p[2] === 1).length, pD = ones / n, HD = H(pD);
+    const cand = [0, 1].map(f => { const v = pts.map(p => p[f]), lo = Math.min(...v), hi = Math.max(...v); return Array.from({ length: 11 }, (_, j) => j === 10 ? hi : lo + j * (hi - lo) / 10); });
+    const split = (f, j) => {
+      const th = cand[f][j]; let ny = 0, oy = 0;
+      pts.forEach(p => { if (p[f] <= th) { ny++; oy += p[2]; } });
+      const nn = n - ny, on = ones - oy, g = ny / n, hy = H(oy / ny), hn = nn ? H(on / nn) : 0;
+      return { th, ny, oy, nn, on, g, hy, hn, pY: oy / ny, pN: nn ? on / nn : 0, ig: HD - g * hy - (1 - g) * hn };
+    };
+    let bestF = 0, bestJ = 0, bestIG = -1;
+    for (const f of [0, 1]) for (let j = 0; j <= 10; j++) { const s = split(f, j); if (s.ig > bestIG + 1e-12) { bestIG = s.ig; bestF = f; bestJ = j; } }
+
+    /* left: the data and the question */
+    const L0 = 44, T0 = 20, W = 260, SL = W / 10;
+    const sxL = a => L0 + a * SL, syL = b => T0 + W - b * SL;
+    const gl = mk('g', { class: 'c-grid' }, svg);
+    for (let v = 0; v <= 10; v += 2) {
+      mk('line', { x1: sxL(v), x2: sxL(v), y1: T0, y2: T0 + W }, gl); mk('line', { x1: L0, x2: L0 + W, y1: syL(v), y2: syL(v) }, gl);
+      mk('text', { x: sxL(v), y: T0 + W + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+      mk('text', { x: L0 - 6, y: syL(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+    }
+    mk('text', { x: L0 + W / 2, y: T0 + W + 36, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'f₁';
+    mk('text', { x: 14, y: T0 + W / 2, 'text-anchor': 'middle', class: 'c-title', transform: `rotate(-90 14 ${T0 + W / 2})` }, svg).textContent = 'f₂';
+    const yesRect = mk('rect', { class: 'c-yes' }, svg);
+    mk('rect', { x: L0, y: T0, width: W, height: W, class: 'c-axis', fill: 'none' }, svg);
+    const gP = mk('g', {}, svg);
+    pts.forEach(p => p[2] ? mk('circle', { cx: sxL(p[0]), cy: syL(p[1]), r: 4.5, class: 'c-pos' }, gP) : mk('rect', { x: sxL(p[0]) - 4, y: syL(p[1]) - 4, width: 8, height: 8, class: 'c-neg' }, gP));
+    const qLine = mk('line', { class: 'c-user' }, svg);
+    const yesLbl = mk('text', { class: 'c-lbl' }, svg); yesLbl.textContent = 'yes';
+    const noLbl = mk('text', { class: 'c-lbl' }, svg); noLbl.textContent = 'no';
+
+    /* right: entropy curve, chord and gain */
+    const R0 = 380, RW = 280, B0 = 260, RH = 220;
+    const sxR = p => R0 + p * RW, syR = h => B0 - h * RH;
+    const gr = mk('g', { class: 'c-grid' }, svg);
+    [0.25, 0.5, 0.75, 1].forEach(v => { mk('line', { x1: sxR(v), x2: sxR(v), y1: syR(0), y2: syR(1) }, gr); });
+    [0.5, 1].forEach(v => { mk('line', { x1: sxR(0), x2: sxR(1), y1: syR(v), y2: syR(v) }, gr); });
+    [0, 0.25, 0.5, 0.75, 1].forEach(v => { mk('text', { x: sxR(v), y: B0 + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v; });
+    [0, 0.5, 1].forEach(v => { mk('text', { x: R0 - 6, y: syR(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v; });
+    mk('line', { x1: sxR(0), x2: sxR(1), y1: B0, y2: B0, class: 'c-axis' }, svg);
+    mk('line', { x1: R0, x2: R0, y1: B0, y2: syR(1), class: 'c-axis' }, svg);
+    mk('text', { x: R0 + RW / 2, y: B0 + 34, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'p, the fraction of 1s';
+    mk('text', { x: 348, y: syR(0.5), 'text-anchor': 'middle', class: 'c-title', transform: `rotate(-90 348 ${syR(0.5)})` }, svg).textContent = 'entropy (bits)';
+    let d = ''; for (let i = 0; i <= 100; i++) { const p = i / 100; d += (i ? ' L' : 'M') + sxR(p).toFixed(1) + ' ' + syR(H(p)).toFixed(1); }
+    mk('path', { d, class: 'c-line', fill: 'none' }, svg);
+    const chord = mk('line', { class: 'c-chord' }, svg);
+    const gain = mk('line', { class: 'c-gain' }, svg);
+    mk('circle', { cx: sxR(pD), cy: syR(HD), r: 4.5, class: 'c-dot' }, svg);
+    const wPt = mk('circle', { r: 3.5, class: 'c-dot' }, svg);
+    const gLbl = mk('text', { class: 'c-lbl c-halo' }, svg); gLbl.textContent = 'gain';
+    const mY = mk('circle', { r: 5.5, class: 'c-pt-hi' }, svg), lY = mk('text', { class: 'c-note c-halo' }, svg); lY.textContent = 'yes';
+    const mN = mk('circle', { r: 5.5, class: 'c-proxy' }, svg), lN = mk('text', { class: 'c-note c-halo' }, svg); lN.textContent = 'no';
+    const counts = mk('text', { x: R0, y: 322, class: 'c-note' }, svg);
+
+    const btnF = document.getElementById('split-feat'), slider = document.getElementById('split-th'), out = document.getElementById('split-th-out');
+    const o = id => document.getElementById(id), status = o('split-status');
+    o('split-hd').textContent = HD.toFixed(3);
+    let f = 0, j = parseInt(slider.value, 10);
+    const show = (e, on) => e.setAttribute('display', on ? 'inline' : 'none');
+    const draw = () => {
+      const s = split(f, j), nm = f ? 'f₂' : 'f₁';
+      if (f === 0) {
+        const x = sxL(s.th);
+        set(yesRect, { x: L0, y: T0, width: x - L0, height: W }); set(qLine, { x1: x, x2: x, y1: T0, y2: T0 + W });
+        set(yesLbl, { x: x - 5, y: T0 - 6, 'text-anchor': 'end' }); set(noLbl, { x: x + 5, y: T0 - 6, 'text-anchor': 'start' });
+        show(yesLbl, x - L0 > 26); show(noLbl, L0 + W - x > 18);
+      } else {
+        const y = syL(s.th);
+        set(yesRect, { x: L0, y, width: W, height: T0 + W - y }); set(qLine, { x1: L0, x2: L0 + W, y1: y, y2: y });
+        set(yesLbl, { x: L0 + W + 6, y: y + 14, 'text-anchor': 'start' }); set(noLbl, { x: L0 + W + 6, y: y - 5, 'text-anchor': 'start' });
+        show(yesLbl, T0 + W - y > 14); show(noLbl, y - T0 > 14);
+      }
+      /* label each end on its outer side, so the two never collide */
+      const xY = sxR(s.pY), yY = syR(s.hy), yLeft = !s.nn || s.pY <= s.pN;
+      set(mY, { cx: xY, cy: yY }); set(lY, { x: xY + (yLeft ? -8 : 8), y: yY - 8, 'text-anchor': yLeft ? 'end' : 'start' });
+      if (s.nn) {
+        const xN = sxR(s.pN), yN = syR(s.hn);
+        set(mN, { cx: xN, cy: yN }); set(lN, { x: xN + (yLeft ? 8 : -8), y: yN - 8, 'text-anchor': yLeft ? 'start' : 'end' }); set(chord, { x1: xY, y1: yY, x2: xN, y2: yN });
+      }
+      [mN, lN, chord].forEach(e => show(e, s.nn > 0));
+      const wH = s.g * s.hy + (1 - s.g) * s.hn, xD = sxR(pD), yW = syR(wH), yD = syR(HD);
+      set(wPt, { cx: xD, cy: yW }); set(gain, { x1: xD, x2: xD, y1: yD, y2: yW });
+      set(gLbl, { x: xD + 9, y: (yD + yW) / 2 + 4 }); show(gLbl, yW - yD > 22);
+      counts.textContent = `yes: ${s.oy} of ${s.ny} points are 1s  ·  no: ` + (s.nn ? `${s.on} of ${s.nn}` : 'empty');
+      out.textContent = `${nm} ≤ ${s.th.toFixed(2)}`;
+      o('split-hy').textContent = s.hy.toFixed(3); o('split-hn').textContent = s.nn ? s.hn.toFixed(3) : '–';
+      o('split-g').textContent = s.g.toFixed(3); o('split-ig').textContent = s.ig.toFixed(3);
+      btnF.textContent = f ? 'Ask about f₁ instead' : 'Ask about f₂ instead';
+      status.textContent = f === bestF && j === bestJ ? `Largest gain of all 22 candidate questions: ${nm} ≤ ${s.th.toFixed(2)}.`
+        : s.nn === 0 ? 'Every point answers yes, so nothing is split and the gain is 0.' : '';
+    };
+    draw();
+    slider.addEventListener('input', () => { j = parseInt(slider.value, 10); draw(); });
+    btnF.addEventListener('click', () => { f = 1 - f; draw(); });
+    document.getElementById('split-best').addEventListener('click', () => { f = bestF; tween(j, bestJ, v => { const jj = Math.round(v); if (jj !== j || jj === bestJ) { j = jj; slider.value = j; draw(); } }); draw(); });
+  })();
+})();
+</script>
+</body>
+</html>
