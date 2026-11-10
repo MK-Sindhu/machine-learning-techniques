@@ -297,3 +297,6 @@ code, .code { font-family: var(--font-mono); font-size: .88em; background: var(-
 .c-arrowhead { fill: var(--ink); }
 .c-proj circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.4; }
 .algo .algo-title { display: block; } /* not a list item, so numbering starts at 1 */
+
+/* Labels that can contain maths must keep their case (uppercase turns x→X, γ→Γ). */
+.readouts .k, .result .lbl, .eq-label, .algo-title, th, .dg .d-row { text-transform: none; letter-spacing: .02em; }

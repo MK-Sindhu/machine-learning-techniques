@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 15 · Perceptron and logistic regression · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 15: lectures 52–56 on the perceptron, its convergence proof and radius–margin bound, the sigmoid, and logistic regression by maximum likelihood.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 15 of 18</span><span class="sep">·</span><a href="part-14.html">← Part 14</a><span class="sep">·</span><a href="part-16.html">Part 16 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Perceptron and logistic regression: learning the line directly</h1>
+    <p class="lede">Notes for lectures 52 to 56, which model the label of a point directly with a linear rule. The perceptron finds a separating line in at most R²/γ² mistakes when the data has a margin, and softening its 0/1 rule with a sigmoid gives logistic regression, fitted by maximum likelihood and gradient ascent.</p>
+    <div class="meta">
+      <span><b>Part 15</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>138 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L52 · 27:37</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L53 · 36:04</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L54 · 32:04</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L55 · 19:52</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L56 · 22:51</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 52</h4>
+      <ul>
+        <li><a href="#discriminative">Generative to discriminative</a></li>
+        <li><a href="#linear-model">A linear rule for labels</a></li>
+        <li><a href="#zero-one">Zero training error is reachable</a></li>
+        <li><a href="#perceptron">The perceptron algorithm</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 53</h4>
+      <ul>
+        <li><a href="#update-rule">Two kinds of mistake</a></li>
+        <li><a href="#local-fix">A fix can break other points</a></li>
+        <li><a href="#cycling">A separable set that cycles</a></li>
+        <li><a href="#margin">Separability with margin γ</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 54</h4>
+      <ul>
+        <li><a href="#assumptions">Radius and unit w*</a></li>
+        <li><a href="#length-bound">‖w‖² grows slowly</a></li>
+        <li><a href="#dot-bound">wᵀw* grows fast</a></li>
+        <li><a href="#radius-margin">The radius–margin bound</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 55</h4>
+      <ul>
+        <li><a href="#scores">From certainty to scores</a></li>
+        <li><a href="#sigmoid">The sigmoid link</a></li>
+        <li><a href="#coin-model">Every data set is possible</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 56</h4>
+      <ul>
+        <li><a href="#likelihood">The logistic log-likelihood</a></li>
+        <li><a href="#gradient">Gradient ascent</a></li>
+        <li><a href="#gradient-weights">What the gradient says</a></li>
+        <li><a href="#logistic-use">Prediction and extensions</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>A <dfn>discriminative</dfn> model describes \(P(y \mid \mathbf{x})\) only. The simplest one labels \(\mathbf{x}\) as 1 exactly when \(\mathbf{w}^\top\mathbf{x} \ge 0\), which is the assumption that the data is <b>linearly separable</b>. Under it the least zero-one loss is 0, though in general the problem is NP-hard.</li>
+        <li>The <b>perceptron</b> starts at \(\mathbf{w} = \mathbf{0}\) and, on each mistake, sets \(\mathbf{w} \leftarrow \mathbf{w} + y_i\mathbf{x}_i\). This raises \(y_i\mathbf{w}^\top\mathbf{x}_i\) by \(\lVert\mathbf{x}_i\rVert^2\), but it can break other points, and with points on the boundary it can cycle forever.</li>
+        <li>Assume a <b>margin</b> (\(y_i\,\mathbf{w}^{*\top}\mathbf{x}_i \ge \gamma > 0\), \(\lVert\mathbf{w}^*\rVert = 1\)) and a <b>radius</b> (\(\lVert\mathbf{x}_i\rVert \le R\)). After \(l\) mistakes \(\lVert\mathbf{w}^l\rVert^2 \le lR^2\) and \(\mathbf{w}^{l\top}\mathbf{w}^* \ge l\gamma\). Cauchy–Schwarz joins them, giving at most \(R^2/\gamma^2\) mistakes, so the perceptron converges.</li>
+        <li>The perceptron's labels are certain. <b>Logistic regression</b> makes them coin tosses with \(P(y = 1 \mid \mathbf{x}) = \frac{1}{1 + e^{-\mathbf{w}^\top\mathbf{x}}}\), so every data set becomes possible, and \(\mathbf{w}\) is chosen by maximum likelihood.</li>
+        <li>The log-likelihood has no closed-form maximizer. Its gradient is \(\sum_i \mathbf{x}_i\,(y_i - g(\mathbf{w}^\top\mathbf{x}_i))\), so gradient ascent weights each point by how badly the current \(\mathbf{w}\) predicts it. A kernel version and an L2-regularized version exist.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 52 ============ -->
+    <section id="discriminative">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=34s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L52 · 0:34</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=127s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L52 · 2:07 a linear boundary</a>
+        </div>
+        <h2>From generative to discriminative models</h2>
+      </div>
+      <p>The course has modelled binary classification in two broad ways. A <dfn>generative model</dfn> describes how the data is produced. Naive Bayes models \(P(y)\) and \(P(\mathbf{x} \mid y)\) under class-conditional independence, first with binary features and then with real ones in Gaussian Naive Bayes, also called Gaussian discriminant analysis (<a href="part-14.html">Part 14</a>). A <dfn>discriminative model</dfn> does not care how the data arose; it only maps an input to a prediction. k-nearest neighbours and decision trees (<a href="part-13.html">Part 13</a>) are discriminative in this non-probabilistic sense.</p>
+      <p>Naive Bayes predicts with \(P(y \mid \mathbf{x})\), obtained from its model through Bayes' rule. Part 14 showed that its decision rule \(P(y = 1 \mid \mathbf{x}) \ge 0.5\) is a linear function of the input: a line separates the two classes. The generative assumptions ended in a linear classifier anyway, so the lecture asks why not model the classifier as a linear function directly.</p>
+      <p>That is the plan from here on: more discriminative models, each a model of \(P(y \mid \mathbf{x})\). Since \(P(y = 0 \mid \mathbf{x}) = 1 - P(y = 1 \mid \mathbf{x})\), it is enough to say how \(P(y = 1 \mid \mathbf{x})\) depends on the feature vector.</p>
+    </section>
+
+    <section id="linear-model">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=223s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L52 · 3:43</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=470s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L52 · 7:50 linear separability</a>
+        </div>
+        <h2>The simplest discriminative model: a linear rule</h2>
+      </div>
+      <p>The simplest assumption about this discriminating function is that it is linear:</p>
+      <div class="eq">\[ P(y = 1 \mid \mathbf{x}) = \begin{cases} 1 & \text{if } \mathbf{w}^\top\mathbf{x} \ge 0 \\ 0 & \text{otherwise} \end{cases} \]</div>
+      <p>The "probability" takes only the values 0 and 1, so labelling is deterministic. The lecture tells it as a discriminative story for how a training set is made <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=378s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:18</a>. Someone hands over an arbitrary \(\mathbf{x}\); there is no model of how \(\mathbf{x}\) arises. To label it, they toss a coin that has heads on both sides or tails on both sides. It is the two-headed coin, giving label 1, exactly when \(\mathbf{w}^\top\mathbf{x} \ge 0\) for a fixed \(\mathbf{w}\) that the labeller knows. The learner sees the labels and knows that such a \(\mathbf{w}\) exists, but not which one.</p>
+      <p>Assuming this model is the same as assuming the data is <dfn>linearly separable</dfn>. A model also decides which data sets can occur at all. In the figure, the left data set could have been produced by the model with some \(\mathbf{w}\). The right one could not: with the extra point, no \(\mathbf{w}\) puts every label-1 point on one side and every label-0 point on the other, so the labeller cannot have used any \(\mathbf{w}\).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 280" role="img" aria-label="Left: label-1 points (filled) up and to the right and label-0 points (hollow) down and to the left, split by a line through the origin with normal vector w. Right: the same points plus one label-0 point among the label-1 points; no line through the origin can split them.">
+            <defs><marker id="p15a-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="20" y="20">Allowed: some w labels it</text>
+            <line class="d-rule" x1="40" y1="130" x2="280" y2="130"/><line class="d-rule" x1="160" y1="32" x2="160" y2="240"/>
+            <line class="d-ln-acc" x1="60" y1="30" x2="260" y2="230" style="stroke-width:2"/>
+            <line class="d-ln-acc" x1="160" y1="130" x2="194" y2="96" marker-end="url(#p15a-ah)"/>
+            <text class="d-t" x="200" y="104" style="fill: var(--accent)">w</text>
+            <circle class="pt-tree" cx="200" cy="70" r="5"/><circle class="pt-tree" cx="240" cy="110" r="5"/><circle class="pt-tree" cx="180" cy="42" r="5"/><circle class="pt-tree" cx="232" cy="66" r="5"/><circle class="pt-tree" cx="256" cy="154" r="5"/>
+            <circle class="pt-no" cx="112" cy="170" r="5"/><circle class="pt-no" cx="80" cy="118" r="5"/><circle class="pt-no" cx="144" cy="210" r="5"/><circle class="pt-no" cx="88" cy="194" r="5"/><circle class="pt-no" cx="184" cy="218" r="5"/>
+            <text class="d-s" x="20" y="268">filled: y = 1 · hollow: y = 0</text>
+
+            <line class="d-rule" x1="320" y1="10" x2="320" y2="272"/>
+
+            <text class="d-h" x="340" y="20">Not allowed</text>
+            <line class="d-rule" x1="360" y1="130" x2="600" y2="130"/><line class="d-rule" x1="480" y1="32" x2="480" y2="240"/>
+            <line class="d-ln d-dash" x1="380" y1="30" x2="580" y2="230"/>
+            <circle cx="536" cy="90" r="11" style="fill: var(--mark)"/>
+            <circle class="pt-tree" cx="520" cy="70" r="5"/><circle class="pt-tree" cx="560" cy="110" r="5"/><circle class="pt-tree" cx="500" cy="42" r="5"/><circle class="pt-tree" cx="552" cy="66" r="5"/><circle class="pt-tree" cx="576" cy="154" r="5"/>
+            <circle class="pt-no" cx="432" cy="170" r="5"/><circle class="pt-no" cx="400" cy="118" r="5"/><circle class="pt-no" cx="464" cy="210" r="5"/><circle class="pt-no" cx="408" cy="194" r="5"/><circle class="pt-no" cx="504" cy="218" r="5"/>
+            <circle class="pt-no" cx="536" cy="90" r="5"/>
+            <text class="d-s" x="340" y="268">highlighted: no w can label it 0</text>
+          </svg>
+        </div>
+        <figcaption><b>Which data sets the model allows</b> (illustrative points). Every boundary passes through the origin, because the rule is \(\mathbf{w}^\top\mathbf{x} \ge 0\). On the left one such line splits the labels. On the right the highlighted label-0 point sits inside the label-1 group, and any line through the origin that keeps all label-1 points on one side keeps it there too.</figcaption>
+      </figure>
+
+      <p>Ruling out a data set like the right one, with a single outlier, is a real weakness: any reasonable model should allow it <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=719s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:59</a>. The lecture accepts the weakness on purpose. If no good algorithm exists even under the strongest assumption, things will only be harder once outliers appear. If one does exist, it can later be adapted to messier data.</p>
+    </section>
+
+    <section id="zero-one">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=811s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L52 · 13:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=963s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L52 · 16:03 zero error</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=1086s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L52 · 18:06 the assumption</a>
+        </div>
+        <h2>Under separability, zero training error is reachable</h2>
+      </div>
+      <p>The goal set at the start of classification (<a href="part-13.html">Part 13</a>) is a classifier from some family \(\mathcal{H}\) with the fewest training mistakes, the zero-one loss:</p>
+      <div class="eq">\[ \min_{h \in \mathcal{H}} \; \sum_{i=1}^{n} \mathbb{1}\big(h(\mathbf{x}_i) \ne y_i\big) \]</div>
+      <p>For a general data set this is NP-hard, even when \(\mathcal{H}\) contains only linear classifiers. "General" means no restriction on the data: outliers and any mixing of the two classes are allowed, and finding the line with the fewest mistakes is still hard.</p>
+      <p>Linear separability is a strong restriction. The labeller used some \(\mathbf{w}\), and with access to that \(\mathbf{w}\) we would make no mistakes on the training set, so the smallest possible zero-one loss is 0. The line is hidden from us. The question becomes whether a line with zero training error can be found efficiently, and the answer is yes.</p>
+      <div class="result">
+        <span class="lbl">Linear separability assumption</span>
+        \[ \exists\, \mathbf{w} \in \mathbb{R}^d \quad \text{such that} \quad \operatorname{sign}(\mathbf{w}^\top\mathbf{x}_i) = y_i \quad \text{for all } i = 1, \dots, n \]
+      </div>
+    </section>
+
+    <section id="perceptron">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=1116s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L52 · 18:36</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=1240s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L52 · 20:40 the algorithm</a>
+        </div>
+        <h2>The perceptron algorithm</h2>
+      </div>
+      <p>The classic algorithm for finding such a line is the <dfn>perceptron</dfn>, given by Frank Rosenblatt in the 1950s. Rosenblatt was working on vision, recognizing objects, and took inspiration from what makes a neuron in the brain fire. He built a physical machine that ran exactly this algorithm and believed it could solve vision and most reasonable decision-making problems. With hindsight its power is limited: it works when the data is linearly separable and may fail when it is not.</p>
+      <p>Input: \(\{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}\) with \(\mathbf{x}_i \in \mathbb{R}^d\). For this algorithm the labels are \(y_i \in \{+1, -1\}\) instead of \(\{1, 0\}\). That is only a renaming (spam is \(+1\), not spam is \(-1\)) that keeps the formulas short. Throughout, \(\operatorname{sign}(z) = +1\) if \(z \ge 0\) and \(-1\) otherwise, so a point with score exactly 0 is predicted \(+1\).</p>
+      <ol class="algo">
+        <li class="algo-title">Perceptron</li>
+        <li>Initialize \(\mathbf{w}^0 = \mathbf{0}\). The superscript counts iterations.</li>
+        <li>Until convergence: pick a pair \((\mathbf{x}_i, y_i)\) from the data set.</li>
+        <li>If \(\operatorname{sign}(\mathbf{w}^{t\top}\mathbf{x}_i) = y_i\), do nothing.</li>
+        <li>Otherwise \(\mathbf{w}^t\) has made a mistake on this point: update \(\mathbf{w}^{t+1} = \mathbf{w}^t + \mathbf{x}_i\,y_i\).</li>
+      </ol>
+      <p>In words: keep a current \(\mathbf{w}\), look through the data, and whenever the current \(\mathbf{w}\) gets a point wrong, add that point times its label. Then check the new \(\mathbf{w}\) against the data again. The algorithm has <dfn>converged</dfn> when the current \(\mathbf{w}\) classifies every training point correctly <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=G7tYdl0Osf4&amp;t=1547s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>25:47</a>. No more updates happen and the algorithm stops.</p>
+      <p>The update rule is the only non-trivial step. Nothing yet guarantees that "until convergence" ever ends: we keep adding vectors to \(\mathbf{w}\), and it is not clear that this reaches a \(\mathbf{w}\) with zero mistakes. That claim needs an argument, and the next two lectures supply it, starting with a close look at the update. A step-by-step run of the algorithm is in the <a href="#perceptron-fig">interactive figure</a> in the Lecture 54 notes.</p>
+    </section>
+
+    <!-- ============ LECTURE 53 ============ -->
+    <section id="update-rule">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=36s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L53 · 0:36</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=134s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L53 · 2:14 analysing the update</a>
+        </div>
+        <h2>Two kinds of mistake, one update</h2>
+      </div>
+      <p>The current \(\mathbf{w}^t\) can be wrong on a point in two ways.</p>
+      <ul>
+        <li><b>Type 1:</b> it predicts \(+1\) but the label is \(-1\). That is, \(\mathbf{w}^{t\top}\mathbf{x}_i \ge 0\) and \(y_i = -1\).</li>
+        <li><b>Type 2:</b> it predicts \(-1\) but the label is \(+1\). That is, \(\mathbf{w}^{t\top}\mathbf{x}_i < 0\) and \(y_i = +1\).</li>
+      </ul>
+      <p>Both get the same update, so check what the update does to the point that caused it. The new \(\mathbf{w}\) scores that point as</p>
+      <div class="eq">\[ \mathbf{w}^{t+1\top}\mathbf{x}_i = (\mathbf{w}^t + y_i\mathbf{x}_i)^\top\mathbf{x}_i = \mathbf{w}^{t\top}\mathbf{x}_i + y_i\,\mathbf{x}_i^\top\mathbf{x}_i = \mathbf{w}^{t\top}\mathbf{x}_i + y_i\,\lVert\mathbf{x}_i\rVert^2 \]</div>
+      <p>Assume no data point is the zero vector, so \(\lVert\mathbf{x}_i\rVert^2 > 0\).</p>
+      <ul>
+        <li>Type 1: \(y_i = -1\), so a positive amount is subtracted from a score that was \(\ge 0\) and should have been negative.</li>
+        <li>Type 2 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=330s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:30</a>: \(y_i = +1\), so a positive amount is added to a score that was negative and should have been positive.</li>
+      </ul>
+      <p>Either way the score moves toward the correct sign. It need not get there in one step: a score of \(-10\) might become \(-5\), still wrong but closer.</p>
+      <p class="rule-of-thumb">The update pushes \(\mathbf{w}\) in the right direction for the point that caused it. It does not promise to fix that point in one step.</p>
+    </section>
+
+    <section id="local-fix">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=427s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L53 · 7:07</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=496s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L53 · 8:16 an example</a>
+        </div>
+        <h2>Fixing one point can break others</h2>
+      </div>
+      <p>That argument is local: it only looks at the point that triggered the update. Even when the update fixes that point, the new \(\mathbf{w}\) can get other points wrong that the old one got right. The lecture shows this with a sketch; the figure redraws it with specific numbers.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 600 300" role="img" aria-label="Left: with w = (0, 1) the boundary is the horizontal axis and only x = (2, -0.5), labelled +1, is wrong. Right: adding x gives w = (2, 0.5); the boundary turns steep, x is now right, but A, labelled +1, and E, labelled -1, are now wrong.">
+            <defs>
+              <marker id="p15b-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p15b-ahk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <text class="d-h" x="20" y="22">Before: w = (0, 1), one mistake</text>
+            <line class="d-rule" x1="150" y1="34" x2="150" y2="270"/>
+            <line class="d-ln-acc" x1="30" y1="150" x2="270" y2="150" style="stroke-width:2"/>
+            <text class="d-s" x="34" y="142">+1 side</text>
+            <text class="d-s" x="34" y="168">−1 side</text>
+            <line class="d-ln-acc" x1="150" y1="150" x2="150" y2="111" marker-end="url(#p15b-ah)"/>
+            <text class="d-t" x="156" y="120" style="fill: var(--accent)">w</text>
+            <circle cx="230" cy="170" r="11" style="fill: var(--mark)"/>
+            <circle class="pt-tree" cx="90" cy="90" r="5"/><circle class="pt-tree" cx="138" cy="58" r="5"/><circle class="pt-tree" cx="190" cy="90" r="5"/><circle class="pt-tree" cx="246" cy="86" r="5"/><circle class="pt-tree" cx="230" cy="170" r="5"/>
+            <circle class="pt-no" cx="190" cy="210" r="5"/><circle class="pt-no" cx="110" cy="198" r="5"/><circle class="pt-no" cx="58" cy="186" r="5"/><circle class="pt-no" cx="158" cy="238" r="5"/>
+            <text class="d-t" x="76" y="84" text-anchor="end">A</text>
+            <text class="d-t" x="204" y="216">E</text>
+            <text class="d-t" x="245" y="176">x</text>
+
+            <line class="d-rule" x1="300" y1="10" x2="300" y2="280"/>
+
+            <text class="d-h" x="320" y="22">After w ← w + y x = (2, 0.5)</text>
+            <line class="d-rule" x1="450" y1="34" x2="450" y2="270"/>
+            <line class="d-ln d-dash" x1="330" y1="150" x2="570" y2="150"/>
+            <text class="d-s" x="336" y="142">old boundary</text>
+            <line class="d-ln-acc" x1="420" y1="30" x2="480" y2="270" style="stroke-width:2"/>
+            <text class="d-s" x="474" y="48">+1 side</text>
+            <text class="d-s" x="352" y="262">−1 side</text>
+            <line class="d-ln d-dash" x1="450" y1="150" x2="450" y2="111" marker-end="url(#p15b-ahk)"/>
+            <text class="d-s" x="455" y="100">old w</text>
+            <line class="d-ln" x1="450" y1="110" x2="528" y2="129.5" marker-end="url(#p15b-ahk)"/>
+            <text class="d-s" x="504" y="114" text-anchor="middle">+ y x</text>
+            <line class="d-ln-acc" x1="450" y1="150" x2="528" y2="130.5" marker-end="url(#p15b-ah)" style="stroke-width:2.2"/>
+            <text class="d-t" x="536" y="146" style="fill: var(--accent)">new w</text>
+            <circle cx="390" cy="90" r="11" style="fill: var(--mark)"/><circle cx="490" cy="210" r="11" style="fill: var(--mark)"/>
+            <circle class="pt-tree" cx="390" cy="90" r="5"/><circle class="pt-tree" cx="438" cy="58" r="5"/><circle class="pt-tree" cx="490" cy="90" r="5"/><circle class="pt-tree" cx="546" cy="86" r="5"/><circle class="pt-tree" cx="530" cy="170" r="5"/>
+            <circle class="pt-no" cx="490" cy="210" r="5"/><circle class="pt-no" cx="410" cy="198" r="5"/><circle class="pt-no" cx="358" cy="186" r="5"/><circle class="pt-no" cx="458" cy="238" r="5"/>
+            <text class="d-t" x="376" y="84" text-anchor="end">A</text>
+            <text class="d-t" x="504" y="216">E</text>
+            <text class="d-t" x="544" y="176">x</text>
+            <text class="d-s" x="20" y="294">filled: y = +1 · hollow: y = −1 · highlighted: misclassified by the current w</text>
+          </svg>
+        </div>
+        <figcaption><b>A local fix with side effects</b> (illustrative points, one grid unit = 40 px). Adding the misclassified \(\mathbf{x}\) to \(\mathbf{w}\) turns the boundary toward \(\mathbf{x}\). Now \(\mathbf{x}\) is on the right side, but A and E, both correct before, have crossed to the wrong side.</figcaption>
+      </figure>
+
+      <p>The numbers behind the figure: \(\mathbf{w}_{\text{old}} = (0, 1)\) gets every point right except \(\mathbf{x} = (2, -0.5)\), whose label is \(+1\) and whose score is \(-0.5\). The update gives \(\mathbf{w}_{\text{new}} = \mathbf{w}_{\text{old}} + \mathbf{x} = (2, 0.5)\), and the score of \(\mathbf{x}\) becomes \(3.75\), which is \(-0.5 + \lVert\mathbf{x}\rVert^2\). But \(A = (-1.5, 1.5)\), label \(+1\), now scores \(-2.25\), and \(E = (1, -1.5)\), label \(-1\), now scores \(1.25\). One mistake fixed, two created <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=715s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:55</a>.</p>
+      <p>So the worry is real. The algorithm might keep fixing one mistake while creating another somewhere else, forever. To claim convergence we need an argument that covers the whole run of the algorithm <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=817s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:37</a>.</p>
+    </section>
+
+    <section id="cycling">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=851s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L53 · 14:11</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=1109s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L53 · 18:29 running perceptron</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=1507s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L53 · 25:07 why it fails</a>
+        </div>
+        <h2>A separable data set on which perceptron cycles</h2>
+      </div>
+      <p>A second example, a corner case, is more revealing. Take three points in \(\mathbb{R}^2\):</p>
+      <div class="eq">\[ \mathbf{x}_1 = (0, 1),\ y_1 = +1; \qquad \mathbf{x}_2 = (0, -1),\ y_2 = +1; \qquad \mathbf{x}_3 = (-1, \tfrac12),\ y_3 = -1 \]</div>
+      <p>Is it linearly separable by the definition above? Yes <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=1041s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>17:21</a>. Any \(\mathbf{w}\) along the positive x-axis works, for example \(\mathbf{w} = (1, 0)\). Its boundary is the y-axis. Then \(\mathbf{w}^\top\mathbf{x}_1 = \mathbf{w}^\top\mathbf{x}_2 = 0\), and \(\operatorname{sign}(0) = +1\) matches both labels, while \(\mathbf{w}^\top\mathbf{x}_3 = -1 < 0\) matches \(y_3 = -1\).</p>
+      <p>Now run the perceptron from \(\mathbf{w}^0 = \mathbf{0}\).</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Current w</th><th>Scores on x₁, x₂, x₃</th><th>Predictions</th><th>Wrong on</th><th>Update</th></tr></thead>
+          <tbody>
+            <tr><td>\(\mathbf{w}^0 = (0, 0)\)</td><td>\(0,\ 0,\ 0\)</td><td>\(+1, +1, +1\)</td><td>\(\mathbf{x}_3\)</td><td>\(\mathbf{w}^1 = \mathbf{w}^0 + y_3\mathbf{x}_3 = (1, -\tfrac12)\)</td></tr>
+            <tr><td>\(\mathbf{w}^1 = (1, -\tfrac12)\)</td><td>\(-\tfrac12,\ \tfrac12,\ -\tfrac54\)</td><td>\(-1, +1, -1\)</td><td>\(\mathbf{x}_1\)</td><td>\(\mathbf{w}^2 = \mathbf{w}^1 + y_1\mathbf{x}_1 = (1, \tfrac12)\)</td></tr>
+            <tr><td>\(\mathbf{w}^2 = (1, \tfrac12)\)</td><td>\(\tfrac12,\ -\tfrac12,\ -\tfrac34\)</td><td>\(+1, -1, -1\)</td><td>\(\mathbf{x}_2\)</td><td>\(\mathbf{w}^3 = \mathbf{w}^2 + y_2\mathbf{x}_2 = (1, -\tfrac12) = \mathbf{w}^1\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>\(\mathbf{w}^3\) equals \(\mathbf{w}^1\), so from here the algorithm alternates between \(\mathbf{w}^1\) and \(\mathbf{w}^2\) forever <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=1406s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:26</a>. Each of them makes exactly one mistake, so the order in which points are picked does not matter, and the perceptron never converges although the data set is linearly separable.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 270" role="img" aria-label="Three panels. Left: w star equals (1, 0); its boundary, the y-axis, passes through x1 and x2. Middle: w1 = (1, -1/2) gets x1 wrong. Right: w2 = (1, 1/2) gets x2 wrong. Arrows show that adding x1 turns w1 into w2 and adding x2 turns w2 back into w1.">
+            <defs>
+              <marker id="p15c-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <text class="d-t" x="110" y="22" text-anchor="middle">Separable: w* = (1, 0)</text>
+            <line class="d-rule" x1="30" y1="130" x2="190" y2="130"/>
+            <line class="d-ln-acc" x1="110" y1="40" x2="110" y2="220" style="stroke-width:2"/>
+            <line class="d-ln-acc" x1="110" y1="130" x2="169" y2="130" marker-end="url(#p15c-ah)"/>
+            <text class="d-t" x="174" y="126" style="fill: var(--accent)">w*</text>
+            <circle class="pt-tree" cx="110" cy="70" r="5"/><circle class="pt-tree" cx="110" cy="190" r="5"/><circle class="pt-no" cx="50" cy="100" r="5"/>
+            <text class="d-s" x="118" y="66">x₁</text><text class="d-s" x="118" y="202">x₂</text><text class="d-s" x="40" y="104" text-anchor="end">x₃</text>
+            <text class="d-s" x="110" y="244" text-anchor="middle">x₁ and x₂ lie on the boundary;</text>
+            <text class="d-s" x="110" y="258" text-anchor="middle">sign(0) = +1 labels them +1</text>
+
+            <line class="d-rule" x1="220" y1="10" x2="220" y2="262"/>
+
+            <text class="d-t" x="330" y="22" text-anchor="middle">w¹ = (1, −½): x₁ wrong</text>
+            <line class="d-rule" x1="250" y1="130" x2="410" y2="130"/><line class="d-rule" x1="330" y1="40" x2="330" y2="220"/>
+            <line class="d-ln-acc" x1="285" y1="220" x2="375" y2="40" style="stroke-width:2"/>
+            <line class="d-ln-acc" x1="330" y1="130" x2="389" y2="159.5" marker-end="url(#p15c-ah)"/>
+            <text class="d-t" x="392" y="174" style="fill: var(--accent)">w¹</text>
+            <circle cx="330" cy="70" r="11" style="fill: var(--mark)"/>
+            <circle class="pt-tree" cx="330" cy="70" r="5"/><circle class="pt-tree" cx="330" cy="190" r="5"/><circle class="pt-no" cx="270" cy="100" r="5"/>
+            <text class="d-s" x="344" y="66">x₁</text><text class="d-s" x="338" y="202">x₂</text><text class="d-s" x="260" y="104" text-anchor="end">x₃</text>
+
+            <text class="d-t" x="550" y="22" text-anchor="middle">w² = (1, ½): x₂ wrong</text>
+            <line class="d-rule" x1="470" y1="130" x2="630" y2="130"/><line class="d-rule" x1="550" y1="40" x2="550" y2="220"/>
+            <line class="d-ln-acc" x1="505" y1="40" x2="595" y2="220" style="stroke-width:2"/>
+            <line class="d-ln-acc" x1="550" y1="130" x2="609" y2="100.5" marker-end="url(#p15c-ah)"/>
+            <text class="d-t" x="614" y="100" style="fill: var(--accent)">w²</text>
+            <circle cx="550" cy="190" r="11" style="fill: var(--mark)"/>
+            <circle class="pt-tree" cx="550" cy="70" r="5"/><circle class="pt-tree" cx="550" cy="190" r="5"/><circle class="pt-no" cx="490" cy="100" r="5"/>
+            <text class="d-s" x="558" y="66">x₁</text><text class="d-s" x="562" y="208">x₂</text><text class="d-s" x="480" y="104" text-anchor="end">x₃</text>
+
+            <path class="d-ln" d="M405 62 Q440 36 475 62" marker-end="url(#p15c-ah)" style="stroke: var(--accent)"/>
+            <text class="d-s" x="440" y="36" text-anchor="middle">add y₁x₁</text>
+            <path class="d-ln" d="M475 198 Q440 224 405 198" marker-end="url(#p15c-ah)" style="stroke: var(--accent)"/>
+            <text class="d-s" x="440" y="238" text-anchor="middle">add y₂x₂:</text>
+            <text class="d-s" x="440" y="252" text-anchor="middle">back to w¹</text>
+          </svg>
+        </div>
+        <figcaption><b>The three-point counterexample, drawn to scale.</b> Filled points have label \(+1\), the hollow one \(-1\); highlighted points are misclassified. The data is separable only because \(\mathbf{x}_1\) and \(\mathbf{x}_2\) sit on the boundary of \(\mathbf{w}^*\). The perceptron reaches \(\mathbf{w}^1 = -\mathbf{x}_3\) and then bounces between \(\mathbf{w}^1\) and \(\mathbf{w}^2\), each wrong on one point.</figcaption>
+      </figure>
+
+      <p>Why does it fail? The data set is separable only because two points lie exactly on the decision boundary of \(\mathbf{w} = (1, 0)\), and the convention \(\operatorname{sign}(0) = +1\) decides their label <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=1541s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>25:41</a>. A point on the boundary is a corner case that could as well have been labelled \(-1\), and this arbitrariness is what breaks convergence. The fix is to assume slightly more about the data: there is a separator with no data point on the boundary itself.</p>
+    </section>
+
+    <section id="margin">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=1637s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L53 · 27:17</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=1865s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L53 · 31:05 the definition</a>
+        </div>
+        <h2>Linear separability with a γ margin</h2>
+      </div>
+      <p>Draw the separator \(\mathbf{w}^\top\mathbf{x} = 0\) and two lines parallel to it, \(\mathbf{w}^\top\mathbf{x} = \gamma\) on the positive side and \(\mathbf{w}^\top\mathbf{x} = -\gamma\) on the negative side. The stronger assumption is that some \(\mathbf{w}\) classifies the data correctly with a gap: no data point lies strictly between those two lines.</p>
+      <div class="result">
+        <span class="lbl">Linear separability with a margin</span>
+        <p>A data set \(\{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}\) is linearly separable with \(\gamma\) margin if, for some \(\gamma > 0\), there is a \(\mathbf{w}^* \in \mathbb{R}^d\) with</p>
+        \[ (\mathbf{w}^{*\top}\mathbf{x}_i)\, y_i \ge \gamma \qquad \text{for all } i. \]
+      </div>
+      <p>Multiplying by \(y_i\) packs two conditions into one.</p>
+      <ul>
+        <li>If \(y_i = +1\) it says \(\mathbf{w}^{*\top}\mathbf{x}_i \ge \gamma\): positive points lie on the line \(\mathbf{w}^{*\top}\mathbf{x} = \gamma\) or beyond it.</li>
+        <li>If \(y_i = -1\) it says \(-\mathbf{w}^{*\top}\mathbf{x}_i \ge \gamma\), that is \(\mathbf{w}^{*\top}\mathbf{x}_i \le -\gamma\): negative points lie on \(\mathbf{w}^{*\top}\mathbf{x} = -\gamma\) or beyond it.</li>
+      </ul>
+      <p>The slab between the two lines is empty, and in particular no data point satisfies \(\mathbf{w}^{*\top}\mathbf{x}_i = 0\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=2032s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>33:52</a>. Nothing is assumed about how large \(\gamma\) is: 0.1, 5 and 100 are all fine, and the gap may be as thin as we like as long as it is not zero. The three-point data set is now excluded. (A one-line check: \(\mathbf{x}_2 = -\mathbf{x}_1\) and both have label \(+1\), so their scores \(\mathbf{w}^\top\mathbf{x}_1\) and \(-\mathbf{w}^\top\mathbf{x}_1\) cannot both be at least \(\gamma > 0\).)</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 620 330" role="img" aria-label="A unit vector w star, its boundary line through the origin and two parallel lines at scores gamma and minus gamma. Positive points lie on or beyond the gamma line, negative points on or beyond the minus gamma line, and the slab between is empty. A dashed circle of radius R around the origin contains every point.">
+            <defs>
+              <marker id="p15d-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p15d-ahk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <polygon points="296.3,309.2 351.7,277.2 203.7,20.8 148.3,52.8" style="fill: var(--accent-soft); fill-opacity: .8"/>
+            <circle class="d-ln d-dash" cx="250" cy="165" r="136"/>
+            <line class="d-ln" x1="296.3" y1="309.2" x2="148.3" y2="52.8"/>
+            <line class="d-ln-acc" x1="324" y1="293.2" x2="176" y2="36.8" style="stroke-width:2"/>
+            <line class="d-ln" x1="351.7" y1="277.2" x2="203.7" y2="20.8"/>
+            <text class="d-s" x="198" y="24" text-anchor="end">w*ᵀx = γ</text>
+            <text class="d-s" x="170" y="40" text-anchor="end" style="fill: var(--accent)">w*ᵀx = 0</text>
+            <text class="d-s" x="142" y="56" text-anchor="end">w*ᵀx = −γ</text>
+            <line class="d-ln-acc" x1="250" y1="165" x2="284" y2="145.3" marker-end="url(#p15d-ah)" style="stroke-width:2.2"/>
+            <text class="d-t" x="289" y="162" style="fill: var(--accent)">w*</text>
+            <line class="d-ln" x1="310" y1="268.9" x2="337.7" y2="252.9" marker-start="url(#p15d-ahk)" marker-end="url(#p15d-ahk)"/>
+            <text class="d-t" x="352" y="264">γ</text>
+            <line class="d-ln" x1="250" y1="165" x2="123" y2="211.2" marker-end="url(#p15d-ahk)"/>
+            <text class="d-t" x="174" y="208">R</text>
+            <circle class="pt-tree" cx="261.6" cy="89" r="5"/><circle class="pt-tree" cx="323.8" cy="140.9" r="5"/><circle class="pt-tree" cx="320.1" cy="78.4" r="5"/><circle class="pt-tree" cx="328.6" cy="221.2" r="5"/><circle class="pt-tree" cx="364.2" cy="186.8" r="5"/><circle class="pt-tree" cx="246.5" cy="46.9" r="5"/><circle class="pt-tree" cx="269.7" cy="135.1" r="5"/>
+            <circle class="pt-no" cx="199.9" cy="166.2" r="5"/><circle class="pt-no" cx="143.6" cy="124.8" r="5"/><circle class="pt-no" cx="179.4" cy="242.7" r="5"/><circle class="pt-no" cx="250.8" cy="238.4" r="5"/><circle class="pt-no" cx="235.7" cy="300.3" r="5"/><circle class="pt-no" cx="176.3" cy="101.3" r="5"/>
+
+            <circle class="pt-tree" cx="406" cy="62" r="5"/><text class="d-s" x="418" y="66">filled: y = +1, so w*ᵀx ≥ γ</text>
+            <circle class="pt-no" cx="406" cy="84" r="5"/><text class="d-s" x="418" y="88">hollow: y = −1, so w*ᵀx ≤ −γ</text>
+            <rect x="400" y="100" width="12" height="12" style="fill: var(--accent-soft)"/><text class="d-s" x="418" y="110">shaded slab: no data point inside</text>
+            <circle class="d-ln d-dash" cx="406" cy="128" r="6"/><text class="d-s" x="418" y="132">dashed circle: every ‖xᵢ‖ ≤ R</text>
+            <text class="d-s" x="400" y="154">‖w*‖ = 1, so γ is a distance</text>
+          </svg>
+        </div>
+        <figcaption><b>Separable with margin γ</b> (illustrative points, drawn with \(\lVert\mathbf{w}^*\rVert = 1\)). Every positive point scores at least \(\gamma\) and every negative point at most \(-\gamma\), so nothing lies in the shaded slab or on the boundary. One point of each class touches its margin line. The dashed circle of radius \(R\) and the unit length of \(\mathbf{w}^*\) are the two simplifications added in Lecture 54.</figcaption>
+      </figure>
+
+      <p>Under this assumption the perceptron has a convergence proof, one of the first for any learning algorithm <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=FMRpmR9HNtY&amp;t=2094s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>34:54</a>. The lecture goes through it because the proof shows which quantities of a problem control how hard it is, and that leads to stronger algorithms later in the course.</p>
+    </section>
+
+    <!-- ============ LECTURE 54 ============ -->
+    <section id="assumptions">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=0s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 0:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=63s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 1:03 radius</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=157s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 2:37 unit w*</a>
+        </div>
+        <h2>Two simplifications: a radius and a unit-length w*</h2>
+      </div>
+      <p>The proof uses three assumptions. The first, linear separability with \(\gamma\) margin, is the important one. The other two are simplifications rather than real assumptions. The proof works without them, but it would carry extra terms.</p>
+      <h3>Assumption 2: a radius <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=63s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 1:03</a></h3>
+      <p>There is an \(R > 0\) with \(\lVert\mathbf{x}_i\rVert \le R\) for every \(i\). Every finite data set satisfies this. Some data point is the longest; take \(R\) to be its length, and the Euclidean ball of radius \(R\) contains all the points (the dashed circle in the margin figure above).</p>
+      <h3>Assumption 3: without loss of generality, ‖w*‖ = 1 <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=157s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 2:37</a></h3>
+      <p>Suppose \(\mathbf{w}^*\) separates the data with margin \(\gamma\) but has some other length. Divide each condition by \(\lVert\mathbf{w}^*\rVert > 0\); dividing by a positive number keeps the inequality:</p>
+      <div class="eq">\[ (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i \ge \gamma \iff \Big(\frac{\mathbf{w}^*}{\lVert\mathbf{w}^*\rVert}\Big)^{\!\top}\mathbf{x}_i\; y_i \ge \frac{\gamma}{\lVert\mathbf{w}^*\rVert} = \gamma' \]</div>
+      <p>So \(\mathbf{w}^{*\prime} = \mathbf{w}^*/\lVert\mathbf{w}^*\rVert\) has length 1 and separates the data with margin \(\gamma'\), which is still positive. The lines are the same lines; only their equations are rescaled, just as \(y = mx + c\) and \(2y = 2mx + 2c\) describe one line. Assumption 1 only asks for some \(\gamma > 0\), so we may as well take the separator to have length 1. If \(\mathbf{w}^*\) separates with \(\gamma = 10\), its unit version separates with \(10/\lVert\mathbf{w}^*\rVert\).</p>
+    </section>
+
+    <section id="length-bound">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=518s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 8:38</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=682s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 11:22 expanding ‖w‖²</a>
+        </div>
+        <h2>Each mistake grows ‖w‖² by at most R²</h2>
+      </div>
+      <p>The strategy is to bound the number of mistakes. The perceptron changes \(\mathbf{w}\) only when it makes a mistake. If it can make at most some finite number of mistakes, say 10,000, then once it has made them it makes no more: it classifies every point correctly, which is exactly convergence.</p>
+      <p>Notation: \(\mathbf{w}^l\) is the weight vector after \(l\) mistakes, so \(\mathbf{w}^0 = \mathbf{0}\). Suppose \(\mathbf{w}^l\) makes a mistake on a data point \((\mathbf{x}, y)\). The update gives \(\mathbf{w}^{l+1} = \mathbf{w}^l + \mathbf{x}\,y\). How much longer is the new vector? Write the squared length as a dot product and expand:</p>
+      <div class="eq">\[ \lVert\mathbf{w}^{l+1}\rVert^2 = (\mathbf{w}^l + \mathbf{x}y)^\top(\mathbf{w}^l + \mathbf{x}y) = \lVert\mathbf{w}^l\rVert^2 + 2\,(\mathbf{w}^{l\top}\mathbf{x})\,y + \lVert\mathbf{x}\rVert^2\,y^2 \]</div>
+      <p>Bound the last two terms.</p>
+      <ul>
+        <li><b>Third term.</b> \(y = \pm1\), so \(y^2 = 1\), and \(\lVert\mathbf{x}\rVert^2 \le R^2\) by the radius assumption <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=777s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:57</a>. The term is at most \(R^2\).</li>
+        <li><b>Middle term.</b> \(\mathbf{w}^l\) made a mistake on \((\mathbf{x}, y)\), so \(\operatorname{sign}(\mathbf{w}^{l\top}\mathbf{x}) \ne y\). Either \(\mathbf{w}^{l\top}\mathbf{x} \ge 0\) and \(y = -1\), or \(\mathbf{w}^{l\top}\mathbf{x} < 0\) and \(y = +1\). In both cases the product \((\mathbf{w}^{l\top}\mathbf{x})\,y \le 0\), so dropping the term can only make the right-hand side larger <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=808s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:28</a>.</li>
+      </ul>
+      <div class="eq">\[ \lVert\mathbf{w}^{l+1}\rVert^2 \le \lVert\mathbf{w}^l\rVert^2 + R^2 \]</div>
+      <p>The same holds one step earlier, because \(\mathbf{w}^l\) came from \(\mathbf{w}^{l-1}\) by an update after a mistake, and so on back to the start. Unrolling down to \(\mathbf{w}^0 = \mathbf{0}\):</p>
+      <div class="eq">\[ \lVert\mathbf{w}^l\rVert^2 \le \lVert\mathbf{w}^{l-1}\rVert^2 + R^2 \le \lVert\mathbf{w}^{l-2}\rVert^2 + 2R^2 \le \cdots \le \lVert\mathbf{w}^0\rVert^2 + lR^2 = lR^2 \]</div>
+      <div class="result">
+        <span class="lbl">Observation 1: the length grows slowly</span>
+        \[ \lVert\mathbf{w}^l\rVert^2 \le l\,R^2 \qquad \text{after } l \text{ mistakes} \]
+        <p>This links the length of \(\mathbf{w}\) to the number of mistakes \(l\). On its own it does not bound \(l\), because it bounds the length from one side only.</p>
+      </div>
+      <p class="note">The lecture writes the left side as \(\lVert\mathbf{w}^{l+1}\rVert^2\) with \(l\) on the right. Counting \(\mathbf{w}^0\) as the start, the tidy form is the one above, and the final bound comes out the same.</p>
+    </section>
+
+    <section id="dot-bound">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1070s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 17:50</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1136s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 18:56 using the margin</a>
+        </div>
+        <h2>Each mistake raises wᵀw* by at least γ</h2>
+      </div>
+      <p>The margin assumption has not been used yet. We do not know \(\mathbf{w}^*\), but we know it exists, and that is enough to reason about it. Track how the dot product of the current \(\mathbf{w}\) with \(\mathbf{w}^*\) changes when \(\mathbf{w}^l\) makes a mistake on \((\mathbf{x}, y)\):</p>
+      <div class="eq">\[ \mathbf{w}^{l+1\top}\mathbf{w}^* = (\mathbf{w}^l + \mathbf{x}y)^\top\mathbf{w}^* = \mathbf{w}^{l\top}\mathbf{w}^* + (\mathbf{w}^{*\top}\mathbf{x})\,y \;\ge\; \mathbf{w}^{l\top}\mathbf{w}^* + \gamma \]</div>
+      <p>The inequality is the margin assumption: \((\mathbf{w}^{*\top}\mathbf{x})\,y \ge \gamma\) holds for every data point, including the one just misclassified. So every update raises the dot product with \(\mathbf{w}^*\) by at least \(\gamma\). The same argument applies to each earlier update. Unrolling down to \(\mathbf{w}^0 = \mathbf{0}\), whose dot product with anything is 0 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1234s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:34</a>:</p>
+      <div class="eq">\[ \mathbf{w}^{l\top}\mathbf{w}^* \ge \mathbf{w}^{l-1\top}\mathbf{w}^* + \gamma \ge \mathbf{w}^{l-2\top}\mathbf{w}^* + 2\gamma \ge \cdots \ge \mathbf{w}^{0\top}\mathbf{w}^* + l\gamma = l\gamma \]</div>
+      <div class="result">
+        <span class="lbl">Observation 2: alignment with w* grows fast</span>
+        \[ \mathbf{w}^{l\top}\mathbf{w}^* \ge l\,\gamma \qquad \text{after } l \text{ mistakes} \]
+        <p>Observation 1 bounds the length of \(\mathbf{w}^l\) from above. This bounds its dot product with \(\mathbf{w}^*\) from below. To combine them we need the dot product in terms of the length.</p>
+      </div>
+    </section>
+
+    <section id="radius-margin">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1301s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 21:41</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1563s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 26:03 the sandwich</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1636s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 27:16 radius–margin bound</a>
+        </div>
+        <h2>Sandwiching ‖w‖²: the radius–margin bound</h2>
+      </div>
+      <h3>A dot product is at most the product of the lengths</h3>
+      <p>Take any two vectors \(\mathbf{u}\) and \(\mathbf{v} \ne \mathbf{0}\). The projection of \(\mathbf{u}\) onto the direction of \(\mathbf{v}\) is \(\frac{\mathbf{u}^\top\mathbf{v}}{\lVert\mathbf{v}\rVert^2}\,\mathbf{v}\), the proxy from the PCA lectures (<a href="part-02.html">Part 2</a>). The projection, the leftover \(\mathbf{u}\) minus the projection, and \(\mathbf{u}\) itself form a right-angled triangle with \(\mathbf{u}\) as the hypotenuse. By Pythagoras, \(\lVert\mathbf{u}\rVert^2\) is the projection's squared length plus the leftover's, so the projection is no longer than \(\mathbf{u}\):</p>
+      <div class="eq">\[ \Big\lVert \frac{\mathbf{u}^\top\mathbf{v}}{\lVert\mathbf{v}\rVert^2}\,\mathbf{v} \Big\rVert^2 \le \lVert\mathbf{u}\rVert^2 \;\Longrightarrow\; \frac{(\mathbf{u}^\top\mathbf{v})^2\,\lVert\mathbf{v}\rVert^2}{\lVert\mathbf{v}\rVert^4} \le \lVert\mathbf{u}\rVert^2 \;\Longrightarrow\; (\mathbf{u}^\top\mathbf{v})^2 \le \lVert\mathbf{u}\rVert^2\,\lVert\mathbf{v}\rVert^2 \]</div>
+      <p>This is a version of the <dfn>Cauchy–Schwarz inequality</dfn>. (The lecture names the two vectors \(\mathbf{x}\) and \(\mathbf{y}\); \(\mathbf{u}\) and \(\mathbf{v}\) avoid a clash with the label \(y\).)</p>
+      <h3>The sandwich <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1466s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 24:26</a></h3>
+      <p>Apply it with \(\mathbf{u} = \mathbf{w}^l\) and \(\mathbf{v} = \mathbf{w}^*\). Observation 2 says \(l\gamma \le \mathbf{w}^{l\top}\mathbf{w}^*\). Both sides are nonnegative, so squaring keeps the inequality. Then Cauchy–Schwarz, and finally \(\lVert\mathbf{w}^*\rVert = 1\):</p>
+      <div class="eq">\[ l^2\gamma^2 \le \big(\mathbf{w}^{l\top}\mathbf{w}^*\big)^2 \le \lVert\mathbf{w}^l\rVert^2\,\lVert\mathbf{w}^*\rVert^2 = \lVert\mathbf{w}^l\rVert^2 \]</div>
+      <p>This is observation 3: \(\lVert\mathbf{w}^l\rVert^2 \ge l^2\gamma^2\). Together with observation 1, the squared length is trapped between two bounds:</p>
+      <div class="eq">\[ \underbrace{l^2\gamma^2}_{\text{observation 3}} \;\le\; \lVert\mathbf{w}^l\rVert^2 \;\le\; \underbrace{l\,R^2}_{\text{observation 1}} \quad\Longrightarrow\quad l^2\gamma^2 \le l\,R^2 \quad\Longrightarrow\quad l \le \frac{R^2}{\gamma^2} \]</div>
+      <p>The last step divides by \(l\gamma^2 > 0\); the case \(l = 0\) needs nothing.</p>
+      <div class="result">
+        <span class="lbl">Radius–margin bound</span>
+        <p>If the data is linearly separable with margin \(\gamma > 0\) and every \(\lVert\mathbf{x}_i\rVert \le R\), the perceptron makes at most</p>
+        \[ l \le \frac{R^2}{\gamma^2} \]
+        <p>mistakes. An update happens only on a mistake, so after finitely many updates the perceptron classifies every point correctly: it converges.</p>
+      </div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 620 300" role="img" aria-label="Plot of squared length against number of mistakes l. The upper bound l R squared is a straight line, the lower bound l squared gamma squared is a parabola. They meet at l = R squared over gamma squared = 16; past it the lower bound exceeds the upper one.">
+            <line class="d-rule" x1="70" y1="176.7" x2="550" y2="176.7"/><line class="d-rule" x1="70" y1="103.3" x2="550" y2="103.3"/><line class="d-rule" x1="70" y1="30" x2="550" y2="30"/>
+            <polygon points="70,250 419.1,132.7 408.2,139.9 397.3,146.9 386.4,153.6 375.5,160.2 364.5,166.5 353.6,172.5 342.7,178.4 331.8,184 320.9,189.4 310,194.5 299.1,199.5 288.2,204.2 277.3,208.6 266.4,212.9 255.5,216.9 244.5,220.7 233.6,224.2 222.7,227.5 211.8,230.6 200.9,233.5 190,236.1 179.1,238.5 168.2,240.7 157.3,242.7 146.4,244.4 135.5,245.9 124.5,247.1 113.6,248.2 102.7,249 91.8,249.5 80.9,249.9" style="fill: var(--accent-soft); fill-opacity: .85"/>
+            <line class="d-ln" x1="70" y1="250" x2="556" y2="250"/><line class="d-ln" x1="70" y1="250" x2="70" y2="24"/>
+            <line class="d-ln" x1="70" y1="250" x2="550" y2="88.7" style="stroke-width:2"/>
+            <polyline class="d-ln-acc" style="stroke-width:2.2" points="70,250 80.9,249.9 91.8,249.5 102.7,249 113.6,248.2 124.5,247.1 135.5,245.9 146.4,244.4 157.3,242.7 168.2,240.7 179.1,238.5 190,236.1 200.9,233.5 211.8,230.6 222.7,227.5 233.6,224.2 244.5,220.7 255.5,216.9 266.4,212.9 277.3,208.6 288.2,204.2 299.1,199.5 310,194.5 320.9,189.4 331.8,184 342.7,178.4 353.6,172.5 364.5,166.5 375.5,160.2 386.4,153.6 397.3,146.9 408.2,139.9 419.1,132.7 430,125.2 440.9,117.5 451.8,109.6 462.7,101.5 473.6,93.1 484.5,84.5 495.5,75.7 506.4,66.7 517.3,57.4 528.2,47.9 539.1,38.1 548,30"/>
+            <line class="d-ln d-dash" x1="419.1" y1="250" x2="419.1" y2="132.7"/>
+            <circle class="pt-new" cx="419.1" cy="132.7" r="5"/>
+            <text class="d-s" x="512" y="120">upper: l R²</text>
+            <text class="d-s" x="350" y="200" style="fill: var(--accent)">lower: l² γ²</text>
+            <text class="d-s" x="428" y="152">R²/γ² = 16: the bounds cross</text>
+            <text class="d-s" x="96" y="150">‖wˡ‖² must lie in this band</text>
+            <line class="d-ln" x1="160" y1="156" x2="230" y2="212"/>
+            <text class="d-al" x="70" y="266" text-anchor="middle">0</text><text class="d-al" x="157.3" y="266" text-anchor="middle">4</text><text class="d-al" x="244.5" y="266" text-anchor="middle">8</text><text class="d-al" x="331.8" y="266" text-anchor="middle">12</text><text class="d-al" x="419.1" y="266" text-anchor="middle">16</text><text class="d-al" x="506.4" y="266" text-anchor="middle">20</text>
+            <text class="d-al" x="62" y="254" text-anchor="end">0</text><text class="d-al" x="62" y="180.7" text-anchor="end">10</text><text class="d-al" x="62" y="107.3" text-anchor="end">20</text><text class="d-al" x="62" y="34" text-anchor="end">30</text>
+            <text class="d-s" x="310" y="290" text-anchor="middle">number of mistakes made so far, l</text>
+            <text class="d-s" x="78" y="20">‖wˡ‖²</text>
+          </svg>
+        </div>
+        <figcaption><b>Why the mistakes must stop.</b> Drawn to scale for \(R = 1\) and \(\gamma = 0.25\), values chosen for illustration. After \(l\) mistakes \(\lVert\mathbf{w}^l\rVert^2\) lies between the parabola \(l^2\gamma^2\) and the line \(lR^2\). The parabola overtakes the line at \(l = R^2/\gamma^2 = 16\), so a 17th mistake would need a length that is both above and below these bounds, which is impossible.</figcaption>
+      </figure>
+
+      <h3>Why γ &gt; 0 matters <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1669s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 27:49</a></h3>
+      <p>The bound is finite only because \(\gamma > 0\). If we allowed \(\gamma = 0\), letting points sit on the separating hyperplane, the same argument would give \(l \le R^2/0 = \infty\), a useless statement. The three-point example shows that the perceptron really can fail in that case. With any positive margin, however small, the number of mistakes is finite and the perceptron must converge.</p>
+
+      <figure id="perceptron-fig">
+        <div class="controls">
+          <label for="perc-gap">Margin of the generated data</label>
+          <input type="range" id="perc-gap" min="0.1" max="1.2" step="0.05" value="0.3">
+          <output id="perc-gap-out" for="perc-gap">0.30</output>
+          <button class="btn" id="perc-step" type="button">Next point</button>
+          <button class="btn" id="perc-run" type="button">Run to convergence</button>
+          <button class="btn" id="perc-reset" type="button">Reset</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Points checked</span><span class="v" id="perc-steps">0</span></div>
+          <div><span class="k">Mistakes made</span><span class="v mine" id="perc-mis">0</span></div>
+          <div><span class="k">Bound on mistakes</span><span class="v" id="perc-bound">–</span></div>
+          <div><span class="k">w before</span><span class="v" id="perc-wb">–</span></div>
+          <div><span class="k">w after</span><span class="v" id="perc-wa">–</span></div>
+        </div>
+        <div class="status" id="perc-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="perc-svg" viewBox="0 0 400 400" role="img" aria-label="Twenty synthetic points with labels plus one and minus one, separable with a margin by a hidden unit vector shown as a faint dotted line. The current perceptron boundary and the direction of w are drawn; the point being checked is circled and highlighted when it is a mistake, with the previous boundary dashed."></svg></div>
+        <figcaption><b>Perceptron, one point at a time.</b> Synthetic data generated for this page: 20 points (filled: \(y = +1\), hollow: \(y = -1\)) labelled by a hidden unit vector \(\mathbf{w}^*\) (faint dotted boundary), each at least the chosen margin from that boundary. Each click checks the next point in order. A highlighted point is a mistake: the dashed line and arrow show the old \(\mathbf{w}\), the solid ones \(\mathbf{w} + y\,\mathbf{x}\) (arrows show direction only). The run ends after a full pass with no mistake. The bound uses \(R\) and \(\gamma\) measured for \(\mathbf{w}^*\) on these points; it is a worst-case guarantee, and the actual count is usually far below it.</figcaption>
+      </figure>
+
+      <h3>Summary, and what comes next <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1738s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L54 · 28:58</a></h3>
+      <p>The perceptron is a very simple update rule: on a mistake, add \(\mathbf{x}\,y\) to \(\mathbf{w}\). Run until convergence, it is guaranteed to stop with a \(\mathbf{w}\) that classifies every training point correctly, provided the data is linearly separable with some margin \(\gamma\). \(R\) is a finite number you can compute from the data. It is one of the first machine learning algorithms with a provable convergence guarantee.</p>
+      <p>Two questions are left open <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=fHDouTKwfXw&amp;t=1836s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>30:36</a>. What does the bound say about the quality of the solution it finds? And what exactly is the role of the margin \(\gamma\)? Thinking about them leads to two major families of algorithms that both grew out of the perceptron and its analysis: <b>support vector machines</b> (<a href="part-16.html">Part 16</a>) and <b>neural networks</b> (<a href="part-18.html">Part 18</a>).</p>
+    </section>
+
+    <!-- ============ LECTURE 55 ============ -->
+    <section id="scores">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L55 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=122s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L55 · 2:02 the 0/1 assumption</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=276s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L55 · 4:36 scores</a>
+        </div>
+        <h2>From certain labels to scores</h2>
+      </div>
+      <p>So far: the perceptron finds a linear classifier when the data is linearly separable, and with margin \(\gamma\) it makes at most \(R^2/\gamma^2\) mistakes. The margin deserves a longer discussion, which the course returns to in <a href="part-16.html">Part 16</a>. For now the lecture parks the perceptron and rethinks its assumption.</p>
+      <p>Written as a probability, the perceptron assumes \(P(y = 1 \mid \mathbf{x}) = 1\) if \(\mathbf{w}^\top\mathbf{x} \ge 0\) and 0 otherwise. Because the probabilities are exactly 1 and 0, a data set with one minus among the pluses and one plus among the minuses cannot occur <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=185s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:05</a>. Whatever \(\mathbf{w}\) the labeller used would have labelled those two points the other way. The culprit is the 0/1 probability, so the question is whether the probabilities can be modelled differently.</p>
+      <p>Start from a simple linear model again. For a feature vector \(\mathbf{x} \in \mathbb{R}^d\), the number</p>
+      <div class="eq">\[ z = \mathbf{w}^\top\mathbf{x} \]</div>
+      <p>is a <dfn>score</dfn> that \(\mathbf{w}\) gives to \(\mathbf{x}\). Points with equal scores form lines parallel to the separator <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=339s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:39</a>: \(\mathbf{w}^\top\mathbf{x} = 0\) is the separator, \(\mathbf{w}^\top\mathbf{x} = 1\) a parallel line on the positive side, and \(\mathbf{w}^\top\mathbf{x} = -1\) one on the negative side.</p>
+      <p>A positive score suggests label \(+1\) and a negative one suggests \(-1\). The size of the score should matter as well <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=402s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:42</a>. A point \(\mathbf{x}_2\) with \(\mathbf{w}^\top\mathbf{x}_2 = 100\) is far from the separator, so we should be more confident that it is \(+1\) than for a point \(\mathbf{x}_1\) just beside the boundary. Likewise a point \(\mathbf{x}_4\) with \(\mathbf{w}^\top\mathbf{x}_4 = -150\) should be \(-1\) with more confidence than a point \(\mathbf{x}_3\) near the boundary on the negative side. In the new model every point gets a nonzero probability of each label, and the score decides how much.</p>
+    </section>
+
+    <section id="sigmoid">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=583s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L55 · 9:43</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=741s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L55 · 12:21 the sigmoid</a>
+        </div>
+        <h2>The sigmoid turns a score into a probability</h2>
+      </div>
+      <p>A score can be any real number, \(z \in (-\infty, \infty)\), so it is not a probability itself. We need a function \(g\) that takes the score and returns \(P(y = 1 \mid \mathbf{x}) = g(\mathbf{w}^\top\mathbf{x})\). Larger scores should mean larger probabilities of \(+1\). Three properties pin down what is reasonable <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=644s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:44</a>:</p>
+      <ul>
+        <li>\(g(0) = 0.5\). A point exactly on the separator is equally likely to be \(+1\) or \(-1\).</li>
+        <li>\(g(z) \to 1\) as \(z \to \infty\). Very high scores make \(+1\) nearly certain.</li>
+        <li>\(g(z) \to 0\) as \(z \to -\infty\). Very low scores make \(+1\) nearly impossible.</li>
+      </ul>
+      <p>Any \(g\) with these properties is a reasonable choice. In the literature such a function is called a <dfn>link function</dfn>, because it links scores to probabilities, and several are used in practice. One popular choice is the <dfn>sigmoid</dfn>, also called the <dfn>logistic function</dfn>:</p>
+      <div class="result">
+        <span class="lbl">Sigmoid (logistic) model</span>
+        \[ g(z) = \frac{1}{1 + e^{-z}}, \qquad P(y = 1 \mid \mathbf{x}) = \frac{1}{1 + e^{-\mathbf{w}^\top\mathbf{x}}} \]
+      </div>
+      <p>Since \(e^{-z} > 0\), the denominator is always larger than 1, so \(g(z)\) is always strictly between 0 and 1. It equals 0.5 at \(z = 0\), rises toward 1 for large \(z\) and falls toward 0 for very negative \(z\). Its graph looks like an S, which is where the name comes from <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=833s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:53</a>. The lecture adds that this choice will make the maths easier, which the log-likelihood in the next lecture bears out.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 300" role="img" aria-label="Left: in the feature plane, lines of equal score w transpose x = -2, -1, 0, 1, 2 run parallel to the separator, with probabilities 0.12, 0.27, 0.5, 0.73, 0.88 of label +1. Right: the sigmoid curve against the score, rising smoothly from 0 to 1 through 0.5 at zero, beside the perceptron's dashed step from 0 to 1 at zero.">
+            <defs><marker id="p15e-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="20" y="20">Equal scores lie on parallel lines</text>
+            <line class="d-ln" x1="139" y1="278.3" x2="37" y2="101.7"/>
+            <line class="d-ln" x1="165" y1="263.3" x2="63" y2="86.7"/>
+            <line class="d-ln-acc" x1="191" y1="248.3" x2="89" y2="71.7" style="stroke-width:2"/>
+            <line class="d-ln" x1="217" y1="233.3" x2="115" y2="56.7"/>
+            <line class="d-ln" x1="243" y1="218.3" x2="141" y2="41.7"/>
+            <line class="d-ln-acc" x1="140" y1="160" x2="175.6" y2="139.5" marker-end="url(#p15e-ah)" style="stroke-width:2.2"/>
+            <text class="d-t" x="180" y="134" style="fill: var(--accent)">w</text>
+            <circle class="pt-plain" cx="130.9" cy="120.2" r="4.5"/><text class="d-s" x="131" y="110" text-anchor="middle">x₁</text>
+            <circle class="pt-plain" cx="222.5" cy="147" r="4.5"/><text class="d-s" x="223" y="137" text-anchor="middle">x₂</text>
+            <text class="d-s" x="143" y="288">z = −2: 0.12</text>
+            <text class="d-s" x="169" y="273">z = −1: 0.27</text>
+            <text class="d-s" x="195" y="258" style="fill: var(--accent)">z = 0: 0.50</text>
+            <text class="d-s" x="221" y="243">z = 1: 0.73</text>
+            <text class="d-s" x="247" y="228">z = 2: 0.88</text>
+
+            <line class="d-rule" x1="318" y1="10" x2="318" y2="292"/>
+
+            <text class="d-h" x="350" y="20">Score to probability</text>
+            <line class="d-rule" x1="350" y1="150" x2="650" y2="150"/><line class="d-rule" x1="350" y1="50" x2="650" y2="50"/><line class="d-rule" x1="500" y1="46" x2="500" y2="250"/>
+            <line class="d-ln" x1="350" y1="250" x2="650" y2="250" style="stroke: var(--rule)"/>
+            <path class="d-ln d-dash" d="M350 250 L500 250 M500 50 L650 50" style="stroke-width:2"/>
+            <circle class="pt-no" cx="500" cy="250" r="3.5"/><circle class="pt-plain" cx="500" cy="50" r="3.5"/>
+            <polyline class="d-ln-acc" style="stroke-width:2.4" points="350,249.5 356.2,249.4 362.5,249.2 368.8,249 375,248.7 381.2,248.3 387.5,247.8 393.8,247.2 400,246.4 406.2,245.4 412.5,244.1 418.8,242.5 425,240.5 431.2,238 437.5,234.8 443.8,230.9 450,226.2 456.2,220.4 462.5,213.5 468.8,205.5 475,196.2 481.2,185.8 487.5,174.5 493.8,162.4 500,150 506.2,137.6 512.5,125.5 518.8,114.2 525,103.8 531.2,94.5 537.5,86.5 543.8,79.6 550,73.8 556.2,69.1 562.5,65.2 568.8,62 575,59.5 581.2,57.5 587.5,55.9 593.8,54.6 600,53.6 606.2,52.8 612.5,52.2 618.8,51.7 625,51.3 631.2,51 637.5,50.8 643.8,50.6 650,50.5"/>
+            <circle class="pt-tree" cx="450" cy="226.2" r="4"/><circle class="pt-tree" cx="475" cy="196.2" r="4"/><circle class="pt-tree" cx="500" cy="150" r="4"/><circle class="pt-tree" cx="525" cy="103.8" r="4"/><circle class="pt-tree" cx="550" cy="73.8" r="4"/>
+            <text class="d-s" x="532" y="112">z = 1: e/(1 + e) ≈ 0.73</text>
+            <line class="d-ln-acc" x1="360" y1="64" x2="380" y2="64" style="stroke-width:2.4"/><text class="d-s" x="386" y="68">sigmoid g(z)</text>
+            <line class="d-ln d-dash" x1="360" y1="84" x2="380" y2="84" style="stroke-width:2"/><text class="d-s" x="386" y="88">perceptron's 0/1 rule</text>
+            <text class="d-al" x="350" y="266" text-anchor="middle">−6</text><text class="d-al" x="400" y="266" text-anchor="middle">−4</text><text class="d-al" x="450" y="266" text-anchor="middle">−2</text><text class="d-al" x="500" y="266" text-anchor="middle">0</text><text class="d-al" x="550" y="266" text-anchor="middle">2</text><text class="d-al" x="600" y="266" text-anchor="middle">4</text><text class="d-al" x="650" y="266" text-anchor="middle">6</text>
+            <text class="d-al" x="342" y="254" text-anchor="end">0</text><text class="d-al" x="342" y="154" text-anchor="end">0.5</text><text class="d-al" x="342" y="54" text-anchor="end">1</text>
+            <text class="d-s" x="650" y="286" text-anchor="end">score z = wᵀx</text>
+          </svg>
+        </div>
+        <figcaption><b>Scores and the sigmoid.</b> Left (\(\lVert\mathbf{w}\rVert = 1\), illustrative): the score is constant along lines parallel to the separator, and each line is labelled with its score \(z\) and \(P(y = 1 \mid \mathbf{x}) = g(z)\). Moving in the direction of \(\mathbf{w}\), from \(\mathbf{x}_1\) toward \(\mathbf{x}_2\), raises the probability of \(+1\). Right, to scale: the sigmoid replaces the perceptron's jump from 0 to 1 at \(z = 0\) with a smooth rise; the dots are the five lines on the left.</figcaption>
+      </figure>
+    </section>
+
+    <section id="coin-model">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=864s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L55 · 14:24</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=1078s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L55 · 17:58 any w could explain it</a>
+        </div>
+        <h2>Now every data set is possible</h2>
+      </div>
+      <p>Under this sigmoid or logistic model, the data set with a minus among the pluses is allowed. The labelling story is a coin toss for every point, with the coin's bias set by the point's score.</p>
+      <ul>
+        <li>A point on the line \(\mathbf{w}^\top\mathbf{x} = 1\) is labelled \(+1\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=927s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:27</a>. Its coin came up heads with probability \(\frac{1}{1 + e^{-1}} = \frac{e}{e + 1} \approx 0.73\), and it did.</li>
+        <li>A point on the line \(\mathbf{w}^\top\mathbf{x} = 10\) is labelled \(-1\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=udFWtBLJUvA&amp;t=988s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:28</a>. Its coin had \(P(+1) = \frac{1}{1 + e^{-10}} = \frac{e^{10}}{e^{10} + 1} \approx 0.99995\), and it came up tails. That is very unlikely (probability about 0.00005) but not impossible, so this point no longer rules the data set out.</li>
+      </ul>
+      <p>Which \(\mathbf{w}\) produced the labels? The same labels could also have come from a different vector \(\mathbf{w}'\). Relative to \(\mathbf{w}'\) each point has a different score and so a different coin, and the observed labels still have some probability. Every \(\mathbf{w}\) is a contender, and we have to pick one.</p>
+      <p class="rule-of-thumb">Pick the \(\mathbf{w}\) with the highest chance of having generated the observed labels. That is maximum likelihood estimation (<a href="part-08.html">Part 8</a>), a problem we know how to set up.</p>
+    </section>
+
+    <!-- ============ LECTURE 56 ============ -->
+    <section id="likelihood">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=121s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 2:01 maximum likelihood</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=214s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 3:34 log-likelihood</a>
+        </div>
+        <h2>Logistic regression and its log-likelihood</h2>
+      </div>
+      <p>This model is called <dfn>logistic regression</dfn>. "Logistic" refers to the logistic (sigmoid) function. "Regression" refers to the real-valued score \(\mathbf{w}^\top\mathbf{x}\) on which the probabilities depend. It is still a classification model, and that is what it is used for.</p>
+      <p>The data is \(\{(\mathbf{x}_1, y_1), \dots, (\mathbf{x}_n, y_n)\}\). For the likelihood the labels are back to \(y_i \in \{0, 1\}\), and for some unknown \(\mathbf{w}\)</p>
+      <div class="eq">\[ P(y = 1 \mid \mathbf{x}) = g(\mathbf{w}^\top\mathbf{x}) = \frac{1}{1 + e^{-\mathbf{w}^\top\mathbf{x}}} \]</div>
+      <p>The features are given and only the labels are random, each generated independently of the others, as usual. Each label is a Bernoulli outcome with success probability \(g(\mathbf{w}^\top\mathbf{x}_i)\). The likelihood has exactly the form of the Bernoulli likelihood from <a href="part-08.html">Part 8</a>, with the single \(p\) replaced by a function of \(\mathbf{w}\):</p>
+      <div class="eq">\[ \mathcal{L}(\mathbf{w};\ \text{data}) = \prod_{i=1}^{n} g(\mathbf{w}^\top\mathbf{x}_i)^{\,y_i}\,\big(1 - g(\mathbf{w}^\top\mathbf{x}_i)\big)^{1 - y_i} \]</div>
+      <p>Take the logarithm before substituting \(g\):</p>
+      <div class="eq">\[ \log\mathcal{L}(\mathbf{w}) = \sum_{i=1}^{n} \Big[\, y_i \log g(\mathbf{w}^\top\mathbf{x}_i) + (1 - y_i)\log\big(1 - g(\mathbf{w}^\top\mathbf{x}_i)\big) \Big] \]</div>
+      <p>Now plug in the sigmoid <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=277s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:37</a>. Write \(z_i = \mathbf{w}^\top\mathbf{x}_i\). The probability of label 0 is \(1 - g(z_i) = \frac{e^{-z_i}}{1 + e^{-z_i}}\), so</p>
+      <div class="eq">\[ \begin{aligned} \log g(z_i) &= -\log\big(1 + e^{-z_i}\big) \\ \log\big(1 - g(z_i)\big) &= \log e^{-z_i} - \log\big(1 + e^{-z_i}\big) = -z_i - \log\big(1 + e^{-z_i}\big) \end{aligned} \]</div>
+      <p>Substitute both and collect the \(\log(1 + e^{-z_i})\) terms. Their coefficients are \(-y_i\) and \(-(1 - y_i)\), which add up to \(-1\):</p>
+      <div class="eq">\[ \begin{aligned} \log\mathcal{L}(\mathbf{w}) &= \sum_{i=1}^{n} \Big[ -y_i\log(1 + e^{-z_i}) + (1 - y_i)(-z_i) - (1 - y_i)\log(1 + e^{-z_i}) \Big] \\ &= \sum_{i=1}^{n} \Big[ (1 - y_i)(-\mathbf{w}^\top\mathbf{x}_i) - \log\big(1 + e^{-\mathbf{w}^\top\mathbf{x}_i}\big) \Big] \end{aligned} \]</div>
+      <p>This is where the exponential form of \(g\) helps: the logarithms undo the exponentials and a few terms cancel.</p>
+      <div class="result">
+        <span class="lbl">Maximum likelihood for logistic regression</span>
+        \[ \max_{\mathbf{w}} \; \sum_{i=1}^{n} \Big[ (1 - y_i)\big(-\mathbf{w}^\top\mathbf{x}_i\big) - \log\big(1 + e^{-\mathbf{w}^\top\mathbf{x}_i}\big) \Big] \]
+      </div>
+    </section>
+
+    <section id="gradient">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=400s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 6:40</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=492s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 8:12 the gradient</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=646s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 10:46 update rule</a>
+        </div>
+        <h2>No closed form, so gradient ascent</h2>
+      </div>
+      <p>The first term of the objective is linear in \(\mathbf{w}\). The second involves \(\log(1 + e^{-\mathbf{w}^\top\mathbf{x}_i})\). If you take the gradient and set it to zero, you do not get a nice formula for \(\mathbf{w}\): there is <b>no closed-form solution</b>. That does not stop us. A gradient method (<a href="part-10.html">Part 10</a>) starts from a guess for \(\mathbf{w}\) and improves it step by step with some step size: against the gradient when minimizing (gradient descent), along it when maximizing (<dfn>gradient ascent</dfn>).</p>
+      <p>Differentiate each term. The first is linear; the second needs the chain rule twice, through the logarithm and then through the exponential:</p>
+      <div class="eq">\[ \begin{aligned} \nabla_{\mathbf{w}}\Big[(1 - y_i)\big(-\mathbf{w}^\top\mathbf{x}_i\big)\Big] &= -(1 - y_i)\,\mathbf{x}_i \\ \nabla_{\mathbf{w}} \log\big(1 + e^{-\mathbf{w}^\top\mathbf{x}_i}\big) &= \frac{1}{1 + e^{-\mathbf{w}^\top\mathbf{x}_i}} \cdot e^{-\mathbf{w}^\top\mathbf{x}_i} \cdot (-\mathbf{x}_i) \end{aligned} \]</div>
+      <p>Subtracting the second from the first and summing over the data:</p>
+      <div class="eq">\[ \begin{aligned} \nabla\log\mathcal{L}(\mathbf{w}) &= \sum_{i=1}^{n} \Big[ -\mathbf{x}_i + y_i\mathbf{x}_i + \mathbf{x}_i\,\frac{e^{-\mathbf{w}^\top\mathbf{x}_i}}{1 + e^{-\mathbf{w}^\top\mathbf{x}_i}} \Big] \\ &= \sum_{i=1}^{n} \Big[ y_i\mathbf{x}_i - \mathbf{x}_i\Big(1 - \frac{e^{-\mathbf{w}^\top\mathbf{x}_i}}{1 + e^{-\mathbf{w}^\top\mathbf{x}_i}}\Big) \Big] \end{aligned} \]</div>
+      <p>The bracket simplifies, since \(1 - \frac{e^{-z}}{1 + e^{-z}} = \frac{1}{1 + e^{-z}}\), and the gradient takes a neat form:</p>
+      <div class="eq">\[ \nabla\log\mathcal{L}(\mathbf{w}) = \sum_{i=1}^{n} \mathbf{x}_i\Big( y_i - \frac{1}{1 + e^{-\mathbf{w}^\top\mathbf{x}_i}} \Big) = \sum_{i=1}^{n} \mathbf{x}_i\big( y_i - g(\mathbf{w}^\top\mathbf{x}_i) \big) \]</div>
+      <div class="result">
+        <span class="lbl">Gradient ascent for logistic regression</span>
+        \[ \mathbf{w}^{t+1} = \mathbf{w}^t + \eta_t \sum_{i=1}^{n} \mathbf{x}_i\Big( y_i - \frac{1}{1 + e^{-\mathbf{w}^{t\top}\mathbf{x}_i}} \Big) \]
+        <p>The plus sign is because we are maximizing; minimizing would use \(-\eta_t\). The step size \(\eta_t\) can be a constant or shrink toward 0, for example \(1/t\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=676s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:16</a>.</p>
+      </div>
+    </section>
+
+    <section id="gradient-weights">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=709s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 11:49</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=804s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 13:24 who drives the step</a>
+        </div>
+        <h2>What the gradient says</h2>
+      </div>
+      <p>Two things can be read off the update.</p>
+      <ol>
+        <li><b>The gradient is a linear combination of the data points</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=774s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:54</a>. Each term is \(\theta_i\,\mathbf{x}_i\) with the number \(\theta_i = y_i - g(\mathbf{w}^{t\top}\mathbf{x}_i)\), so the gradient is \(\sum_i \theta_i\,\mathbf{x}_i\).</li>
+        <li><b>Each point's weight \(\theta_i\) measures how well the current \(\mathbf{w}^t\) predicts it.</b> \(g(\mathbf{w}^{t\top}\mathbf{x}_i)\) is the current model's probability that point \(i\) has label 1. If the label is 1 and that probability is 0.99, then \(\theta_i = 0.01\) and the point barely affects the step. If the label is 1 but the model gives it only 0.1, so it thinks the point is 90% likely to be the other class, then \(\theta_i = 0.9\) and the point has a large say.</li>
+      </ol>
+      <p>So the next \(\mathbf{w}\) is shaped mostly by the points the current \(\mathbf{w}\) gets wrong. \(\theta_i\) is never exactly 0, because the sigmoid never reaches 0 or 1, but a well-predicted point contributes very little. (A comparison the lecture does not make here: the perceptron adds \(y_i\mathbf{x}_i\) only for misclassified points, while this update adds every point with a weight.)</p>
+
+      <figure id="logit-fig">
+        <div class="controls">
+          <label for="logit-eta">Step size η</label>
+          <input type="range" id="logit-eta" min="0.005" max="0.05" step="0.005" value="0.02">
+          <output id="logit-eta-out" for="logit-eta">0.020</output>
+          <button class="btn" id="logit-step" type="button">One step</button>
+          <button class="btn" id="logit-run" type="button">Run 25 steps</button>
+          <button class="btn" id="logit-reset" type="button">Reset</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Iteration t</span><span class="v" id="logit-t">0</span></div>
+          <div><span class="k">Log-likelihood</span><span class="v mine" id="logit-ll">–</span></div>
+          <div><span class="k">Misclassified</span><span class="v" id="logit-mis">–</span></div>
+          <div><span class="k">Their share of the weight</span><span class="v" id="logit-share">–</span></div>
+        </div>
+        <div class="status" id="logit-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="logit-svg" viewBox="0 0 400 400" role="img" aria-label="Forty synthetic points from two overlapping clouds with labels 1 and 0. The current logistic regression boundary and the lines where the probability is 0.25 and 0.75 are drawn. Each point's size grows with its weight in the gradient, and misclassified points are highlighted."></svg></div>
+        <figcaption><b>Gradient ascent, point by point.</b> Synthetic data generated for this page: 40 points from two overlapping Gaussian clouds (filled: \(y = 1\), hollow: \(y = 0\)), so no line separates them. Each dot's radius grows with its weight \(|\theta_i| = |y_i - g(\mathbf{w}^\top\mathbf{x}_i)|\) in the gradient, and highlighted dots are misclassified. The solid line is \(\mathbf{w}^\top\mathbf{x} = 0\); the dashed lines are where \(g = 0.75\) (on the side \(\mathbf{w}\) points to) and \(g = 0.25\). The run starts from a deliberately poor guess \(\mathbf{w}^0 = (-1.5, 1.2)\). The well-predicted dots shrink, and the few misclassified ones keep a large share of the pull.</figcaption>
+      </figure>
+    </section>
+
+    <section id="logistic-use">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=957s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 15:57</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=989s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 16:29 prediction</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=1142s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 19:02 regularization</a>
+        </div>
+        <h2>Prediction, and two extensions</h2>
+      </div>
+      <p>Gradient ascent is the plain way to solve the problem. Faster second-order methods exist, for example <dfn>iteratively reweighted least squares</dfn> (IRLS), which solves a sequence of weighted least-squares problems to reach the maximum-likelihood \(\mathbf{w}\). The course does not cover it.</p>
+      <h3>Prediction comes with a confidence</h3>
+      <p>Let \(\hat{\mathbf{w}}\) be the solution gradient ascent converges to. For a test point \(\mathbf{x}_{\text{test}} \in \mathbb{R}^d\), predict by the sign of \(\hat{\mathbf{w}}^\top\mathbf{x}_{\text{test}}\), as usual: class 1 when \(\hat{\mathbf{w}}^\top\mathbf{x}_{\text{test}} \ge 0\), which is when \(g(\hat{\mathbf{w}}^\top\mathbf{x}_{\text{test}}) \ge 0.5\). Because probabilities are built into the model, it also returns \(g(\hat{\mathbf{w}}^\top\mathbf{x}_{\text{test}})\) itself, which can be read as the confidence of the prediction <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=1020s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>17:00</a>. This is one of the model's major advantages.</p>
+      <h3>A kernel version <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=1050s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 17:30</a></h3>
+      <p>The optimal \(\mathbf{w}^*\) can be shown to be a linear combination of the data points, \(\mathbf{w}^* = \sum_i \alpha_i\mathbf{x}_i\). The theorem that guarantees this is the <dfn>representer theorem</dfn> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=1112s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:32</a>. Substituting this form into the objective leaves only dot products \(\mathbf{x}_i^\top\mathbf{x}_j\), which can be replaced by a kernel (<a href="part-05.html">Part 5</a>), as in kernel regression (<a href="part-11.html">Part 11</a>). The lecture mentions this for awareness and does not derive it.</p>
+      <h3>Regularized logistic regression <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=1142s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 19:02</a></h3>
+      <p>In practice a Bayesian, or regularized, version is very popular. Turn the maximization into a minimization of the negative log-likelihood and add the usual L2-norm penalty:</p>
+      <div class="eq">\[ \min_{\mathbf{w}} \; \sum_{i=1}^{n} \Big[ \log\big(1 + e^{-\mathbf{w}^\top\mathbf{x}_i}\big) + (1 - y_i)\,\mathbf{w}^\top\mathbf{x}_i \Big] + \frac{\lambda}{2}\lVert\mathbf{w}\rVert^2 \]</div>
+      <p>\(\lambda\) is a hyperparameter, chosen by cross-validation (<a href="part-11.html">Part 11</a>). The gradient is the previous one, with its sign flipped for minimization, plus \(\lambda\mathbf{w}\), so gradient descent stays just as efficient. The link between a prior and an L2 penalty is the one seen for ridge regression in <a href="part-12.html">Part 12</a>.</p>
+      <p class="note">The \(\tfrac{\lambda}{2}\) scaling is chosen here so that the penalty adds exactly \(\lambda\mathbf{w}\) to the gradient, matching the lecture's description of the gradient.</p>
+      <h3>Logistic regression and the perceptron <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=1234s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L56 · 20:34</a></h3>
+      <p>Logistic regression can model any data set, with or without outliers, and if the data has structure beyond linear, its kernel version can capture it. The perceptron works only for linearly separable data. Logistic regression converges to a good \(\mathbf{w}\) in its own way, by maximizing the likelihood of the observed labels under its model.</p>
+      <p>The perceptron gave something in return: a mistake bound, and the bound's dependence on the margin points to a more direct algorithm <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=bb4yn4RssLs&amp;t=1296s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:36</a>. That algorithm is the <b>support vector machine</b>, elegant and powerful in practice, especially for structured data. <a href="part-16.html">Part 16</a> develops it from the perceptron's mistake bound.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Discriminative model</dt><dd>A model of \(P(y \mid \mathbf{x})\) only, with no model of how \(\mathbf{x}\) is generated.</dd></div>
+        <div><dt>Linear separability</dt><dd>Some \(\mathbf{w}\) has \(\operatorname{sign}(\mathbf{w}^\top\mathbf{x}_i) = y_i\) for every training point; the least zero-one loss is then 0.</dd></div>
+        <div><dt>Perceptron</dt><dd>Rosenblatt's algorithm: start at \(\mathbf{w} = \mathbf{0}\) and add \(y_i\mathbf{x}_i\) whenever \(\mathbf{x}_i\) is misclassified, until no point is.</dd></div>
+        <div><dt>Update rule</dt><dd>\(\mathbf{w}^{t+1} = \mathbf{w}^t + \mathbf{x}_i y_i\); it changes the point's score by \(y_i\lVert\mathbf{x}_i\rVert^2\), toward the right sign.</dd></div>
+        <div><dt>Margin γ</dt><dd>Data is separable with margin \(\gamma > 0\) if some \(\mathbf{w}^*\) has \(y_i\,\mathbf{w}^{*\top}\mathbf{x}_i \ge \gamma\) for all \(i\): an empty slab around the boundary.</dd></div>
+        <div><dt>Radius R</dt><dd>A bound \(\lVert\mathbf{x}_i\rVert \le R\) on every data point; the longest point's length always works.</dd></div>
+        <div><dt>Radius–margin bound</dt><dd>On data separable with margin \(\gamma\), the perceptron makes at most \(R^2/\gamma^2\) mistakes, so it converges.</dd></div>
+        <div><dt>Cauchy–Schwarz inequality</dt><dd>\((\mathbf{u}^\top\mathbf{v})^2 \le \lVert\mathbf{u}\rVert^2\lVert\mathbf{v}\rVert^2\), from Pythagoras applied to a projection.</dd></div>
+        <div><dt>Score</dt><dd>\(z = \mathbf{w}^\top\mathbf{x}\); constant along lines parallel to the separator.</dd></div>
+        <div><dt>Link function</dt><dd>Turns a real score into a probability, with \(g(0) = 0.5\), \(g \to 1\) as \(z \to \infty\) and \(g \to 0\) as \(z \to -\infty\).</dd></div>
+        <div><dt>Sigmoid (logistic) function</dt><dd>\(g(z) = 1/(1 + e^{-z})\), an S-shaped link function.</dd></div>
+        <div><dt>Logistic regression</dt><dd>The classifier \(P(y = 1 \mid \mathbf{x}) = g(\mathbf{w}^\top\mathbf{x})\), fitted by maximum likelihood; the name's "regression" refers to the real-valued score.</dd></div>
+        <div><dt>Gradient ascent</dt><dd>Repeating \(\mathbf{w} \leftarrow \mathbf{w} + \eta\,\nabla\log\mathcal{L}(\mathbf{w})\) to maximize; needed because there is no closed form.</dd></div>
+        <div><dt>Representer theorem</dt><dd>Guarantees that the optimal logistic-regression \(\mathbf{w}\) is a linear combination of the data points, which allows a kernel version.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>The perceptron's current weight is \(\mathbf{w} = (1, -1)\). It checks \(\mathbf{x} = (1, 2)\) with \(y = +1\). Is this a mistake? If so, what is the new \(\mathbf{w}\) and the point's new score?</span><span class="tog"></span></summary>
+          <p>\(\mathbf{w}^\top\mathbf{x} = 1 - 2 = -1 < 0\), so it predicts \(-1\): a type-2 mistake. The update gives \(\mathbf{w} + y\mathbf{x} = (2, 1)\). The new score is \(2 + 2 = 4\), which equals the old score plus \(\lVert\mathbf{x}\rVert^2 = 5\). Here one update fixed the point.</p></details>
+        <details><summary><span class="q">Q2</span><span>Why can a single perceptron update create new mistakes, even though it moves the misclassified point's score the right way?</span><span class="tog"></span></summary>
+          <p>The update changes \(\mathbf{w}\) and therefore every point's score, not only the point it was made for. Turning the boundary toward that point can push points that were correct across it, as A and E do in the figure for Lecture 53.</p></details>
+        <details><summary><span class="q">Q3</span><span>The data \(\mathbf{x}_1 = (0, 1)\), \(\mathbf{x}_2 = (0, -1)\) (both \(+1\)), \(\mathbf{x}_3 = (-1, \tfrac12)\) (\(-1\)) is linearly separable, yet the perceptron cycles on it. Show that it is not separable with any positive margin.</span><span class="tog"></span></summary>
+          <p>For any \(\mathbf{w}\), \(\mathbf{w}^\top\mathbf{x}_2 = -\mathbf{w}^\top\mathbf{x}_1\). Both points have label \(+1\), so a margin \(\gamma > 0\) would need \(\mathbf{w}^\top\mathbf{x}_1 \ge \gamma\) and \(-\mathbf{w}^\top\mathbf{x}_1 \ge \gamma\) at once, which is impossible. Separability here relies on both points sitting on the boundary with \(\operatorname{sign}(0) = +1\).</p></details>
+        <details><summary><span class="q">Q4</span><span>All data points have length at most \(R = 3\), and a unit vector \(\mathbf{w}^*\) separates them with margin \(\gamma = 0.5\). At most how many mistakes can the perceptron make?</span><span class="tog"></span></summary>
+          <p>\(R^2/\gamma^2 = 9/0.25 = 36\).</p></details>
+        <details><summary><span class="q">Q5</span><span>Every data point in Q4 is multiplied by 10. What happens to the bound?</span><span class="tog"></span></summary>
+          <p>\(R\) becomes \(10R\). For the same unit \(\mathbf{w}^*\), \(y\,\mathbf{w}^{*\top}(10\mathbf{x}) = 10\,y\,\mathbf{w}^{*\top}\mathbf{x} \ge 10\gamma\), so the margin becomes \(10\gamma\). The ratio \(R^2/\gamma^2\) is unchanged at 36: the bound depends only on the shape of the data, not its scale.</p></details>
+        <details><summary><span class="q">Q6</span><span>In the convergence proof, where is the fact that an update happens only on a mistake used, and where is the margin used?</span><span class="tog"></span></summary>
+          <p>The mistake gives \(y\,\mathbf{w}^{l\top}\mathbf{x} \le 0\), which lets us drop the cross term and get \(\lVert\mathbf{w}^{l+1}\rVert^2 \le \lVert\mathbf{w}^l\rVert^2 + R^2\). The margin gives \(y\,\mathbf{w}^{*\top}\mathbf{x} \ge \gamma\), which makes the dot product with \(\mathbf{w}^*\) grow by at least \(\gamma\) per mistake.</p></details>
+        <details><summary><span class="q">Q7</span><span>Compute \(g(0)\), \(g(1)\) and \(g(-1)\) for the sigmoid, and show that \(1 - g(z) = g(-z)\).</span><span class="tog"></span></summary>
+          <p>\(g(0) = 0.5\), \(g(1) = e/(1 + e) \approx 0.731\), \(g(-1) = 1/(1 + e) \approx 0.269\). In general \(1 - \frac{1}{1 + e^{-z}} = \frac{e^{-z}}{1 + e^{-z}} = \frac{1}{e^{z} + 1} = g(-z)\), multiplying top and bottom by \(e^{z}\).</p></details>
+        <details><summary><span class="q">Q8</span><span>At the current \(\mathbf{w}\), point A has \(y = 1\) and \(g(\mathbf{w}^\top\mathbf{x}_A) = 0.95\); point B has \(y = 1\) and \(g(\mathbf{w}^\top\mathbf{x}_B) = 0.2\). Which shapes the next gradient-ascent step more, and why is gradient ascent needed at all?</span><span class="tog"></span></summary>
+          <p>The weights are \(\theta_A = 1 - 0.95 = 0.05\) and \(\theta_B = 1 - 0.2 = 0.8\), so B, the point the model gets wrong, pulls 16 times as hard per unit of \(\mathbf{x}\). Gradient ascent is needed because setting the gradient of the log-likelihood to zero has no closed-form solution.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-14.html"><span class="dir">← Part 14</span><span class="nm">Generative models and Naive Bayes</span></a><a class="next" href="part-16.html"><span class="dir">Part 16 →</span><span class="nm">Support vector machines</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+  const mkRand = s0 => { let seed = s0; return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+  const num = (v, d) => { const s = (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toFixed(d); return s.replace('-', '−'); };
+  const vec = (w, d) => '(' + num(w[0], d) + ', ' + num(w[1], d) + ')';
+  const setLine = (el, p, q) => { el.setAttribute('x1', p[0]); el.setAttribute('y1', p[1]); el.setAttribute('x2', q[0]); el.setAttribute('y2', q[1]); };
+  const arrowHead = (defs, id, token) => { const m = mk('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs); mk('path', { d: 'M0,0 L10,5 L0,10 z', style: 'fill: var(' + token + ')' }, m); };
+
+  /* ---------- Perceptron step-through on separable synthetic data ---------- */
+  (() => {
+    const svg = document.getElementById('perc-svg'); if (!svg) return;
+    const lo = -5, hi = 5, P = 20, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    const px = p => [sx(p[0]), sy(p[1])];
+    axes(svg, sx, sy, lo, hi, 2);
+    const defs = mk('defs', {}, svg);
+    const cp = mk('clipPath', { id: 'p15-perc-clip' }, defs); mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P }, cp);
+    arrowHead(defs, 'p15-perc-ah', '--accent'); arrowHead(defs, 'p15-perc-ahm', '--muted');
+    const th = 62 * Math.PI / 180, ws = [Math.cos(th), Math.sin(th)], wp = [-ws[1], ws[0]];
+    const starLine = mk('line', { 'clip-path': 'url(#p15-perc-clip)', style: 'stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 1.5 4; stroke-linecap: round' }, svg);
+    setLine(starLine, px([-9 * wp[0], -9 * wp[1]]), px([9 * wp[0], 9 * wp[1]]));
+    const sl = px([4.75, -1.85]);
+    mk('text', { class: 'c-tick', 'text-anchor': 'end', x: sl[0], y: sl[1] }, svg).textContent = 'w*';
+    const prevLine = mk('line', { 'clip-path': 'url(#p15-perc-clip)', style: 'stroke: var(--ink-2); stroke-width: 1.6; stroke-dasharray: 6 5' }, svg);
+    const curLine = mk('line', { class: 'c-user', 'clip-path': 'url(#p15-perc-clip)' }, svg);
+    const prevArrow = mk('line', { 'marker-end': 'url(#p15-perc-ahm)', style: 'stroke: var(--muted); stroke-width: 1.8; stroke-dasharray: 4 3' }, svg);
+    const curArrow = mk('line', { 'marker-end': 'url(#p15-perc-ah)', style: 'stroke: var(--accent); stroke-width: 2.4' }, svg);
+    const wLbl = mk('text', { class: 'c-lbl' }, svg); wLbl.textContent = 'w';
+    const halo = mk('circle', { r: 11, style: 'fill: var(--mark)' }, svg);
+    const gPts = mk('g', {}, svg);
+    const ring = mk('circle', { r: 9.5, class: 'c-hl' }, svg);
+    const ringLbl = mk('text', { class: 'c-note' }, svg);
+    const slider = document.getElementById('perc-gap'), out = document.getElementById('perc-gap-out');
+    const oSteps = document.getElementById('perc-steps'), oMis = document.getElementById('perc-mis'), oBound = document.getElementById('perc-bound');
+    const oWb = document.getElementById('perc-wb'), oWa = document.getElementById('perc-wa'), status = document.getElementById('perc-status');
+    let pts = [], R = 0, gam = 0, st = null, timer = null, dots = [];
+    const sub = k => String(k).split('').map(c => '₀₁₂₃₄₅₆₇₈₉'[+c]).join('');
+    const build = () => {
+      const g = parseFloat(slider.value), rand = mkRand(4242);
+      pts = [];
+      for (let k = 0; k < 20; k++) {
+        const y = k % 2 ? 1 : -1, u = y * (g + 1.1 * rand()), v = -3.8 + 7.6 * rand();
+        pts.push({ x: [u * ws[0] + v * wp[0], u * ws[1] + v * wp[1]], y });
+      }
+      R = Math.max(...pts.map(p => Math.hypot(p.x[0], p.x[1])));
+      gam = Math.min(...pts.map(p => p.y * (ws[0] * p.x[0] + ws[1] * p.x[1])));
+      while (gPts.firstChild) gPts.removeChild(gPts.firstChild);
+      dots = pts.map(p => mk('circle', { cx: sx(p.x[0]), cy: sy(p.x[1]), r: 5, style: p.y > 0 ? 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.5' : 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.8' }, gPts));
+      out.textContent = g.toFixed(2);
+      oBound.textContent = String(Math.floor(R * R / (gam * gam)));
+    };
+    const reset = () => { st = { w: [0, 0], prev: [0, 0], i: 0, steps: 0, mis: 0, clean: 0, done: false, last: null }; draw(); };
+    const boundary = (el, w) => {
+      const n = Math.hypot(w[0], w[1]);
+      if (n < 1e-9) { el.setAttribute('visibility', 'hidden'); return; }
+      const d = [-w[1] / n, w[0] / n];
+      setLine(el, px([-9 * d[0], -9 * d[1]]), px([9 * d[0], 9 * d[1]])); el.setAttribute('visibility', 'visible');
+    };
+    const arrow = (el, w, len) => {
+      const n = Math.hypot(w[0], w[1]);
+      if (n < 1e-9) { el.setAttribute('visibility', 'hidden'); return null; }
+      const tip = [len * w[0] / n, len * w[1] / n];
+      setLine(el, px([0, 0]), px(tip)); el.setAttribute('visibility', 'visible'); return tip;
+    };
+    const draw = () => {
+      const s = st, upd = s.last && s.last.mistake;
+      boundary(curLine, s.w);
+      if (upd) boundary(prevLine, s.prev); else prevLine.setAttribute('visibility', 'hidden');
+      const tip = arrow(curArrow, s.w, 1.9);
+      if (upd) arrow(prevArrow, s.prev, 1.9); else prevArrow.setAttribute('visibility', 'hidden');
+      if (tip) { const t = px([tip[0] * 1.18, tip[1] * 1.18]); wLbl.setAttribute('x', t[0] - 4); wLbl.setAttribute('y', t[1] + 4); wLbl.setAttribute('visibility', 'visible'); } else wLbl.setAttribute('visibility', 'hidden');
+      if (s.last) {
+        const p = pts[s.last.idx], q = px(p.x);
+        ring.setAttribute('cx', q[0]); ring.setAttribute('cy', q[1]); ring.setAttribute('visibility', 'visible');
+        ringLbl.setAttribute('x', q[0] + 12); ringLbl.setAttribute('y', q[1] - 10); ringLbl.textContent = 'x' + sub(s.last.idx + 1); ringLbl.setAttribute('visibility', 'visible');
+        halo.setAttribute('cx', q[0]); halo.setAttribute('cy', q[1]); halo.setAttribute('visibility', upd ? 'visible' : 'hidden');
+      } else { ring.setAttribute('visibility', 'hidden'); ringLbl.setAttribute('visibility', 'hidden'); halo.setAttribute('visibility', 'hidden'); }
+      oSteps.textContent = String(s.steps); oMis.textContent = String(s.mis);
+      oWb.textContent = s.last ? vec(s.prev, 2) : '–'; oWa.textContent = vec(s.w, 2);
+      const bound = Math.floor(R * R / (gam * gam));
+      if (!s.last) status.textContent = 'w⁰ = 0, so every score is 0 and every point is predicted +1. R = ' + R.toFixed(2) + ' and γ = ' + gam.toFixed(2) + ' for w*, so at most ' + bound + ' mistakes.';
+      else if (s.done) status.textContent = 'Converged: ' + pts.length + ' points in a row checked with no mistake. ' + s.mis + ' mistakes in total; the bound allowed ' + bound + '.';
+      else {
+        const L = s.last, lab = 'x' + sub(L.idx + 1) + ' (y = ' + (pts[L.idx].y > 0 ? '+1' : '−1') + '): wᵀx = ' + num(L.score, 2);
+        status.textContent = L.mistake ? lab + ', predicted ' + (L.score >= 0 ? '+1' : '−1') + '. Mistake ' + s.mis + ': w ← w + y x.' : lab + ', sign matches. No update.';
+      }
+    };
+    const step = () => {
+      const s = st; if (s.done) return;
+      const p = pts[s.i], score = s.w[0] * p.x[0] + s.w[1] * p.x[1], pred = score >= 0 ? 1 : -1;
+      s.prev = s.w.slice();
+      if (pred !== p.y) { s.w = [s.w[0] + p.y * p.x[0], s.w[1] + p.y * p.x[1]]; s.mis++; s.clean = 0; s.last = { idx: s.i, mistake: true, score }; }
+      else { s.clean++; s.last = { idx: s.i, mistake: false, score }; }
+      s.steps++; s.i = (s.i + 1) % pts.length;
+      if (s.clean >= pts.length || s.steps > 4000) s.done = true;
+    };
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+    build(); reset();
+    slider.addEventListener('input', () => { stop(); build(); reset(); });
+    document.getElementById('perc-step').addEventListener('click', () => { stop(); step(); draw(); });
+    document.getElementById('perc-reset').addEventListener('click', () => { stop(); reset(); });
+    document.getElementById('perc-run').addEventListener('click', () => {
+      stop();
+      if (reduce) { while (!st.done) step(); draw(); return; }
+      timer = setInterval(() => { step(); draw(); if (st.done) stop(); }, 110);
+    });
+  })();
+
+  /* ---------- Logistic regression: gradient ascent and per-point weights ---------- */
+  (() => {
+    const svg = document.getElementById('logit-svg'); if (!svg) return;
+    const lo = -5, hi = 5, P = 20, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    const px = p => [sx(p[0]), sy(p[1])];
+    axes(svg, sx, sy, lo, hi, 2);
+    const defs = mk('defs', {}, svg);
+    const cp = mk('clipPath', { id: 'p15-logit-clip' }, defs); mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P }, cp);
+    arrowHead(defs, 'p15-logit-ah', '--accent');
+    const rand = mkRand(5602);
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const pts = [];
+    for (let k = 0; k < 40; k++) { const y = k % 2, m = y ? [1.0, 0.8] : [-1.0, -0.8]; pts.push({ x: [m[0] + 1.05 * normal(), m[1] + 1.05 * normal()], y }); }
+    const W0 = [-1.5, 1.2], LN3 = Math.log(3);
+    const sig = z => 1 / (1 + Math.exp(-z));
+    const c75 = mk('line', { 'clip-path': 'url(#p15-logit-clip)', style: 'stroke: var(--ink-2); stroke-width: 1.3; stroke-dasharray: 5 4' }, svg);
+    const c25 = mk('line', { 'clip-path': 'url(#p15-logit-clip)', style: 'stroke: var(--ink-2); stroke-width: 1.3; stroke-dasharray: 5 4' }, svg);
+    const bLine = mk('line', { class: 'c-user', 'clip-path': 'url(#p15-logit-clip)' }, svg);
+    const gHalo = mk('g', {}, svg), gPts = mk('g', {}, svg);
+    const halos = pts.map(() => mk('circle', { style: 'fill: var(--mark)' }, gHalo));
+    const dots = pts.map(p => mk('circle', { cx: sx(p.x[0]), cy: sy(p.x[1]), style: p.y ? 'fill: var(--accent); fill-opacity: .85; stroke: var(--surface); stroke-width: 1.2' : 'fill: var(--surface); fill-opacity: .6; stroke: var(--ink-2); stroke-width: 1.6' }, gPts));
+    halos.forEach((h, i) => { h.setAttribute('cx', sx(pts[i].x[0])); h.setAttribute('cy', sy(pts[i].x[1])); });
+    const wArrow = mk('line', { 'marker-end': 'url(#p15-logit-ah)', style: 'stroke: var(--accent); stroke-width: 2.4' }, svg);
+    const wLbl = mk('text', { class: 'c-lbl' }, svg); wLbl.textContent = 'w';
+    const slider = document.getElementById('logit-eta'), out = document.getElementById('logit-eta-out');
+    const oT = document.getElementById('logit-t'), oLL = document.getElementById('logit-ll'), oMis = document.getElementById('logit-mis'), oShare = document.getElementById('logit-share'), status = document.getElementById('logit-status');
+    let w = W0.slice(), t = 0, timer = null;
+    const ll = () => pts.reduce((s, p) => { const z = w[0] * p.x[0] + w[1] * p.x[1]; return s + (1 - p.y) * (-z) - Math.log(1 + Math.exp(-z)); }, 0);
+    const level = (el, c) => {
+      const n2 = w[0] * w[0] + w[1] * w[1], n = Math.sqrt(n2);
+      if (n < 1e-9) { el.setAttribute('visibility', 'hidden'); return; }
+      const o = [c * w[0] / n2, c * w[1] / n2], d = [-w[1] / n, w[0] / n];
+      setLine(el, px([o[0] - 12 * d[0], o[1] - 12 * d[1]]), px([o[0] + 12 * d[0], o[1] + 12 * d[1]])); el.setAttribute('visibility', 'visible');
+    };
+    const draw = () => {
+      level(bLine, 0); level(c75, LN3); level(c25, -LN3);
+      let mis = 0, tot = 0, ms = 0;
+      pts.forEach((p, i) => {
+        const z = w[0] * p.x[0] + w[1] * p.x[1], a = Math.abs(p.y - sig(z)), r = 2.2 + 9 * a, wrong = (z >= 0 ? 1 : 0) !== p.y;
+        dots[i].setAttribute('r', r.toFixed(2));
+        halos[i].setAttribute('r', (r + 3.5).toFixed(2)); halos[i].setAttribute('visibility', wrong ? 'visible' : 'hidden');
+        tot += a; if (wrong) { mis++; ms += a; }
+      });
+      wArrow.setAttribute('visibility', 'visible'); setLine(wArrow, px([0, 0]), px(w));
+      const n = Math.hypot(w[0], w[1]), lt = px([w[0] + 0.35 * w[0] / n, w[1] + 0.35 * w[1] / n]); wLbl.setAttribute('x', lt[0] - 4); wLbl.setAttribute('y', lt[1] + 4);
+      oT.textContent = String(t); oLL.textContent = num(ll(), 2); oMis.textContent = mis + ' of ' + pts.length;
+      const share = tot ? Math.round(100 * ms / tot) : 0; oShare.textContent = share + '%';
+      status.textContent = (t === 0 ? 'Start: w⁰ = ' + vec(w, 2) : 't = ' + t + ': w = ' + vec(w, 2)) + '. The ' + mis + ' misclassified points (' + Math.round(100 * mis / pts.length) + '% of the data) carry ' + share + '% of the total weight Σ|θᵢ|.';
+    };
+    const step = () => {
+      const eta = parseFloat(slider.value);
+      const g = pts.reduce((acc, p) => { const th = p.y - sig(w[0] * p.x[0] + w[1] * p.x[1]); return [acc[0] + th * p.x[0], acc[1] + th * p.x[1]]; }, [0, 0]);
+      w = [w[0] + eta * g[0], w[1] + eta * g[1]]; t++;
+    };
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+    draw();
+    slider.addEventListener('input', () => { out.textContent = parseFloat(slider.value).toFixed(3); });
+    document.getElementById('logit-step').addEventListener('click', () => { stop(); step(); draw(); });
+    document.getElementById('logit-reset').addEventListener('click', () => { stop(); w = W0.slice(); t = 0; draw(); });
+    document.getElementById('logit-run').addEventListener('click', () => {
+      stop();
+      if (reduce) { for (let k = 0; k < 25; k++) step(); draw(); return; }
+      let k = 0;
+      timer = setInterval(() => { step(); draw(); if (++k >= 25) stop(); }, 90);
+    });
+  })();
+})();
+</script>
+</body>
+</html>

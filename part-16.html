@@ -1,0 +1,1263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 16 · Support vector machines · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 16: lectures 57–65 on the maximum-margin classifier, Lagrangian duality, support vectors, kernels and the soft-margin SVM.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 16 of 18</span><span class="sep">·</span><a href="part-15.html">← Part 15</a><span class="sep">·</span><a href="part-17.html">Part 17 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Support vector machines: maximum margin, duality and the soft margin</h1>
+    <p class="lede">Notes for lectures 57 to 65. Starting from the perceptron's margin bound, the lectures set up the maximum-margin problem, derive its dual with Lagrange multipliers, and use complementary slackness to show that only a few support vectors shape the solution. The soft-margin SVM then lets outliers pay a penalized slack while keeping a kernelizable dual, simple box constraints and a sparse solution.</p>
+    <div class="meta">
+      <span><b>Part 16</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>187 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L57 · 18:41</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L58 · 28:40</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L59 · 19:55</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L60 · 22:08</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L61 · 21:54</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L62 · 14:31</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L63 · 21:37</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=jthjk2nboDM&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L64 · 21:23</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L65 · 18:09</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 57</h4>
+      <ul>
+        <li><a href="#perceptron-recap">The mistake bound</a></li>
+        <li><a href="#many-separators">Many separators</a></li>
+        <li><a href="#why-margin">Why a wide margin</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 58</h4>
+      <ul>
+        <li><a href="#first-attempt">Maximize γ?</a></li>
+        <li><a href="#fix-gamma">Fix γ = 1 instead</a></li>
+        <li><a href="#width">The width 2/‖w‖</a></li>
+        <li><a href="#hard-margin-primal">Hard-margin primal</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 59</h4>
+      <ul>
+        <li><a href="#lagrangian">The Lagrangian</a></li>
+        <li><a href="#duality">Swapping min and max</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 60</h4>
+      <ul>
+        <li><a href="#svm-lagrangian">The inner minimization</a></li>
+        <li><a href="#dual-hard">Hard-margin dual</a></li>
+        <li><a href="#why-dual">What the dual buys</a></li>
+        <li><a href="#alpha-importance">Which points matter?</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 61</h4>
+      <ul>
+        <li><a href="#complementary-slackness">Complementary slackness</a></li>
+        <li><a href="#support-vectors">Support vectors</a></li>
+        <li><a href="#kernel-prediction">Kernel predictions</a></li>
+        <li><a href="#outliers">Outliers</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 62</h4>
+      <ul>
+        <li><a href="#bribes">Slack as a bribe</a></li>
+        <li><a href="#choosing-c">What C does</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 63</h4>
+      <ul>
+        <li><a href="#soft-lagrangian">Soft-margin Lagrangian</a></li>
+        <li><a href="#soft-dual">Soft-margin dual</a></li>
+        <li><a href="#box-constraints">Box constraints</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 64</h4>
+      <ul>
+        <li><a href="#soft-cs">The CS conditions</a></li>
+        <li><a href="#three-cases">Three cases for α*</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 65</h4>
+      <ul>
+        <li><a href="#primal-view">The primal view</a></li>
+        <li><a href="#soft-summary">Summary of the cases</a></li>
+        <li><a href="#svm-conclusions">Why SVMs are used</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>Perceptron's mistake bound \(R^2/\gamma^2\) depends on the <b>best margin</b> any separator achieves, yet perceptron stops at whatever separator it reaches first. Wide margins tolerate noise, so the lectures look for the <dfn>maximum-margin</dfn> separator directly.</li>
+        <li>Fixing the margin at 1 removes the freedom to rescale \(\mathbf{w}\). The lines \(\mathbf{w}^\top\mathbf{x} = \pm1\) are \(2/\lVert\mathbf{w}\rVert\) apart, so the widest margin comes from the <b>shortest</b> \(\mathbf{w}\): minimize \(\tfrac12\lVert\mathbf{w}\rVert^2\) subject to \((\mathbf{w}^\top\mathbf{x}_i)y_i \ge 1\).</li>
+        <li>A <dfn>Lagrangian</dfn> turns the constrained problem into a min–max; for convex problems min and max can be swapped. The resulting <b>dual</b> is \(\max_{\boldsymbol\alpha\ge0} \boldsymbol\alpha^\top\mathbf{1} - \tfrac12\boldsymbol\alpha^\top Y^\top X^\top X Y\boldsymbol\alpha\), with \(\mathbf{w}^* = \sum_i \alpha_i^* y_i\mathbf{x}_i\).</li>
+        <li>The dual sees the data only through \(X^\top X\), so it can be <b>kernelized</b>. <dfn>Complementary slackness</dfn> shows that only points on the supporting hyperplanes, the <b>support vectors</b>, can have \(\alpha_i^* > 0\): the solution is sparse.</li>
+        <li>The <b>soft-margin SVM</b> lets each point pay a slack (a "bribe") \(\xi_i\), priced by a hyperparameter \(C\). Its dual is the same except for <b>box constraints</b> \(0 \le \alpha_i \le C\).</li>
+        <li>Three cases: \(\alpha_i^* = 0\) means margin at least 1, \(0 &lt; \alpha_i^* &lt; C\) means exactly on a supporting hyperplane, \(\alpha_i^* = C\) means inside the margin or misclassified. The soft margin stays kernelizable, easy to constrain and sparse.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 57 ============ -->
+    <section id="perceptron-recap">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=31s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L57 · 0:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=95s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L57 · 1:35 margin γ</a>
+        </div>
+        <h2>Recap: the perceptron's radius-margin bound</h2>
+      </div>
+      <p>The SVM lectures start by revisiting the perceptron from <a href="part-15.html">Part 15</a>, whose properties lead to a more principled way of building a classifier. Perceptron's convergence proof bounded the number of mistakes it makes:</p>
+      <div class="eq">\[ \text{number of mistakes} \;\le\; \frac{R^2}{\gamma^2} \]</div>
+      <p>Two assumptions sit behind the bound. \(R\) is a radius: \(\lVert\mathbf{x}_i\rVert^2 \le R^2\) for every point, so all the data lies inside a ball of radius \(R\). \(\gamma\) is the margin: the data set is <dfn>linearly separable with margin \(\gamma\)</dfn>, meaning</p>
+      <div class="eq">\[ \text{there is a } \mathbf{w}^* \text{ with } (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i \ge \gamma \;\text{ for all } i, \qquad \gamma &gt; 0 \]</div>
+      <p>In pictures, the lines \(\{\mathbf{x} : \mathbf{w}^{*\top}\mathbf{x} = \gamma\}\) and \(\{\mathbf{x} : \mathbf{w}^{*\top}\mathbf{x} = -\gamma\}\) run parallel to the separator. Every positive point lies on or beyond the first, every negative point on or beyond the second. That gap of nonzero width is what the proof needs: Part 15 showed an example without it where perceptron may never converge. With the gap, perceptron makes finitely many mistakes and so converges. As in the proof, \(\mathbf{w}^*\) is taken to have unit length.</p>
+    </section>
+
+    <section id="many-separators">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=191s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L57 · 3:11</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=533s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L57 · 8:53 observation 1</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=659s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L57 · 10:59 observation 2</a>
+        </div>
+        <h2>Many separators, different margins</h2>
+      </div>
+      <p>What does the bound say about the <i>quality of the final solution</i>? The lecture's example is a separable data set with positives on one side and negatives on the other, and two unit directions that both separate it.</p>
+      <ul>
+        <li>\(\mathbf{w}^*_1\) points diagonally. Its two margin lines lie far apart: a wide margin.</li>
+        <li>\(\mathbf{w}^*_2\) is the x-axis direction, so its separating line is the y-axis. All positives are on one side of the y-axis and all negatives on the other, but the nearest points are close to it: a thin margin.</li>
+      </ul>
+      <p>Given this data, \(\mathbf{w}^*_1\) feels like the better separator, because it separates the classes with a larger margin.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 350" role="img" aria-label="Five positive and five negative points separated by two lines through the origin. The diagonal separator w1 has a wide shaded margin; the y-axis, the separator of w2, has a thin margin between dashed lines. A negative point nudged by noise crosses the y-axis but stays on the correct side of the diagonal.">
+            <defs>
+              <marker id="p16a-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p16a-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <path d="M20 30 L136 30 L320 214 L320 330 L204 330 L20 146 Z" style="fill: var(--accent-soft); fill-opacity: .8"/>
+            <line class="d-rule" x1="20" y1="180" x2="320" y2="180"/>
+            <line class="d-ln-acc" x1="136" y1="30" x2="320" y2="214"/>
+            <line class="d-ln-acc" x1="20" y1="146" x2="204" y2="330"/>
+            <line class="d-ln-acc" x1="20" y1="30" x2="320" y2="330" style="stroke-width:2.6"/>
+            <line class="d-ln d-dash" x1="154" y1="30" x2="154" y2="330"/>
+            <line class="d-ln d-dash" x1="186" y1="30" x2="186" y2="330"/>
+            <line class="d-ln" x1="170" y1="30" x2="170" y2="330" style="stroke-width:2"/>
+            <text class="d-al" x="174" y="22">separator of w*₂ (the y-axis)</text>
+            <text class="d-al" x="316" y="345" text-anchor="end">separator of w*₁</text>
+            <line class="d-ln-acc" x1="170" y1="180" x2="206" y2="144" marker-end="url(#p16a-ah-acc)" style="stroke-width:2.2"/>
+            <text class="d-t" x="211" y="153" style="fill: var(--accent)">w*₁</text>
+            <line class="d-ln" x1="170" y1="180" x2="214" y2="180" marker-end="url(#p16a-ah)" style="stroke-width:2"/>
+            <text class="d-t" x="218" y="197">w*₂</text>
+            <circle class="pt-tree" cx="186" cy="64" r="5"/>
+            <circle class="pt-tree" cx="222" cy="116" r="5"/>
+            <circle class="pt-tree" cx="266" cy="112" r="5"/>
+            <circle class="pt-tree" cx="286" cy="156" r="5"/>
+            <circle class="pt-tree" cx="246" cy="68" r="5"/>
+            <rect class="pt-no" x="149.5" y="291.5" width="9" height="9"/>
+            <rect class="pt-no" x="113.5" y="239.5" width="9" height="9"/>
+            <rect class="pt-no" x="69.5" y="243.5" width="9" height="9"/>
+            <rect class="pt-no" x="49.5" y="199.5" width="9" height="9"/>
+            <rect class="pt-no" x="89.5" y="287.5" width="9" height="9"/>
+            <line class="d-ln d-dash" x1="159" y1="292" x2="189" y2="276" marker-end="url(#p16a-ah)"/>
+            <rect class="pt-new" x="191.5" y="267.5" width="9" height="9"/>
+            <text class="d-s" x="206" y="292">noisy copy</text>
+
+            <text class="d-h" x="350" y="56">Same data, two separators</text>
+            <line class="d-ln-acc" x1="350" y1="80" x2="378" y2="80" style="stroke-width:2.6"/>
+            <text class="d-s" x="386" y="84">w*₁ (diagonal): margin γ ≈ 2.05</text>
+            <line class="d-ln" x1="350" y1="104" x2="378" y2="104" style="stroke-width:2"/>
+            <text class="d-s" x="386" y="108">w*₂ (x-axis): margin γ = 0.4</text>
+            <text class="d-t" x="350" y="146">Perceptron</text>
+            <text class="d-s" x="350" y="166">The bound R²/γ² holds for every</text>
+            <text class="d-s" x="350" y="182">separating w*, so the widest margin</text>
+            <text class="d-s" x="350" y="198">gives the tightest bound. Yet the</text>
+            <text class="d-s" x="350" y="214">algorithm may stop at either line.</text>
+            <text class="d-t" x="350" y="252">Noise</text>
+            <text class="d-s" x="350" y="272">A −1 point nudged across the y-axis</text>
+            <text class="d-s" x="350" y="288">is misclassified by w*₂ but is still</text>
+            <text class="d-s" x="350" y="304">on the correct side of w*₁.</text>
+            <circle class="pt-tree" cx="355" cy="330" r="5"/><text class="d-s" x="365" y="334">+1</text>
+            <rect class="pt-no" x="390.5" y="325.5" width="9" height="9"/><text class="d-s" x="405" y="334">−1</text>
+          </svg>
+        </div>
+        <figcaption><b>Two separators, one data set (illustrative points).</b> Both unit directions separate the data with a line through the origin, but the diagonal \(\mathbf{w}^*_1\) leaves a margin about five times wider than the x-axis direction \(\mathbf{w}^*_2\). Perceptron could stop at either; only the wide one still classifies the noisy copy correctly.</figcaption>
+      </figure>
+
+      <h3>Observation 1: the bound uses the best margin <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=533s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L57 · 8:53</a></h3>
+      <p>The proof assumed only that <i>some</i> \(\mathbf{w}^*\) separates the data with margin \(\gamma\); it said nothing else about \(\mathbf{w}^*\). So the bound holds for every separating unit vector with its own margin, and the tightest version comes from the largest margin. With the lecture's illustrative numbers, if one separator has \(\gamma = 1\) and another has \(\gamma = 10\), the mistake count is bounded by \(R^2/10^2\). The number of mistakes depends on the margin of the best possible \(\mathbf{w}^*\): the larger it is, the fewer mistakes.</p>
+
+      <h3>Observation 2: perceptron need not find that separator <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=659s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L57 · 10:59</a></h3>
+      <p>The vector \(\mathbf{w}_{\text{perc}}\) that perceptron outputs need not be the \(\mathbf{w}^*\) with the largest margin. Nothing in the update rule pushes toward a large margin. Perceptron only updates on mistakes, so the moment it reaches a vector like \(\mathbf{w}^*_2\) that classifies every training point correctly, it stops and reports convergence.</p>
+      <p>This is no contradiction <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=784s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:04</a>. A large margin makes the problem easier because the two classes are well separated, so perceptron needs few mistakes to find <i>some</i> separator. An easy problem does not mean it finds the widest one.</p>
+    </section>
+
+    <section id="why-margin">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=876s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L57 · 14:36</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=-guLBqucS_I&amp;t=936s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L57 · 15:36 robustness to noise</a>
+        </div>
+        <h2>Why prefer a wide margin</h2>
+      </div>
+      <p>We prefer separators with a large margin, and perceptron, for all its simplicity, does not have the power to find them. So the lecture lets go of perceptron and asks directly: given a linearly separable data set, can we find the \(\mathbf{w}^*\) that separates it with as large a margin as possible?</p>
+      <p>Why is a wide margin better? Loosely, because of generalization. Think of test data as a noisy version of the training data. Take a negative point near the thin-margin separator and add a little noise: it can cross that line and be predicted positive, while it is still on the correct side of the wide-margin separator. The margin is leeway that absorbs such perturbations, so the wider it is, the more robust the classifier.</p>
+      <p class="rule-of-thumb">Goal: a principled way to find the \(\mathbf{w}\) that classifies the data with the largest possible margin.</p>
+    </section>
+
+    <!-- ============ LECTURE 58 ============ -->
+    <section id="first-attempt">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=33s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L58 · 0:33</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=154s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L58 · 2:34 the scaling problem</a>
+        </div>
+        <h2>A first formulation, and why it breaks</h2>
+      </div>
+      <p>To make "largest margin" precise, treat both \(\mathbf{w}\) and \(\gamma\) as parameters. Make \(\gamma\) as large as possible, but allow only those \(\mathbf{w}\) that separate the data with margin \(\gamma\):</p>
+      <div class="eq">\[ \max_{\mathbf{w},\,\gamma}\; \gamma \quad \text{such that} \quad (\mathbf{w}^\top\mathbf{x}_i)\,y_i \ge \gamma \;\; \text{for all } i \]</div>
+      <p>Every positive point is then on or beyond the line \(\mathbf{w}^\top\mathbf{x} = \gamma\) and every negative point on or beyond \(\mathbf{w}^\top\mathbf{x} = -\gamma\). But something is missing. Suppose the problem returned some \(\mathbf{w}\) with \(\gamma = 5\). Every \(\mathbf{x}\) with \(\mathbf{w}^\top\mathbf{x} = 5\) also satisfies \((2\mathbf{w})^\top\mathbf{x} = 10\), so \(\mathbf{w}' = 2\mathbf{w}\) separates the same data with margin 10. Keep scaling and \(\gamma\) grows to infinity. As stated, the problem has no useful answer.</p>
+      <p>One fix <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=307s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:07</a>, as in the perceptron analysis: allow only unit-length \(\mathbf{w}\).</p>
+      <div class="eq">\[ \max_{\mathbf{w},\,\gamma}\; \gamma \quad \text{such that} \quad (\mathbf{w}^\top\mathbf{x}_i)\,y_i \ge \gamma \;\; \text{for all } i, \qquad \lVert\mathbf{w}\rVert = 1 \]</div>
+      <p>Now \(2\mathbf{w}\) is not allowed, since \(\lVert 2\mathbf{w}\rVert^2 = 4\). This is a reasonable formulation, and optimization techniques will solve it.</p>
+    </section>
+
+    <section id="fix-gamma">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=369s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L58 · 6:09</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=524s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L58 · 8:44 fix γ instead</a>
+        </div>
+        <h2>Fix \(\gamma = 1\) instead of \(\lVert\mathbf{w}\rVert = 1\)</h2>
+      </div>
+      <p>Do we need two variables? With \(\lVert\mathbf{w}\rVert = 1\), choosing \(\mathbf{w}\) only chooses a direction, and then the data decide \(\gamma\): slide the two parallel lines away from the separator until they hit the nearest points. In the lecture's sketch, one unit direction \(\mathbf{w}_1\) gives the margin line \(\mathbf{w}_1^\top\mathbf{x} = 5\), so \(\gamma = 5\), and another, \(\mathbf{w}_2\), gives \(\mathbf{w}_2^\top\mathbf{x} = 3\), so \(\gamma = 3\). Once \(\mathbf{w}\) is fixed, \(\gamma\) is a function of \(\mathbf{w}\).</p>
+      <p>The other way to stop the scaling is to drop \(\lVert\mathbf{w}\rVert = 1\) and pin \(\gamma\) instead, at \(\gamma = 1\). Any direction that separates the data can be rescaled so that its margin lines read exactly \(\pm1\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=616s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:16</a>: the line \(\mathbf{w}_1^\top\mathbf{x} = 5\) is the same set of points as \((\mathbf{w}_1/5)^\top\mathbf{x} = 1\). So use \(\mathbf{w}_1' = \mathbf{w}_1/5\) and \(\mathbf{w}_2' = \mathbf{w}_2/3\). The lines are the same; only their equations, and the lengths of the vectors, change.</p>
+      <p>With \(\gamma\) fixed it can no longer be the thing we maximize. What still changes from one \(\mathbf{w}\) to another is the width between the lines \(\mathbf{w}^\top\mathbf{x} = 1\) and \(\mathbf{w}^\top\mathbf{x} = -1\), so the equivalent formulation is <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=836s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:56</a></p>
+      <div class="eq">\[ \max_{\mathbf{w}}\; \text{width}(\mathbf{w}) \quad \text{such that} \quad (\mathbf{w}^\top\mathbf{x}_i)\,y_i \ge 1 \;\; \text{for all } i \]</div>
+      <p>\(\gamma\) has disappeared, and the length of \(\mathbf{w}\) is unrestricted: any \(\mathbf{w}\) that separates the data with margin 1 is allowed. It remains to find the width as a function of \(\mathbf{w}\).</p>
+    </section>
+
+    <section id="width">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=928s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L58 · 15:28</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=1112s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L58 · 18:32 the answer</a>
+        </div>
+        <h2>The width is \(2/\lVert\mathbf{w}\rVert\)</h2>
+      </div>
+      <p>The width is the distance between two parallel lines. Take any \(\mathbf{x}\) on the line \(\mathbf{w}^\top\mathbf{x} = -1\) and find the closest point \(\mathbf{z}\) on \(\mathbf{w}^\top\mathbf{z} = 1\); their distance is the width, whichever \(\mathbf{x}\) we start from. As an optimization problem:</p>
+      <div class="eq">\[ \min_{\mathbf{z}}\; \tfrac12\lVert \mathbf{x} - \mathbf{z}\rVert^2 \quad \text{such that} \quad \mathbf{w}^\top\mathbf{z} = 1, \qquad \text{where } \mathbf{w}^\top\mathbf{x} = -1 \]</div>
+      <p>Minimizing the distance, its square or half its square gives the same \(\mathbf{z}\). The lecture states the answer without solving the problem (it suggests Lagrange multipliers). A quick way to see it, added here: the closest point is reached by moving from \(\mathbf{x}\) along \(\mathbf{w}\), so \(\mathbf{z} = \mathbf{x} + t\,\mathbf{w}\). Then \(\mathbf{w}^\top\mathbf{z} = -1 + t\lVert\mathbf{w}\rVert^2 = 1\) gives \(t = 2/\lVert\mathbf{w}\rVert^2\), and</p>
+      <div class="eq">\[ \lVert \mathbf{z}-\mathbf{x}\rVert = t\,\lVert\mathbf{w}\rVert = \frac{2}{\lVert\mathbf{w}\rVert}, \qquad \tfrac12\lVert \mathbf{z}-\mathbf{x}\rVert^2 = \frac{2}{\lVert\mathbf{w}\rVert^2} \]</div>
+      <p>The lecture's "width of \(\mathbf{w}\)" is the value of this problem, half the squared distance, \(2/\lVert\mathbf{w}\rVert^2\). The distance itself is \(2/\lVert\mathbf{w}\rVert\). Either way it shrinks as \(\lVert\mathbf{w}\rVert\) grows. As a sanity check, the answer depends only on \(\mathbf{w}\) and not on the starting point \(\mathbf{x}\), as it must for the distance between two parallel lines.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 300" role="img" aria-label="Left: three horizontal lines, the separator and two margin lines at distance gamma, with positives above and negatives below; dividing w by gamma rewrites the margin lines as plus and minus one. Right: from a point x on the line w transpose x equals minus one, the closest point z on the line plus one is straight along w; a slanted path to another point is longer; the same length appears from any x.">
+            <defs>
+              <marker id="p16b-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p16b-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <text class="d-h" x="20" y="24">Pin γ = 1 by rescaling w</text>
+            <rect x="20" y="90" width="290" height="140" style="fill: var(--accent-soft); fill-opacity: .6"/>
+            <line class="d-ln" x1="20" y1="90" x2="310" y2="90"/>
+            <line class="d-ln-acc" x1="20" y1="160" x2="310" y2="160" style="stroke-width:2.2"/>
+            <line class="d-ln" x1="20" y1="230" x2="310" y2="230"/>
+            <text class="d-s" x="24" y="84">wᵀx = γ  ⇔  (w/γ)ᵀx = 1</text>
+            <text class="d-al" x="24" y="154">wᵀx = 0</text>
+            <text class="d-s" x="24" y="224">wᵀx = −γ  ⇔  (w/γ)ᵀx = −1</text>
+            <line class="d-ln-acc" x1="120" y1="160" x2="120" y2="113" marker-end="url(#p16b-ah-acc)" style="stroke-width:2.2"/>
+            <text class="d-s" x="127" y="132" style="fill: var(--accent)">w (unit)</text>
+            <line class="d-ln" x1="200" y1="157" x2="200" y2="93" marker-start="url(#p16b-ah)" marker-end="url(#p16b-ah)"/>
+            <text class="d-t" x="206" y="130">γ</text>
+            <circle class="pt-tree" cx="236" cy="90" r="5"/>
+            <circle class="pt-tree" cx="264" cy="62" r="5"/>
+            <circle class="pt-tree" cx="236" cy="42" r="5"/>
+            <circle class="pt-tree" cx="296" cy="76" r="5"/>
+            <circle class="pt-tree" cx="290" cy="40" r="5"/>
+            <rect class="pt-no" x="250.5" y="225.5" width="9" height="9"/>
+            <rect class="pt-no" x="225.5" y="257.5" width="9" height="9"/>
+            <rect class="pt-no" x="275.5" y="251.5" width="9" height="9"/>
+            <rect class="pt-no" x="293.5" y="239.5" width="9" height="9"/>
+            <rect class="pt-no" x="259.5" y="279.5" width="9" height="9"/>
+            <text class="d-t" x="24" y="258">The lecture's two directions</text>
+            <text class="d-s" x="24" y="276">γ = 5: use w/5, length 1/5</text>
+            <text class="d-s" x="24" y="292">γ = 3: use w/3, length 1/3</text>
+
+            <line class="d-rule" x1="335" y1="12" x2="335" y2="290"/>
+
+            <text class="d-h" x="350" y="24">Width between the ±1 lines</text>
+            <rect x="350" y="80" width="290" height="140" style="fill: var(--accent-soft); fill-opacity: .6"/>
+            <line class="d-ln" x1="350" y1="80" x2="640" y2="80"/>
+            <line class="d-ln d-dash" x1="350" y1="150" x2="640" y2="150"/>
+            <line class="d-ln" x1="350" y1="220" x2="640" y2="220"/>
+            <text class="d-al" x="636" y="74" text-anchor="end">wᵀx = 1</text>
+            <text class="d-al" x="636" y="144" text-anchor="end">wᵀx = 0</text>
+            <text class="d-al" x="636" y="214" text-anchor="end">wᵀx = −1</text>
+            <line class="d-ln d-dash" x1="424" y1="215" x2="497" y2="85"/>
+            <circle class="pt-no" cx="500" cy="80" r="3.5"/>
+            <text class="d-s" x="446" y="196">other z: longer</text>
+            <line class="d-ln-acc" x1="420" y1="214" x2="420" y2="87" marker-end="url(#p16b-ah-acc)" style="stroke-width:2.2"/>
+            <text class="d-s" x="412" y="134" text-anchor="end" style="fill: var(--accent)">z − x = t w</text>
+            <circle class="pt-plain" cx="420" cy="220" r="4.5"/>
+            <circle class="pt-plain" cx="420" cy="80" r="4.5"/>
+            <text class="d-t" x="420" y="242" text-anchor="middle">x</text>
+            <text class="d-t" x="420" y="68" text-anchor="middle">z</text>
+            <line class="d-ln-acc" x1="560" y1="214" x2="560" y2="87" marker-end="url(#p16b-ah-acc)" style="stroke-width:2.2"/>
+            <circle class="pt-plain" cx="560" cy="220" r="4.5"/>
+            <circle class="pt-plain" cx="560" cy="80" r="4.5"/>
+            <text class="d-s" x="636" y="242" text-anchor="end">same length from any x</text>
+            <text class="d-s" x="350" y="268">z = x + t w, and wᵀz = 1 gives t = 2/‖w‖²</text>
+            <text class="d-t" x="350" y="288">width = ‖t w‖ = 2/‖w‖</text>
+          </svg>
+        </div>
+        <figcaption><b>Grounding \(\gamma\), then measuring the width.</b> Left: dividing \(\mathbf{w}\) by \(\gamma\) rewrites the margin lines as \(\pm1\) without moving them, so a wider margin means a shorter rescaled \(\mathbf{w}\). Right: the closest point \(\mathbf{z}\) is reached by moving along \(\mathbf{w}\), which gives the distance \(2/\lVert\mathbf{w}\rVert\) from any starting point \(\mathbf{x}\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="hard-margin-primal">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=1203s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L58 · 20:03</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=1452s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L58 · 24:12 minimize the length</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=1545s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L58 · 25:45 if not separable</a>
+        </div>
+        <h2>The hard-margin SVM problem</h2>
+      </div>
+      <p>Put the width into the formulation: maximize \(2/\lVert\mathbf{w}\rVert^2\) subject to \((\mathbf{w}^\top\mathbf{x}_i)y_i \ge 1\). Maximizing \(2/\lVert\mathbf{w}\rVert^2\) is the same as minimizing \(\lVert\mathbf{w}\rVert^2\), which the lecture writes with a convenient \(\tfrac12\).</p>
+      <div class="result">
+        <span class="lbl">Hard-margin primal</span>
+        \[ \min_{\mathbf{w}\in\mathbb{R}^d}\; \tfrac12\lVert\mathbf{w}\rVert^2 \quad \text{such that} \quad (\mathbf{w}^\top\mathbf{x}_i)\,y_i \ge 1 \;\; \text{for } i = 1,\dots,n \]
+        <p>The constraints ask for every point to be classified with margin at least 1. Among those \(\mathbf{w}\), the objective picks the shortest, which is the one whose margin lines are farthest apart.</p>
+      </div>
+      <p>Why does a short \(\mathbf{w}\) mean a wide margin? <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=1235s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:35</a> The margin is pinned at 1 on both sides. If the margin is narrow, the points on the line \(\mathbf{w}^\top\mathbf{x} = 1\) in any fixed direction are close to the origin, so they are short. For a short \(\mathbf{x}\) to give \(\mathbf{w}^\top\mathbf{x} = 1\), \(\mathbf{w}\) must be long. A narrow margin forces a long \(\mathbf{w}\); a wide one allows a short \(\mathbf{w}\).</p>
+      <p>If the data are not linearly separable, no \(\mathbf{w}\) satisfies the constraints and the problem simply has no feasible solution. If they are, its solution is the separator with the largest width. It can be solved by gradient-based methods such as projected gradient descent (gradient descent itself is in <a href="part-10.html">Part 10</a>). The lecture is after insight instead <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZzWFdt_6KLA&amp;t=1608s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>26:48</a>, and the standard route to insight about an optimization problem is its <dfn>dual problem</dfn>: another way of looking at the same problem, which here will also show how to go beyond linear separators.</p>
+
+      <figure id="mm-fig">
+        <div class="controls">
+          <label for="mm-th">Direction of the unit vector \(\mathbf{w}\)</label>
+          <input type="range" id="mm-th" min="0" max="359" step="1" value="15">
+          <output id="mm-th-out" for="mm-th">15°</output>
+          <button class="btn" id="mm-snap" type="button">Show the maximum-margin line</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Margin γ of unit w</span><span class="v mine" id="mm-gam">–</span></div>
+          <div><span class="k">‖w‖ after setting γ = 1</span><span class="v" id="mm-norm">–</span></div>
+          <div><span class="k">Largest possible γ*</span><span class="v" id="mm-best">–</span></div>
+        </div>
+        <div class="status" id="mm-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="mm-svg" viewBox="0 0 400 428" role="img" aria-label="Twenty-four synthetic points, positives as filled circles in the upper right and negatives as squares in the lower left, with a rotatable separating line through the origin, its shaded margin band and the nearest point ringed."></svg></div>
+        <figcaption><b>Synthetic, linearly separable data (24 points)</b>, generated for this page. As in the lecture's formulation, which has no offset term, every separator passes through the origin. Rotate \(\mathbf{w}\): the ringed point is the nearest one, and it sets the margin \(\gamma\) of the unit vector. Rescaling so that \(\gamma = 1\) gives \(\lVert\mathbf{w}\rVert = 1/\gamma\), so the direction with the largest \(\gamma\) is the one with the smallest \(\tfrac12\lVert\mathbf{w}\rVert^2\). The button turns to that direction; the points ringed there are what Lecture 61 calls support vectors.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============ LECTURE 59 ============ -->
+    <section id="lagrangian">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;t=121s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L59 · 2:01</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;t=182s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L59 · 3:02 the Lagrangian</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;t=766s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L59 · 12:46 min–max form</a>
+        </div>
+        <h2>Constrained optimization with a Lagrangian</h2>
+      </div>
+      <p>Call the hard-margin problem <b>problem A</b>. To find its dual, the lecture takes a detour through a general problem with a single constraint:</p>
+      <div class="eq">\[ \min_{\mathbf{w}}\; f(\mathbf{w}) \quad \text{such that} \quad g(\mathbf{w}) \le 0 \]</div>
+      <p>Problem A has this shape once its constraints, which read "\(\ge 1\)", are rewritten as "\(\le 0\)". It has \(n\) constraints, one per point; the many-constraint version comes at the end of the lecture. Define the <dfn>Lagrangian</dfn>, a function of \(\mathbf{w}\) and a new real variable \(\alpha\):</p>
+      <div class="eq">\[ L(\mathbf{w}, \alpha) = f(\mathbf{w}) + \alpha\, g(\mathbf{w}) \]</div>
+      <p>The objective stays intact and the constraint becomes part of it. How is this related to the original problem? Fix any \(\mathbf{w}\) and look at \(\max_{\alpha \ge 0} L(\mathbf{w}, \alpha)\). There are two cases.</p>
+      <h3>Case 1: \(g(\mathbf{w}) &gt; 0\) <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;t=276s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L59 · 4:36</a></h3>
+      <p>The lecture's example: \(f(\mathbf{w}) = -100\) and \(g(\mathbf{w}) = 5\), so we maximize \(-100 + 5\alpha\) over \(\alpha \ge 0\). \(\alpha = 1\) gives \(-95\), \(\alpha = 10\) gives \(-50\), \(\alpha = 100\) gives \(400\). \(f(\mathbf{w})\) is a fixed number, however small, while \(\alpha\) can grow without limit, so the maximum is \(+\infty\).</p>
+      <h3>Case 2: \(g(\mathbf{w}) \le 0\) <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;t=431s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L59 · 7:11</a></h3>
+      <p>Example: \(\mathbf{w} = (3, 4, 5, 6)\) with \(f(\mathbf{w}) = 100\) and \(g(\mathbf{w}) = -5\), so we maximize \(100 - 5\alpha\). Every positive \(\alpha\) lowers the value and negative \(\alpha\) is not allowed, so the best choice is \(\alpha = 0\), with value \(100 = f(\mathbf{w})\). If \(g(\mathbf{w}) = 0\) exactly, the second term vanishes for every \(\alpha\) and the value is again \(f(\mathbf{w})\).</p>
+      <div class="result">
+        <span class="lbl">The max over α enforces the constraint</span>
+        \[ \max_{\alpha \ge 0}\; f(\mathbf{w}) + \alpha\,g(\mathbf{w}) = \begin{cases} f(\mathbf{w}) &amp; \text{if } g(\mathbf{w}) \le 0, \\ +\infty &amp; \text{if } g(\mathbf{w}) &gt; 0. \end{cases} \]
+      </div>
+      <p>As a function of \(\mathbf{w}\), this equals \(f\) on the feasible region and \(+\infty\) outside it. Minimizing it over \(\mathbf{w}\) can never pick an infeasible point, and inside the region it is just \(f\). So the constrained problem equals an unconstrained min–max, which the lecture calls B:</p>
+      <div class="eq">\[ \min_{\mathbf{w}} f(\mathbf{w}) \;\text{ such that }\; g(\mathbf{w}) \le 0 \quad=\quad \min_{\mathbf{w}}\; \max_{\alpha\ge 0}\; f(\mathbf{w}) + \alpha\,g(\mathbf{w}) \qquad \text{(B)} \]</div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 290" role="img" aria-label="Left: f plus alpha g plotted against alpha from 0 to 100 for the two numeric examples. With g equal to 5 the line rises from minus 100 to 400; with g equal to minus 5 it falls from 100, so its maximum is at alpha equals 0. Right: in the space of w, an ellipse marks the feasible region g at most 0, where the max over alpha equals f; outside it the value is infinite; the minimizer w star lies inside.">
+            <text class="d-h" x="20" y="24">Fix w, maximize over α ≥ 0</text>
+            <line class="d-ln" x1="60" y1="40" x2="60" y2="262" style="stroke-width:1"/>
+            <line class="d-ln" x1="60" y1="150" x2="310" y2="150" style="stroke-width:1"/>
+            <text class="d-al" x="314" y="154">α</text>
+            <text class="d-al" x="66" y="44">f(w) + α g(w)</text>
+            <text class="d-al" x="54" y="54" text-anchor="end">400</text>
+            <text class="d-al" x="54" y="154" text-anchor="end">0</text>
+            <text class="d-al" x="54" y="254" text-anchor="end">−400</text>
+            <text class="d-al" x="180" y="166" text-anchor="middle">50</text>
+            <text class="d-al" x="300" y="166" text-anchor="middle">100</text>
+            <line class="d-ln-acc" x1="60" y1="175" x2="300" y2="50" style="stroke-width:2.2"/>
+            <circle class="pt-tree" cx="62.4" cy="173.75" r="3.5"/>
+            <circle class="pt-tree" cx="84" cy="162.5" r="3.5"/>
+            <circle class="pt-tree" cx="300" cy="50" r="3.5"/>
+            <text class="d-al" x="294" y="42" text-anchor="end">(100, 400)</text>
+            <text class="d-s" x="74" y="76" style="fill: var(--accent)">g(w) = 5 &gt; 0:</text>
+            <text class="d-s" x="74" y="92" style="fill: var(--accent)">max over α = +∞</text>
+            <line class="d-ln" x1="60" y1="125" x2="300" y2="250" style="stroke-width:2"/>
+            <circle class="pt-new" cx="60" cy="125" r="5"/>
+            <text class="d-s" x="68" y="118">f(w) = 100</text>
+            <text class="d-s" x="74" y="278">g(w) = −5: best α = 0, max = f(w)</text>
+
+            <line class="d-rule" x1="345" y1="12" x2="345" y2="280"/>
+
+            <text class="d-h" x="365" y="24">Then minimize over w</text>
+            <ellipse class="d-box-acc" cx="505" cy="150" rx="110" ry="68"/>
+            <text class="d-t" x="505" y="136" text-anchor="middle">g(w) ≤ 0</text>
+            <text class="d-s" x="505" y="154" text-anchor="middle">max over α equals f(w)</text>
+            <circle class="pt-new" cx="540" cy="184" r="5"/>
+            <text class="d-t" x="550" y="188">w*</text>
+            <circle class="pt-plain" cx="392" cy="62" r="4"/>
+            <text class="d-s" x="402" y="66">g(w) &gt; 0: max over α is +∞</text>
+            <text class="d-s" x="505" y="246" text-anchor="middle">so the minimizer is w*, the smallest</text>
+            <text class="d-s" x="505" y="262" text-anchor="middle">f(w) among the points with g(w) ≤ 0</text>
+          </svg>
+        </div>
+        <figcaption><b>The max over \(\alpha\) acts as a constraint check.</b> Left, the lecture's two numeric cases: with \(g(\mathbf{w}) = 5\) the value grows without bound (\(-95, -50, 400\) at \(\alpha = 1, 10, 100\)); with \(g(\mathbf{w}) = -5\) the best \(\alpha\) is 0. Right: the result is \(f(\mathbf{w})\) on the feasible region and \(+\infty\) outside, so its minimizer solves the constrained problem.</figcaption>
+      </figure>
+    </section>
+
+    <section id="duality">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;t=796s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L59 · 13:16</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;t=984s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L59 · 16:24 several constraints</a>
+        </div>
+        <h2>Swapping min and max: duality</h2>
+      </div>
+      <p>Once we have a min–max problem, we can ask whether the order can be swapped without changing the answer:</p>
+      <div class="eq">\[ \min_{\mathbf{w}}\, \max_{\alpha\ge 0}\; f(\mathbf{w}) + \alpha\,g(\mathbf{w}) \;\overset{?}{=}\; \max_{\alpha\ge 0}\, \min_{\mathbf{w}}\; f(\mathbf{w}) + \alpha\,g(\mathbf{w}) \]</div>
+      <p>In general the answer is no. But if \(f\) and \(g\) are "nice", which here means <b>convex</b>, the swap is allowed <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;t=892s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>14:52</a>. This is a fundamental result of convex optimization, which the lecture calls <dfn>convex duality</dfn>; it is not proved in the course, and a convex optimization book or course covers it. For the SVM, only quadratic and linear functions appear, and both are convex. (Convex functions were introduced in <a href="part-09.html">Part 9</a>.)</p>
+      <p>Several constraints \(g_1(\mathbf{w}) \le 0, \dots, g_k(\mathbf{w}) \le 0\) work the same way, with one multiplier per constraint, each restricted to be non-negative.</p>
+      <div class="result">
+        <span class="lbl">Lagrangian duality with k constraints</span>
+        \[ \min_{\mathbf{w}}\; \max_{\alpha_1,\dots,\alpha_k \ge 0}\; f(\mathbf{w}) + \sum_{j=1}^{k}\alpha_j\,g_j(\mathbf{w}) \;=\; \max_{\alpha_1,\dots,\alpha_k \ge 0}\; \min_{\mathbf{w}}\; f(\mathbf{w}) + \sum_{j=1}^{k}\alpha_j\,g_j(\mathbf{w}) \]
+        <p>The left side is the constrained problem: if any constraint is violated, its \(\alpha_j\) drives the value to \(+\infty\); if all hold, the value is \(f(\mathbf{w})\). The equality with the right side holds when \(f\) and every \(g_j\) are convex. The left side is the <dfn>primal</dfn> problem, the right side the <dfn>dual</dfn>.</p>
+      </div>
+      <p>At first glance nothing is gained <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=7Th2YgPMnk0&amp;t=1167s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:27</a>: a constrained minimization became a min–max and then a max–min, neither obviously easier. The next lecture shows what the swap buys for the SVM.</p>
+    </section>
+
+    <!-- ============ LECTURE 60 ============ -->
+    <section id="svm-lagrangian">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L60 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=219s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L60 · 3:39 fix α, minimize over w</a>
+        </div>
+        <h2>The SVM Lagrangian and its inner minimization</h2>
+      </div>
+      <p>Problem A is convex: \(\tfrac12\lVert\mathbf{w}\rVert^2\) is quadratic in \(\mathbf{w}\) and each constraint is linear in \(\mathbf{w}\). So the min–max swap applies. In standard form the constraints are</p>
+      <div class="eq">\[ g_i(\mathbf{w}) = 1 - (\mathbf{w}^\top\mathbf{x}_i)\,y_i \le 0, \qquad i = 1,\dots,n \]</div>
+      <p>Each data point gets its own multiplier, and the lecture collects them in one vector \(\boldsymbol\alpha = (\alpha_1, \dots, \alpha_n)\); \(\boldsymbol\alpha \ge 0\) means every \(\alpha_i \ge 0\).</p>
+      <div class="eq">\[ L(\mathbf{w},\boldsymbol{\alpha}) = \tfrac12\lVert\mathbf{w}\rVert^2 + \sum_{i=1}^{n} \alpha_i\big(1 - (\mathbf{w}^\top\mathbf{x}_i)\,y_i\big), \qquad \min_{\mathbf{w}}\,\max_{\boldsymbol\alpha\ge 0} L(\mathbf{w},\boldsymbol\alpha) = \max_{\boldsymbol\alpha\ge 0}\,\min_{\mathbf{w}} L(\mathbf{w},\boldsymbol\alpha) \]</div>
+      <p>The right-hand side helps for this reason. Fix any \(\boldsymbol\alpha \ge 0\). The inner minimization over \(\mathbf{w}\) then has no constraints at all, so we can take the gradient and set it to zero <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=342s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:42</a>:</p>
+      <div class="eq">\[ \nabla_{\mathbf{w}} L = \mathbf{w} - \sum_{i=1}^{n}\alpha_i y_i \mathbf{x}_i = \mathbf{0} \quad\Longrightarrow\quad \mathbf{w}^*_{\boldsymbol\alpha} = \sum_{i=1}^{n} \alpha_i y_i \mathbf{x}_i \]</div>
+      <p>The subscript is a reminder that this is the best \(\mathbf{w}\) for the \(\boldsymbol\alpha\) we fixed. It has a simple form: a linear combination of the data points, point \(i\) weighted by \(\alpha_i y_i\) (a non-negative number times \(\pm1\)). In matrix notation <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=526s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:46</a>:</p>
+      <div class="eq">\[ \mathbf{w}^*_{\boldsymbol\alpha} = X Y \boldsymbol{\alpha}, \qquad X = \big[\,\mathbf{x}_1 \;\cdots\; \mathbf{x}_n\,\big] \in \mathbb{R}^{d\times n},\quad Y = \begin{bmatrix} y_1 &amp; &amp; \\ &amp; \ddots &amp; \\ &amp; &amp; y_n \end{bmatrix} \in \mathbb{R}^{n\times n},\quad \boldsymbol\alpha\in\mathbb{R}^n \]</div>
+      <p class="note">\(X\) has the data points as columns and \(Y\) has the labels on its diagonal, so \(XY\) has columns \(y_i\mathbf{x}_i\), and multiplying by \(\boldsymbol\alpha\) weights column \(i\) by \(\alpha_i\). The sizes \((d\times n)(n\times n)(n\times 1)\) give a \(d\times 1\) vector, the shape of \(\mathbf{w}\).</p>
+    </section>
+
+    <section id="dual-hard">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=618s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L60 · 10:18</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=679s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L60 · 11:19 the dual</a>
+        </div>
+        <h2>The hard-margin dual</h2>
+      </div>
+      <p>Substitute \(\mathbf{w} = XY\boldsymbol\alpha\) back into the Lagrangian, and every \(\mathbf{w}\) disappears. The lecture skips the algebra; it is short. The constraint term is \(\sum_i \alpha_i - \sum_i \alpha_i y_i\,\mathbf{x}_i^\top\mathbf{w} = \boldsymbol\alpha^\top\mathbf{1} - (XY\boldsymbol\alpha)^\top\mathbf{w}\), so</p>
+      <div class="eq">\[ L(XY\boldsymbol\alpha, \boldsymbol\alpha) = \tfrac12\,\boldsymbol\alpha^\top Y^\top X^\top X Y\boldsymbol\alpha \;+\; \boldsymbol\alpha^\top\mathbf{1} \;-\; \boldsymbol\alpha^\top Y^\top X^\top X Y\boldsymbol\alpha \;=\; \boldsymbol\alpha^\top\mathbf{1} - \tfrac12\,\boldsymbol\alpha^\top Y^\top X^\top X Y\boldsymbol\alpha \]</div>
+      <p>Here \(\mathbf{1}\) is the \(n\)-dimensional vector of all ones. This is the value of the inner minimization for a given \(\boldsymbol\alpha\); the outer maximization then chooses \(\boldsymbol\alpha\).</p>
+      <div class="result">
+        <span class="lbl">Hard-margin dual</span>
+        \[ \max_{\boldsymbol\alpha \ge 0}\; \boldsymbol\alpha^\top\mathbf{1} - \tfrac12\,\boldsymbol\alpha^\top Y^\top X^\top X\, Y\boldsymbol\alpha \;=\; \max_{\boldsymbol\alpha\ge 0}\; \sum_{i=1}^n \alpha_i - \tfrac12\sum_{i=1}^n\sum_{j=1}^n \alpha_i\alpha_j\,y_i y_j\,\mathbf{x}_i^\top\mathbf{x}_j \]
+        <p>Problem A is the primal. Both give the same answer: from the dual solution \(\boldsymbol\alpha^*\), the primal solution is \(\mathbf{w}^* = XY\boldsymbol\alpha^* = \sum_i \alpha_i^* y_i\mathbf{x}_i\).</p>
+      </div>
+    </section>
+
+    <section id="why-dual">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=741s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L60 · 12:21</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=993s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L60 · 16:33 kernels</a>
+        </div>
+        <h2>What the dual buys</h2>
+      </div>
+      <p>If both problems give the same answer, why bother with the dual? The lecture lists three gains.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>Primal (problem A)</th><th>Dual</th></tr></thead>
+          <tbody>
+            <tr><td>Search space</td><td>\(\mathbf{w} \in \mathbb{R}^d\), one weight per feature</td><td>\(\boldsymbol\alpha \in \mathbb{R}^n_{+}\), one multiplier per point</td></tr>
+            <tr><td>Constraints</td><td>\(n\) linear constraints \((\mathbf{w}^\top\mathbf{x}_i)y_i \ge 1\)</td><td>only \(\boldsymbol\alpha \ge 0\), the non-negative orthant</td></tr>
+            <tr><td>How the data enter</td><td>each \(\mathbf{x}_i\) separately</td><td>only through \(X^\top X\), the dot products of all pairs</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ol>
+        <li><b>Dimension.</b> The dual searches in \(n\) dimensions, the primal in \(d\). When \(d\) is much larger than \(n\), the dual is the smaller search, which helps algorithms (for example gradient-based ones) whose convergence depends on the dimension of the space. This only pays off when \(d \gg n\).</li>
+        <li><b>Simpler constraints</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=901s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:01</a>. Both problems are still constrained. A projected gradient method takes a step and, if it leaves the feasible set, projects back onto it. Projecting onto the region cut out by \(n\) linear constraints is harder than projecting onto the non-negative quadrant \(\boldsymbol\alpha \ge 0\).</li>
+        <li><b>Kernels</b>, the main benefit. The dual objective depends on the data only through \(X^\top X \in \mathbb{R}^{n\times n}\), the matrix of dot products between every pair of points. Anything written in terms of dot products can be kernelized (<a href="part-05.html">Part 5</a>, and kernel regression in <a href="part-11.html">Part 11</a>): replace \(X^\top X\) by a kernel matrix \(K\), whose entries \(K_{ij} = k(\mathbf{x}_i, \mathbf{x}_j)\) are dot products in some high-dimensional feature space. The same problem then finds separators that are quadratic, cubic or given by a Gaussian (radial basis function) kernel. The primal gave no hint of this: it looks for a line with margin 1, and it is unclear how to use it for quadratically separable data.</li>
+      </ol>
+      <p class="rule-of-thumb">The first two advantages are side benefits. The reason to look at the dual is that it reveals the problem can be kernelized.</p>
+    </section>
+
+    <section id="alpha-importance">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=1148s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L60 · 19:08</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=85BxDKkiK4c&amp;t=1239s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L60 · 20:39 the question</a>
+        </div>
+        <h2>Which points matter?</h2>
+      </div>
+      <p>For the optimal \(\boldsymbol\alpha^*\), the optimal \(\mathbf{w}^*\) is a linear combination of the data points:</p>
+      <div class="eq">\[ \mathbf{w}^* = \sum_{i=1}^n \alpha_i^*\, y_i\, \mathbf{x}_i \]</div>
+      <p>The multiplier \(\alpha_i^*\) is the importance of point \(i\). If \(\alpha_i^* = 0\), the point contributes nothing to \(\mathbf{w}^*\); if \(\alpha_i^* &gt; 0\), it contributes something. The dual only guarantees \(\alpha_i^* \ge 0\), so some multipliers may be zero and others positive. Which points have \(\alpha_i^* &gt; 0\)? Characterizing them tells us how many points actually shape \(\mathbf{w}^*\). Lecture 61 answers this.</p>
+    </section>
+
+    <!-- ============ LECTURE 61 ============ -->
+    <section id="complementary-slackness">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L61 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=310s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L61 · 5:10 the product is zero</a>
+        </div>
+        <h2>Complementary slackness</h2>
+      </div>
+      <p>Return to the general problem with one constraint, with \(f\) and \(g\) convex so that duality holds. Let \(\mathbf{w}^*\) solve the primal (the min over \(\mathbf{w}\) of the max over \(\alpha\)) and \(\alpha^*\) solve the dual (the max over \(\alpha\) of the min over \(\mathbf{w}\)). Evaluate each side at its solution.</p>
+      <ul>
+        <li><b>Primal side.</b> \(\max_{\alpha\ge0} L(\mathbf{w}^*, \alpha) = f(\mathbf{w}^*)\), because \(\mathbf{w}^*\) is feasible, \(g(\mathbf{w}^*) \le 0\), and at a feasible point the max over \(\alpha\) returns \(f\).</li>
+        <li><b>Dual side.</b> \(\min_{\mathbf{w}} L(\mathbf{w}, \alpha^*) \le L(\mathbf{w}^*, \alpha^*) = f(\mathbf{w}^*) + \alpha^* g(\mathbf{w}^*)\), since a minimum over all \(\mathbf{w}\) is no larger than the value at the particular point \(\mathbf{w}^*\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=187s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:07</a>.</li>
+      </ul>
+      <p>Duality says the two optimal values are equal, so</p>
+      <div class="eq">\[ f(\mathbf{w}^*) = \min_{\mathbf{w}} L(\mathbf{w},\alpha^*) \le f(\mathbf{w}^*) + \alpha^* g(\mathbf{w}^*) \quad\Longrightarrow\quad \alpha^* g(\mathbf{w}^*) \ge 0 \qquad (1) \]</div>
+      <p>Feasibility says the opposite. The optimal points are feasible points, so \(\alpha^* \ge 0\) (dual feasible) and \(g(\mathbf{w}^*) \le 0\) (primal feasible). A non-negative number times a non-positive one cannot be strictly positive: \(\alpha^* g(\mathbf{w}^*) \le 0\) (2). Both (1) and (2) can hold only if the product is zero.</p>
+      <div class="result">
+        <span class="lbl">Complementary slackness</span>
+        \[ \alpha^*\, g(\mathbf{w}^*) = 0, \qquad\text{and with several constraints}\qquad \alpha_i^*\, g_i(\mathbf{w}^*) = 0 \;\text{ for every } i \]
+        <p>If one factor is slack (\(\alpha^*\) strictly positive, or \(g(\mathbf{w}^*)\) strictly negative), the other must be exactly zero. The two are complementary, hence the name.</p>
+      </div>
+    </section>
+
+    <section id="support-vectors">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=440s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L61 · 7:20</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=501s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L61 · 8:21 α* &gt; 0 means on the line</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=844s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L61 · 14:04 support vectors</a>
+        </div>
+        <h2>Support vectors</h2>
+      </div>
+      <p>For the SVM, \(g_i(\mathbf{w}^*) = 1 - (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i\), so complementary slackness reads</p>
+      <div class="eq">\[ \alpha_i^*\,\big(1 - (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i\big) = 0 \quad \text{for all } i \]</div>
+      <p>If point \(i\) contributes to \(\mathbf{w}^*\), that is \(\alpha_i^* &gt; 0\), the bracket must vanish:</p>
+      <div class="eq">\[ \alpha_i^* &gt; 0 \;\Longrightarrow\; (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i = 1 \]</div>
+      <p>So \(\mathbf{x}_i\) lies exactly on the line \(\mathbf{w}^{*\top}\mathbf{x} = 1\) (if it is positive) or \(\mathbf{w}^{*\top}\mathbf{x} = -1\) (if negative). Read the other way: a point that is not on one of these two lines has \(\alpha_i^* = 0\) and does not contribute to \(\mathbf{w}^*\) at all. The implication runs one way only. A point on one of the lines may still have \(\alpha_i^* = 0\).</p>
+      <p>The two lines are the <dfn>supporting hyperplanes</dfn>, and the points on them, the only ones that can carry \(\alpha_i^* &gt; 0\), are the <dfn>support vectors</dfn>. Because the algorithm relies on them, it is called the <dfn>support vector machine</dfn> (SVM); "machine" is just a fancy word. It was developed mainly by Vapnik and colleagues in the 1990s <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=876s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>14:36</a>.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 300" role="img" aria-label="A separator w star transpose x equals 0 with supporting hyperplanes at plus and minus one. Two positive and two negative points lie on the supporting hyperplanes and are ringed; the remaining points lie beyond them. A side panel shows that predictions sum alpha times y times a dot product or kernel over the support vectors only.">
+            <rect x="20" y="95" width="380" height="120" style="fill: var(--accent-soft); fill-opacity: .7"/>
+            <line class="d-ln" x1="20" y1="95" x2="400" y2="95"/>
+            <line class="d-ln-acc" x1="20" y1="155" x2="400" y2="155" style="stroke-width:2.2"/>
+            <line class="d-ln" x1="20" y1="215" x2="400" y2="215"/>
+            <text class="d-al" x="24" y="89">w*ᵀx = 1</text>
+            <text class="d-al" x="24" y="149">w*ᵀx = 0</text>
+            <text class="d-al" x="24" y="209">w*ᵀx = −1</text>
+            <text class="d-s" x="400" y="22" text-anchor="end">off the supporting hyperplanes: α* = 0</text>
+            <text class="d-s" x="130" y="128">ringed: on a supporting hyperplane, the</text>
+            <text class="d-s" x="130" y="144">only points that can have α* &gt; 0</text>
+            <text class="d-s" x="130" y="186">(being on the line does not force α* &gt; 0)</text>
+            <circle class="pt-tree" cx="150" cy="95" r="5"/>
+            <circle class="pt-tree" cx="290" cy="95" r="5"/>
+            <circle class="pt-tree" cx="100" cy="60" r="5"/>
+            <circle class="pt-tree" cx="200" cy="45" r="5"/>
+            <circle class="pt-tree" cx="245" cy="70" r="5"/>
+            <circle class="pt-tree" cx="340" cy="52" r="5"/>
+            <circle class="pt-tree" cx="380" cy="76" r="5"/>
+            <rect class="pt-no" x="115.5" y="210.5" width="9" height="9"/>
+            <rect class="pt-no" x="255.5" y="210.5" width="9" height="9"/>
+            <rect class="pt-no" x="65.5" y="245.5" width="9" height="9"/>
+            <rect class="pt-no" x="175.5" y="260.5" width="9" height="9"/>
+            <rect class="pt-no" x="220.5" y="238.5" width="9" height="9"/>
+            <rect class="pt-no" x="315.5" y="263.5" width="9" height="9"/>
+            <rect class="pt-no" x="365.5" y="240.5" width="9" height="9"/>
+            <circle class="d-ln-acc" cx="150" cy="95" r="10"/>
+            <circle class="d-ln-acc" cx="290" cy="95" r="10"/>
+            <circle class="d-ln-acc" cx="120" cy="215" r="10"/>
+            <circle class="d-ln-acc" cx="260" cy="215" r="10"/>
+
+            <line class="d-rule" x1="415" y1="12" x2="415" y2="290"/>
+
+            <text class="d-h" x="430" y="40">Prediction uses only them</text>
+            <text class="d-s" x="430" y="70">w* = Σᵢ αᵢ* yᵢ xᵢ</text>
+            <text class="d-s" x="430" y="92">w*ᵀx = Σᵢ αᵢ* yᵢ xᵢᵀx</text>
+            <text class="d-s" x="430" y="114">kernel: Σᵢ αᵢ* yᵢ k(xᵢ, x)</text>
+            <text class="d-s" x="430" y="146">Terms with αᵢ* = 0 vanish, so</text>
+            <text class="d-s" x="430" y="162">store only the support vectors</text>
+            <text class="d-s" x="430" y="178">with their αᵢ* and labels yᵢ.</text>
+            <circle class="pt-tree" cx="436" cy="232" r="5"/><text class="d-s" x="446" y="236">+1</text>
+            <rect class="pt-no" x="465.5" y="227.5" width="9" height="9"/><text class="d-s" x="480" y="236">−1</text>
+            <circle class="d-ln-acc" cx="510" cy="232" r="8"/><circle class="pt-plain" cx="510" cy="232" r="3"/><text class="d-s" x="524" y="236">support vector</text>
+          </svg>
+        </div>
+        <figcaption><b>Support vectors (illustrative points).</b> Complementary slackness allows \(\alpha_i^* &gt; 0\) only for points on the supporting hyperplanes \(\mathbf{w}^{*\top}\mathbf{x} = \pm1\) (ringed). Every other point has \(\alpha_i^* = 0\) and can be discarded; predictions, with or without a kernel, need only the support vectors.</figcaption>
+      </figure>
+
+      <p>This is the big advantage: \(\mathbf{w}^*\) is a <b>sparse</b> linear combination of the data points <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=906s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:06</a>. Out of a billion points, perhaps only hundreds lie on the supporting hyperplanes, and they are all that matters for \(\mathbf{w}^*\). The rest can be thrown away. The algorithm automatically compresses the data set into a small set of relevant points, an instance of the course's compression theme from <a href="part-02.html">Part 2</a>.</p>
+    </section>
+
+    <section id="kernel-prediction">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=936s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L61 · 15:36</a>
+        <h2>Predicting with support vectors and kernels</h2>
+      </div>
+      <p>To classify a test point, compute \(\mathbf{w}^{*\top}\mathbf{x}_{\text{test}}\); the side of the separator it falls on, its sign, gives the label. Substituting \(\mathbf{w}^*\):</p>
+      <div class="eq">\[ \mathbf{w}^{*\top}\mathbf{x}_{\text{test}} = \Big(\sum_{i=1}^n \alpha_i^*\, y_i\, \mathbf{x}_i\Big)^{\!\top}\mathbf{x}_{\text{test}} = \sum_{i=1}^n \alpha_i^*\, y_i\, \mathbf{x}_i^\top\mathbf{x}_{\text{test}} \]</div>
+      <p>Only dot products appear again, so in the kernel version, with feature map \(\phi\), the high-dimensional \(\mathbf{w}^*\) is never built explicitly:</p>
+      <div class="result">
+        <span class="lbl">Kernel SVM prediction</span>
+        \[ \mathbf{w}^{*\top}\phi(\mathbf{x}_{\text{test}}) = \sum_{i=1}^n \alpha_i^*\, y_i\, k(\mathbf{x}_i, \mathbf{x}_{\text{test}}) = \sum_{i \,:\, \alpha_i^* &gt; 0} \alpha_i^*\, y_i\, k(\mathbf{x}_i, \mathbf{x}_{\text{test}}) \]
+        <p>Only the support vectors, their \(\alpha_i^*\) and their labels need to be kept: perhaps 100 points out of a billion, which makes classification fast.</p>
+      </div>
+    </section>
+
+    <section id="outliers">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=1032s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L61 · 17:12</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=2LnQ2r7Q3-0&amp;t=1157s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L61 · 19:17 why not a kernel</a>
+        </div>
+        <h2>The remaining question: outliers</h2>
+      </div>
+      <p>The SVM is now a solid algorithm: it can be kernelized and its solution is sparse. One question is left: how to adapt it when the data have <b>outliers</b>. The algorithm assumes the data are linearly separable (or, with a kernel, separable in some high-dimensional space). In the lecture's example, pluses and minuses are separated by a line except for one plus sitting among the minuses and one minus among the pluses. No \(\mathbf{w}\) classifies every point correctly, so the SVM gives up: there is no feasible \(\mathbf{w}\).</p>
+      <p>Why not map the data to a high-dimensional space with a kernel, where it might become separable? Because kernels address <i>structure</i>. Their hypothesis is that the true separator is nonlinear (quadratic, cubic and so on) in the original space but linear in a higher one. Here the structure is still linear, and a few noisy points cause the trouble. Outliers are a problem of noise, and a tool built for structure may not give the best accuracy on them.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Situation</th><th>Cause</th><th>Remedy</th></tr></thead>
+          <tbody>
+            <tr><td>Quadratic, cubic or other curved boundary</td><td>Nonlinear structure</td><td>Kernel, through the dual</td></tr>
+            <tr><td>A line separates the classes except for a few points on the wrong side</td><td>Noise (outliers)</td><td>Soft-margin SVM, next lecture</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The fix is a small modification of the formulation with profound consequences: the <b>soft-margin</b> support vector machine, one of its most powerful variants.</p>
+    </section>
+
+    <!-- ============ LECTURE 62 ============ -->
+    <section id="bribes">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;t=91s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L62 · 1:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;t=220s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L62 · 3:40 first attempt</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;t=437s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L62 · 7:17 penalize the bribes</a>
+        </div>
+        <h2>Slack variables: letting points pay a bribe</h2>
+      </div>
+      <p>The <a href="#hard-margin-primal">hard-margin problem</a> only admits a \(\mathbf{w}\) with \((\mathbf{w}^\top\mathbf{x}_i)y_i \ge 1\) for every point. With outliers no such \(\mathbf{w}\) exists. The insight of the soft margin is to make <b>every \(\mathbf{w}\) feasible</b>.</p>
+      <p>Fix any \(\mathbf{w}\). It classifies some points correctly and others not. Instead of rejecting it, let each offending point pay a <dfn>bribe</dfn> \(\xi_i\) to be counted on the correct side (the lecture writes the bribe as \(\epsilon_i\) or \(\xi_i\)):</p>
+      <div class="eq">\[ (\mathbf{w}^\top\mathbf{x}_i)\,y_i + \xi_i \ge 1, \qquad \xi_i \ge 0 \]</div>
+      <p>A point that already meets its margin pays nothing. Any other point has \((\mathbf{w}^\top\mathbf{x}_i)y_i &lt; 1\) and needs an extra push to reach 1; that push is its bribe. Bribes are never negative.</p>
+      <h3>A first attempt fails <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;t=343s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L62 · 5:43</a></h3>
+      <div class="eq">\[ \min_{\mathbf{w},\,\boldsymbol\xi}\; \tfrac12\lVert\mathbf{w}\rVert^2 \quad\text{such that}\quad (\mathbf{w}^\top\mathbf{x}_i)\,y_i + \xi_i \ge 1,\;\; \xi_i\ge 0 \;\;\text{for all } i \]</div>
+      <p>Every \(\mathbf{w}\) is now feasible, including the all-zeros vector: then \((\mathbf{w}^\top\mathbf{x}_i)y_i = 0\) and each point pays \(\xi_i = 1\). The length cannot go below 0, so this problem always returns \(\mathbf{w} = \mathbf{0}\). Something is badly wrong.</p>
+      <h3>Bribes must cost something <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;t=437s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L62 · 7:17</a></h3>
+      <p>Allowing bribes is fine; letting them be free is the flaw. Points should pay as little as possible, and the only place to penalize bribes is the objective, where the goodness of a \(\mathbf{w}\) is judged. So add the total bribe to it. Then \(\mathbf{w} = \mathbf{0}\) pays a total of \(n\), which is probably too much for it to be optimal.</p>
+      <p>The two terms have incompatible units, a squared length and an amount of bribe, so a balancing factor \(C \ge 0\) weighs them <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;t=560s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>9:20</a>. How large \(C\) should be depends on the data, for instance on how many outliers there are, so \(C\) is a <b>hyperparameter</b> chosen by cross-validation (<a href="part-11.html">Part 11</a>).</p>
+      <div class="result">
+        <span class="lbl">Soft-margin primal</span>
+        \[ \min_{\mathbf{w}\in\mathbb{R}^d,\;\boldsymbol\xi\in\mathbb{R}^n}\; \tfrac12\lVert\mathbf{w}\rVert^2 + C\sum_{i=1}^n \xi_i \quad\text{such that}\quad (\mathbf{w}^\top\mathbf{x}_i)\,y_i + \xi_i \ge 1,\;\; \xi_i \ge 0 \;\;\text{for all } i \]
+        <p>It is a <i>soft</i> margin because \((\mathbf{w}^\top\mathbf{x}_i)y_i \ge 1\) is no longer demanded of every point. In the literature the bribes \(\xi_i\) are called <dfn>slack variables</dfn>.</p>
+      </div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 300" role="img" aria-label="Horizontal lines w transpose x equals 1, 0 and minus 1. A positive point beyond its margin line pays no slack; a positive point inside the margin pays slack 0.5; a positive point on the wrong side pays 1.5; a negative point on the positive side pays 1.4. Dashed segments show each slack as the distance to the point's own margin line.">
+            <rect x="20" y="80" width="400" height="140" style="fill: var(--accent-soft); fill-opacity: .7"/>
+            <line class="d-ln" x1="20" y1="80" x2="420" y2="80"/>
+            <line class="d-ln-acc" x1="20" y1="150" x2="420" y2="150" style="stroke-width:2.2"/>
+            <line class="d-ln" x1="20" y1="220" x2="420" y2="220"/>
+            <text class="d-al" x="24" y="74">wᵀx = 1</text>
+            <text class="d-al" x="24" y="144">wᵀx = 0</text>
+            <text class="d-al" x="24" y="214">wᵀx = −1</text>
+            <circle class="pt-tree" cx="90" cy="45" r="5"/>
+            <text class="d-s" x="100" y="49">ξ = 0</text>
+            <circle class="pt-tree" cx="165" cy="38" r="5"/>
+            <circle class="pt-tree" cx="270" cy="32" r="5"/>
+            <circle class="pt-tree" cx="345" cy="52" r="5"/>
+            <line class="d-ln-acc d-dash" x1="210" y1="110" x2="210" y2="82"/>
+            <circle class="pt-tree" cx="210" cy="115" r="5"/>
+            <text class="d-s" x="218" y="104" style="fill: var(--accent)">ξ = 0.5</text>
+            <line class="d-ln-acc d-dash" x1="330" y1="180" x2="330" y2="82"/>
+            <circle class="pt-tree" cx="330" cy="185" r="5"/>
+            <text class="d-s" x="338" y="176" style="fill: var(--accent)">ξ = 1.5</text>
+            <rect class="pt-no" x="105.5" y="250.5" width="9" height="9"/>
+            <rect class="pt-no" x="235.5" y="263.5" width="9" height="9"/>
+            <rect class="pt-no" x="295.5" y="245.5" width="9" height="9"/>
+            <rect class="pt-no" x="175.5" y="277.5" width="9" height="9"/>
+            <line class="d-ln-acc d-dash" x1="395" y1="127" x2="395" y2="218"/>
+            <rect class="pt-no" x="390.5" y="117.5" width="9" height="9"/>
+            <text class="d-s" x="388" y="204" text-anchor="end" style="fill: var(--accent)">ξ = 1.4</text>
+
+            <line class="d-rule" x1="445" y1="12" x2="445" y2="290"/>
+
+            <text class="d-h" x="460" y="36">The bribe ξᵢ ≥ 0</text>
+            <text class="d-s" x="460" y="62">need yᵢ wᵀxᵢ + ξᵢ ≥ 1</text>
+            <text class="d-s" x="460" y="80">cheapest bribe for this w:</text>
+            <text class="d-s" x="460" y="98">ξᵢ = max(0, 1 − yᵢ wᵀxᵢ)</text>
+            <text class="d-s" x="460" y="132">ξ = 0: on or beyond its line</text>
+            <text class="d-s" x="460" y="150">0 &lt; ξ ≤ 1: inside, not wrong</text>
+            <text class="d-s" x="460" y="168">ξ &gt; 1: on the wrong side</text>
+            <text class="d-t" x="460" y="208">w = 0 is feasible too:</text>
+            <text class="d-s" x="460" y="226">every ξᵢ = 1, total n. So the</text>
+            <text class="d-s" x="460" y="244">objective adds C Σᵢ ξᵢ.</text>
+          </svg>
+        </div>
+        <figcaption><b>Slack as a bribe (illustrative points).</b> Each point pays just enough \(\xi_i\) to reach its own margin line: nothing beyond it, up to 1 inside the margin, more than 1 on the wrong side of the separator. The formula for the cheapest bribe follows from the two constraints. Without a price on \(\xi\), \(\mathbf{w} = \mathbf{0}\) would win.</figcaption>
+      </figure>
+    </section>
+
+    <section id="choosing-c">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;t=651s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L62 · 10:51</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;t=802s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L62 · 13:22 does the dual survive?</a>
+        </div>
+        <h2>What \(C\) does</h2>
+      </div>
+      <p>\(C\) is the price of one unit of bribe. The two extremes show its role.</p>
+      <ul>
+        <li><b>\(C = 0\).</b> Bribes cost nothing, and we are back to the failed first attempt: only the length is minimized, and \(\mathbf{w} = \mathbf{0}\) is feasible, so it is the solution.</li>
+        <li><b>\(C = \infty\)</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=leolYGmaFLM&amp;t=681s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:21</a>. Each unit of bribe costs infinitely more than length, so only a \(\mathbf{w}\) that pays no bribe at all has a finite objective. That is a \(\mathbf{w}\) that classifies every point correctly with margin 1: the hard-margin, linearly separable case. If the data are not separable, every \(\mathbf{w}\) costs \(\infty\) and all are equally bad, which is useless.</li>
+      </ul>
+      <p>In between, \(C\) interpolates between how much we care about the margin (through the length of \(\mathbf{w}\)) and how much we care about handling outliers. Since we don't know in advance how many outliers the data has, cross-validation picks \(C\).</p>
+      <p>One question remains. The hard-margin problem became powerful through its dual: kernelizable, with simple constraints. The soft-margin primal has the extra variables \(\xi_i\), and it is not obvious what its dual looks like. If the dual lost those advantages, this would be a poor formulation. The only way to find out is to derive it.</p>
+    </section>
+
+    <!-- ============ LECTURE 63 ============ -->
+    <section id="soft-lagrangian">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=93s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L63 · 1:33</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=185s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L63 · 3:05 the Lagrangian</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=463s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L63 · 7:43 set gradients to zero</a>
+        </div>
+        <h2>The soft-margin Lagrangian</h2>
+      </div>
+      <p>Why does kernelizing still matter? Data can have a nonlinear structure <i>and</i> outliers. The lecture's example is 2-D data where a quadratic curve separates the classes, except for a few negatives on the positive side and a few positives on the negative side. We want slack for the outliers and a kernel for the curve.</p>
+      <p>The primal variables are now \(\mathbf{w}\) and \(\boldsymbol\xi\). Each point has two constraints and therefore two multipliers: \(\alpha_i\) for \((\mathbf{w}^\top\mathbf{x}_i)y_i + \xi_i \ge 1\) and \(\beta_i\) for \(\xi_i \ge 0\). In standard form these are \(1 - (\mathbf{w}^\top\mathbf{x}_i)y_i - \xi_i \le 0\) and \(-\xi_i \le 0\), so</p>
+      <div class="eq">\[ L(\mathbf{w},\boldsymbol\xi,\boldsymbol\alpha,\boldsymbol\beta) = \tfrac12\lVert\mathbf{w}\rVert^2 + C\sum_{i=1}^n\xi_i + \sum_{i=1}^n \alpha_i\big(1 - (\mathbf{w}^\top\mathbf{x}_i)\,y_i - \xi_i\big) + \sum_{i=1}^n \beta_i\,(-\xi_i) \]</div>
+      <p>The objective and all constraints are convex, so the min–max equals the max–min (the lecture names this strong duality):</p>
+      <div class="eq">\[ \min_{\mathbf{w},\,\boldsymbol\xi}\;\max_{\boldsymbol\alpha\ge0,\,\boldsymbol\beta\ge0} L \;=\; \max_{\boldsymbol\alpha\ge0,\,\boldsymbol\beta\ge0}\;\min_{\mathbf{w},\,\boldsymbol\xi} L \]</div>
+      <p>As before, fix \(\boldsymbol\alpha\) and \(\boldsymbol\beta\); the inner minimization is unconstrained, so set the gradients with respect to \(\mathbf{w}\) and each \(\xi_i\) to zero:</p>
+      <div class="eq">\[ \nabla_{\mathbf{w}}L = \mathbf{0} \;\Rightarrow\; \mathbf{w}^* = \sum_{i=1}^n\alpha_i y_i\mathbf{x}_i = XY\boldsymbol\alpha, \qquad \frac{\partial L}{\partial \xi_i} = C - \alpha_i - \beta_i = 0 \;\Rightarrow\; \alpha_i + \beta_i = C \]</div>
+      <p>The equation for \(\mathbf{w}^*\) is exactly the hard-margin one. The new condition \(\alpha_i + \beta_i = C\) has to hold for whatever \(\boldsymbol\alpha, \boldsymbol\beta\) the dual ends up with.</p>
+    </section>
+
+    <section id="soft-dual">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=619s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L63 · 10:19</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=780s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L63 · 13:00 β only bounds α</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=875s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L63 · 14:35 sanity checks</a>
+        </div>
+        <h2>The soft-margin dual</h2>
+      </div>
+      <p>Substitute \(\mathbf{w} = XY\boldsymbol\alpha\) back. The lecture notes that a lot cancels; in detail, the \(\xi\) terms are \(C\sum_i\xi_i - \sum_i\alpha_i\xi_i - \sum_i\beta_i\xi_i = \sum_i (C - \alpha_i - \beta_i)\,\xi_i = 0\). What remains is the hard-margin expression:</p>
+      <div class="eq">\[ \max_{\boldsymbol\alpha\ge0,\;\boldsymbol\beta\ge0,\;\boldsymbol\alpha+\boldsymbol\beta = C\mathbf{1}}\;\; \boldsymbol\alpha^\top\mathbf{1} - \tfrac12\,\boldsymbol\alpha^\top Y^\top X^\top X\,Y\boldsymbol\alpha \]</div>
+      <p>Here \(\boldsymbol\alpha + \boldsymbol\beta = C\mathbf{1}\) means \(\alpha_i + \beta_i = C\) for every \(i\). \(\boldsymbol\beta\) does not appear in the objective; it only restricts \(\boldsymbol\alpha\). Since \(\beta_i = C - \alpha_i\) must be non-negative, the restriction is \(\alpha_i \le C\), and \(\boldsymbol\beta\) can be dropped.</p>
+      <div class="result">
+        <span class="lbl">Soft-margin dual</span>
+        \[ \max_{\mathbf{0}\,\le\,\boldsymbol\alpha\,\le\,C\mathbf{1}}\;\; \boldsymbol\alpha^\top\mathbf{1} - \tfrac12\,\boldsymbol\alpha^\top Y^\top X^\top X\,Y\boldsymbol\alpha, \qquad \mathbf{w}^* = XY\boldsymbol\alpha^* = \sum_{i=1}^n \alpha_i^* y_i \mathbf{x}_i \]
+        <p>The only difference from the hard-margin dual: every \(\alpha_i\) now has an upper bound \(C\), the user-chosen hyperparameter.</p>
+      </div>
+      <h3>Sanity checks on \(C\) <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=875s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L63 · 14:35</a></h3>
+      <ul>
+        <li><b>\(C = 0\).</b> \(0 \le \alpha_i \le 0\) leaves only \(\boldsymbol\alpha = \mathbf{0}\), the single feasible and hence optimal point. Then \(\mathbf{w}^* = \sum_i 0\cdot y_i\mathbf{x}_i = \mathbf{0}\), as the primal argument predicted: free bribes give \(\mathbf{w} = \mathbf{0}\).</li>
+        <li><b>\(C = \infty\).</b> There is no upper bound, so this is exactly the hard-margin dual, matching the primal argument that infinitely expensive bribes bring back the hard-margin case.</li>
+      </ul>
+    </section>
+
+    <section id="box-constraints">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=1033s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L63 · 17:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=1186s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L63 · 19:46 is it still sparse?</a>
+        </div>
+        <h2>Box constraints keep the dual easy</h2>
+      </div>
+      <p>The data still enter only through \(X^\top X\), so the soft-margin SVM can still be kernelized. The constraints \(0 \le \alpha_i \le C\) are called <dfn>box constraints</dfn>: \(\boldsymbol\alpha\) must lie in a hypercube of side \(C\), a square in two dimensions. Projecting onto a box is easy <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=MZzp4OP8GgQ&amp;t=1095s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:15</a>. If a gradient method pushes some \(\alpha_i\) above \(C\), clip it to \(C\); if below 0, clip it to 0.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 600 270" role="img" aria-label="Left: the hard-margin dual's feasible set is the whole non-negative quadrant; a gradient step that leaves it is clipped back to alpha one equals zero. Right: the soft-margin feasible set is a square from 0 to C; a step past alpha one equals C is clipped back to C.">
+            <defs>
+              <marker id="p16f-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p16f-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <text class="d-h" x="20" y="24">Hard margin: α ≥ 0</text>
+            <rect x="90" y="50" width="180" height="170" style="fill: var(--accent-soft); fill-opacity: .7"/>
+            <line class="d-ln" x1="90" y1="220" x2="276" y2="220" marker-end="url(#p16f-ah)"/>
+            <line class="d-ln" x1="90" y1="220" x2="90" y2="44" marker-end="url(#p16f-ah)"/>
+            <text class="d-al" x="282" y="224">α₁</text>
+            <text class="d-al" x="84" y="48" text-anchor="end">α₂</text>
+            <text class="d-al" x="84" y="234" text-anchor="end">0</text>
+            <text class="d-s" x="180" y="80" text-anchor="middle">feasible: the whole quadrant</text>
+            <line class="d-ln" x1="170" y1="165" x2="39" y2="126.4" marker-end="url(#p16f-ah)"/>
+            <circle class="pt-plain" cx="170" cy="165" r="3.5"/>
+            <circle class="pt-no" cx="34" cy="125" r="3.5"/>
+            <line class="d-ln-acc d-dash" x1="40" y1="125" x2="85" y2="125" marker-end="url(#p16f-ah-acc)"/>
+            <circle class="pt-tree" cx="90" cy="125" r="4"/>
+            <text class="d-s" x="96" y="112" style="fill: var(--accent)">clip α₁ to 0</text>
+            <text class="d-s" x="20" y="258">projection: set any negative αᵢ to 0</text>
+
+            <line class="d-rule" x1="300" y1="12" x2="300" y2="262"/>
+
+            <text class="d-h" x="320" y="24">Soft margin: 0 ≤ α ≤ C</text>
+            <rect class="d-box-acc" x="360" y="80" width="140" height="140"/>
+            <line class="d-ln" x1="360" y1="220" x2="566" y2="220" marker-end="url(#p16f-ah)"/>
+            <line class="d-ln" x1="360" y1="220" x2="360" y2="44" marker-end="url(#p16f-ah)"/>
+            <text class="d-al" x="572" y="224">α₁</text>
+            <text class="d-al" x="354" y="48" text-anchor="end">α₂</text>
+            <text class="d-al" x="354" y="234" text-anchor="end">0</text>
+            <text class="d-al" x="500" y="236" text-anchor="middle">C</text>
+            <text class="d-al" x="354" y="84" text-anchor="end">C</text>
+            <text class="d-s" x="430" y="200" text-anchor="middle">feasible: the box</text>
+            <line class="d-ln" x1="430" y1="160" x2="545.4" y2="110" marker-end="url(#p16f-ah)"/>
+            <circle class="pt-plain" cx="430" cy="160" r="3.5"/>
+            <circle class="pt-no" cx="550" cy="108" r="3.5"/>
+            <line class="d-ln-acc d-dash" x1="545" y1="108" x2="505" y2="108" marker-end="url(#p16f-ah-acc)"/>
+            <circle class="pt-tree" cx="500" cy="108" r="4"/>
+            <text class="d-s" x="508" y="96" style="fill: var(--accent)">clip α₁ to C</text>
+            <text class="d-s" x="320" y="258">projection: clip each αᵢ into [0, C]</text>
+          </svg>
+        </div>
+        <figcaption><b>From quadrant to box.</b> The hard-margin dual only needs \(\boldsymbol\alpha \ge 0\); the soft-margin dual adds \(\alpha_i \le C\). In both cases, projecting a gradient step back into the feasible set means clipping each coordinate.</figcaption>
+      </figure>
+
+      <p>So the soft margin keeps both advantages of the hard-margin dual and also handles outliers, which makes it a very powerful algorithm. One property is still unchecked: <b>sparsity</b>. In the hard-margin case, complementary slackness showed that only points on the supporting hyperplanes contribute to \(\mathbf{w}^*\), so for kernel predictions we kept only those. With bribes allowed, could \(\mathbf{w}^*\) suddenly depend on every point, forcing us to keep the whole data set? Complementary slackness for the soft margin answers this.</p>
+    </section>
+
+    <!-- ============ LECTURE 64 ============ -->
+    <section id="soft-cs">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=jthjk2nboDM&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L64 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=jthjk2nboDM&amp;t=90s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L64 · 1:30 the two conditions</a>
+        </div>
+        <h2>Complementary slackness for the soft margin</h2>
+      </div>
+      <p>Complementary slackness links the primal and dual optimal solutions. Let \(\mathbf{w}^*, \boldsymbol\xi^*\) solve the primal and \(\boldsymbol\alpha^*, \boldsymbol\beta^*\) solve the dual. Keeping \(\boldsymbol\beta^*\) in the analysis makes the cases easier. Each term added to the Lagrangian for a constraint is zero at the optimum:</p>
+      <div class="result">
+        <span class="lbl">Conditions at the optimum</span>
+        \[ \text{CS1: } \alpha_i^*\big(1 - (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i - \xi_i^*\big) = 0, \qquad \text{CS2: } \beta_i^*\,\xi_i^* = 0, \qquad \alpha_i^* + \beta_i^* = C \]
+        <p>These hold for every point \(i\), together with primal feasibility \((\mathbf{w}^{*\top}\mathbf{x}_i)y_i + \xi_i^* \ge 1\) and \(\xi_i^* \ge 0\). The third equation is not special to the optimum: every feasible \(\boldsymbol\alpha, \boldsymbol\beta\) satisfies it, since that is how \(\boldsymbol\beta\) bounds \(\boldsymbol\alpha\).</p>
+      </div>
+      <p>In the hard-margin case there were two cases, \(\alpha_i^* = 0\) or \(\alpha_i^* &gt; 0\). Now \(\alpha_i^*\) lies between 0 and \(C\), and the value \(C\) turns out to be special, so there are three <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=jthjk2nboDM&amp;t=213s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:33</a>. The lecture assumes \(C\) is strictly positive.</p>
+    </section>
+
+    <section id="three-cases">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=jthjk2nboDM&amp;t=243s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L64 · 4:03 α* = 0</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=jthjk2nboDM&amp;t=521s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L64 · 8:41 0 &lt; α* &lt; C</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=jthjk2nboDM&amp;t=741s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L64 · 12:21 α* = C</a>
+        </div>
+        <h2>Three cases for \(\alpha_i^*\)</h2>
+      </div>
+      <p>Suppose we solved the dual and look at one point's \(\alpha_i^*\). What can we infer about where the point is?</p>
+      <h3>Case 1: \(\alpha_i^* = 0\)</h3>
+      <p>Then \(\beta_i^* = C &gt; 0\), so CS2 forces \(\xi_i^* = 0\). Primal feasibility becomes \((\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i \ge 1\). The point is correctly classified, either on its supporting hyperplane or beyond it; nothing more can be said. It does not contribute to \(\mathbf{w}^*\): it is a well-classified point that the solution does not need.</p>
+      <h3>Case 2: \(0 &lt; \alpha_i^* &lt; C\)</h3>
+      <p>Then \(\beta_i^* = C - \alpha_i^*\) is also strictly between 0 and \(C\). CS2 with \(\beta_i^* \ne 0\) gives \(\xi_i^* = 0\). CS1 with \(\alpha_i^* \ne 0\) gives \(1 - (\mathbf{w}^{*\top}\mathbf{x}_i)y_i - \xi_i^* = 0\). Together:</p>
+      <div class="eq">\[ (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i = 1 \]</div>
+      <p>The point lies exactly on a supporting hyperplane. Its \(\alpha_i^*\) is positive, so it contributes to \(\mathbf{w}^*\): it is a support vector.</p>
+      <h3>Case 3: \(\alpha_i^* = C\)</h3>
+      <p>Then \(\beta_i^* = 0\), and CS2 says nothing about \(\xi_i^*\) beyond the constraint \(\xi_i^* \ge 0\). But \(\alpha_i^* = C &gt; 0\), so CS1 gives</p>
+      <div class="eq">\[ \xi_i^* = 1 - (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i \ge 0 \quad\Longrightarrow\quad (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i \le 1 \]</div>
+      <p>Where are such points <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=jthjk2nboDM&amp;t=897s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>14:57</a>? For a positive point, \(\mathbf{w}^{*\top}\mathbf{x}_i \le 1\): on its supporting hyperplane or anywhere on the near side of it. Predictions use the separator \(\mathbf{w}^{*\top}\mathbf{x} = 0\), so a point strictly inside this region is in one of two situations:</p>
+      <ul>
+        <li>\((\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i &lt; 0\): the point is on the wrong side of the separator and is <b>misclassified</b>;</li>
+        <li>\(0 &lt; (\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i &lt; 1\): the point is on the correct side but closer to the separator than its supporting hyperplane, so it is <b>correctly classified without enough margin</b>. The lecture calls this strip the danger zone, where we are not confident about the classification.</li>
+      </ul>
+      <p>These are the outliers of the data set, together with the points too close to the separator. The solution is robust to them in the sense that it accepts misclassifying an outlier. Yet they get the largest possible weight, \(\alpha_i^* = C\), so they influence \(\mathbf{w}^*\) the most <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=jthjk2nboDM&amp;t=1147s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:07</a>.</p>
+      <p class="rule-of-thumb">In the soft margin, every point with \(\alpha_i^* &gt; 0\) is a support vector. It lies on a supporting hyperplane (\(0 &lt; \alpha_i^* &lt; C\)), or inside the margin, or on the wrong side of the separator (\(\alpha_i^* = C\)). In the hard margin only the first kind exists.</p>
+    </section>
+
+    <!-- ============ LECTURE 65 ============ -->
+    <section id="primal-view">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;t=30s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L65 · 0:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;t=153s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L65 · 2:33 on the hyperplane</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;t=244s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L65 · 4:04 beyond it</a>
+        </div>
+        <h2>The same cases from the primal side</h2>
+      </div>
+      <p>Lecture 64 started from \(\alpha_i^*\), the dual solution, and asked where the point is. Now start from the primal solution \(\mathbf{w}^*\), look at a point's margin \((\mathbf{w}^{*\top}\mathbf{x}_i)y_i\), and ask what \(\alpha_i^*\) must be.</p>
+      <h3>Margin strictly less than 1: inside the margin or misclassified</h3>
+      <p>Feasibility gives \(\xi_i^* \ge 1 - (\mathbf{w}^{*\top}\mathbf{x}_i)y_i &gt; 0\). With \(\xi_i^* &gt; 0\), CS2 forces \(\beta_i^* = 0\), so \(\alpha_i^* = C\). Such a point is strictly off its supporting hyperplane on the wrong side, and it is among the most important points.</p>
+      <h3>Margin exactly 1: on a supporting hyperplane</h3>
+      <p>Feasibility only gives \(\xi_i^* \ge 0\). Then \(\beta_i^*\) can be anything in \([0, C]\), and so can \(\alpha_i^*\), including 0 and \(C\). Nothing more follows. Lecture 64's case 2 is not an "if and only if": \(0 &lt; \alpha_i^* &lt; C\) puts a point on the hyperplane, but a point on the hyperplane can have any \(\alpha_i^*\) in \([0, C]\).</p>
+      <h3>Margin strictly greater than 1: well clear of the hyperplane</h3>
+      <p>Then \(1 - (\mathbf{w}^{*\top}\mathbf{x}_i)y_i &lt; 0\), and subtracting \(\xi_i^* \ge 0\) keeps it negative: \(1 - (\mathbf{w}^{*\top}\mathbf{x}_i)y_i - \xi_i^* &lt; 0\). CS1 then forces \(\alpha_i^* = 0\). Points classified with margin greater than 1 do not contribute to \(\mathbf{w}^*\).</p>
+    </section>
+
+    <section id="soft-summary">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;t=338s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L65 · 5:38</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;t=465s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L65 · 7:45 in a picture</a>
+        </div>
+        <h2>Summary: where a point is and what \(\alpha^*\) it gets</h2>
+      </div>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Dual says</th><th>so the point has</th><th>Primal says</th><th>so</th></tr></thead>
+          <tbody>
+            <tr><td>\(\alpha_i^* = 0\)</td><td>margin \(\ge 1\): on or beyond its hyperplane</td><td>margin \(&gt; 1\)</td><td>\(\alpha_i^* = 0\)</td></tr>
+            <tr><td>\(0 &lt; \alpha_i^* &lt; C\)</td><td>margin \(= 1\): on its hyperplane</td><td>margin \(= 1\)</td><td>\(\alpha_i^*\) anywhere in \([0, C]\)</td></tr>
+            <tr><td>\(\alpha_i^* = C\)</td><td>margin \(\le 1\): inside the margin or misclassified (or just on its hyperplane)</td><td>margin \(&lt; 1\)</td><td>\(\alpha_i^* = C\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">"Margin" here is \((\mathbf{w}^{*\top}\mathbf{x}_i)\,y_i\). The two halves of the table are not mirror images, because of the points that sit exactly on a supporting hyperplane.</p>
+      <p>The lecture walks through a picture. Points well beyond their supporting hyperplane, on the correct side, have \(\alpha^* = 0\). Points on the wrong side of their supporting hyperplane, whether misclassified or correctly classified without enough margin, all get \(\alpha^* = C\); being correctly classified does not help if the margin is too small. Points exactly on a supporting hyperplane can have any value: one might have 0, another 1, another \(C\) (with \(C &gt; 1\)). On one side of the line you get exactly 0, on the other exactly \(C\), and on the line anything in between. The widget below solves a small soft-margin problem so you can see the three groups move as \(C\) changes.</p>
+
+      <figure id="sm-fig">
+        <div class="controls">
+          <label for="sm-c">Penalty \(C\) (log scale)</label>
+          <input type="range" id="sm-c" min="-2" max="1" step="0.01" value="0">
+          <output id="sm-c-out" for="sm-c">C = 1.0</output>
+          <button class="btn" id="sm-slack" type="button" aria-pressed="true">Hide slack ξ</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">α* = 0</span><span class="v" id="sm-n0">–</span></div>
+          <div><span class="k">0 &lt; α* &lt; C</span><span class="v mine" id="sm-n1">–</span></div>
+          <div><span class="k">α* = C</span><span class="v mine" id="sm-nc">–</span></div>
+          <div><span class="k">Width 2/‖w*‖</span><span class="v" id="sm-width">–</span></div>
+        </div>
+        <div class="status" id="sm-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="sm-svg" viewBox="0 0 400 428" role="img" aria-label="Thirty synthetic points with two outliers and the soft-margin SVM solution through the origin: separator, shaded margin band and supporting hyperplanes. Points with alpha equal to C have a yellow halo and a dashed slack segment, points with alpha strictly between 0 and C are ringed, and the rest are unmarked."></svg></div>
+        <figcaption><b>Synthetic data with two planted outliers (30 points)</b>, generated for this page. Each slider move solves the soft-margin dual to high precision (coordinate ascent with clipping to \([0, C]\); as in the lecture there is no offset term, so the separator passes through the origin). Halo: \(\alpha^* = C\), inside the margin or misclassified, with its slack drawn dashed. Ring: \(0 &lt; \alpha^* &lt; C\), exactly on a supporting hyperplane. Unmarked: \(\alpha^* = 0\). A small \(C\) makes slack cheap: the margin is wide and many points sit at \(\alpha^* = C\). A larger \(C\) narrows the margin and leaves fewer points at the bound, though the two planted outliers stay misclassified throughout.</figcaption>
+      </figure>
+    </section>
+
+    <section id="svm-conclusions">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;t=744s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L65 · 12:24</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;t=835s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L65 · 13:55 summary</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;t=987s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L65 · 16:27 vs logistic regression</a>
+        </div>
+        <h2>Wrapping up: why the soft-margin SVM is used</h2>
+      </div>
+      <p>Is the soft-margin solution still sparse? The points with \(\alpha^* = 0\) drop out, and only points on a supporting hyperplane or on its wrong side can contribute. If the data are linearly separable apart from some outliers, in the feature space of whatever kernel is used, those points should still be few compared with the whole data set. So the soft margin loses nothing on sparsity.</p>
+      <p>The lecture's summary of the soft-margin SVM, seen through its dual:</p>
+      <ol>
+        <li><b>Kernelizable.</b> The data appear only through dot products.</li>
+        <li><b>Simple constraints.</b> Box constraints \(0 \le \alpha_i \le C\) are easy to handle, even in a projected gradient method.</li>
+        <li><b>Sparse.</b> Only a handful of points have \(\alpha_i^* \ne 0\) compared with the total.</li>
+      </ol>
+      <p>These properties are not only theoretically elegant: the algorithm performs very well in practice and has been applied successfully in many applications, especially on structured data, where features come in a structured (tabular) format <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=jbcaJ_kn3CQ&amp;t=896s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>14:56</a>. Training is a quadratic optimization problem, and a lot of work has gone into fast solvers; the lecture mentions that the fastest ones run in time linear in the size of the problem. Those techniques are not covered in this course.</p>
+      <p>The lecture closes with a comparison to <b>logistic regression</b> (<a href="part-15.html">Part 15</a>). It can also deal with outliers and has a kernel version. Both are well-motivated algorithms that differ subtly in what they optimize (<a href="part-18.html">Part 18</a> compares their loss functions), and in practice they are usually competitive. A sensible approach is to try both and choose by performance on a validation set.</p>
+      <p>Next, in <a href="part-17.html">Part 17</a>, the course takes a broader, meta view of classification after naive Bayes, decision trees, nearest neighbours, logistic regression, perceptron and SVMs: <b>ensemble</b> classifiers, leading to bagging and boosting.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Margin \(\gamma\)</dt><dd>For a unit \(\mathbf{w}\), the smallest \((\mathbf{w}^\top\mathbf{x}_i)y_i\) over the data: how far the nearest point is from the separator.</dd></div>
+        <div><dt>Radius-margin bound</dt><dd>Perceptron makes at most \(R^2/\gamma^2\) mistakes on data within radius \(R\) that is separable with margin \(\gamma\).</dd></div>
+        <div><dt>Supporting hyperplanes</dt><dd>The lines \(\mathbf{w}^\top\mathbf{x} = 1\) and \(\mathbf{w}^\top\mathbf{x} = -1\) once the margin is fixed at 1; they are \(2/\lVert\mathbf{w}\rVert\) apart.</dd></div>
+        <div><dt>Hard-margin SVM</dt><dd>\(\min \tfrac12\lVert\mathbf{w}\rVert^2\) such that \((\mathbf{w}^\top\mathbf{x}_i)y_i \ge 1\) for all \(i\): the maximum-margin separator. Needs linearly separable data.</dd></div>
+        <div><dt>Lagrangian</dt><dd>\(f(\mathbf{w}) + \sum_j \alpha_j g_j(\mathbf{w})\) with one multiplier \(\alpha_j \ge 0\) per constraint; maximizing over \(\boldsymbol\alpha\) enforces the constraints.</dd></div>
+        <div><dt>Primal and dual</dt><dd>\(\min_{\mathbf{w}}\max_{\boldsymbol\alpha\ge0} L\) and \(\max_{\boldsymbol\alpha\ge0}\min_{\mathbf{w}} L\). For convex problems they are equal (convex, or strong, duality).</dd></div>
+        <div><dt>Dot-product matrix \(X^\top X\)</dt><dd>The \(n\times n\) matrix of all \(\mathbf{x}_i^\top\mathbf{x}_j\); the only way the data enter the dual, so it can be replaced by a kernel matrix.</dd></div>
+        <div><dt>Complementary slackness</dt><dd>\(\alpha_i^* g_i(\mathbf{w}^*) = 0\) at the optimum: a multiplier can be positive only if its constraint holds with equality.</dd></div>
+        <div><dt>Support vectors</dt><dd>Points with \(\alpha_i^* &gt; 0\). In the hard margin they lie on the supporting hyperplanes; \(\mathbf{w}^*\) and predictions depend only on them.</dd></div>
+        <div><dt>Soft-margin SVM</dt><dd>\(\min \tfrac12\lVert\mathbf{w}\rVert^2 + C\sum_i\xi_i\) such that \((\mathbf{w}^\top\mathbf{x}_i)y_i + \xi_i \ge 1\), \(\xi_i \ge 0\); handles outliers.</dd></div>
+        <div><dt>Slack variable \(\xi_i\)</dt><dd>The lecture's "bribe": how much point \(i\) falls short of margin 1, paid so that every \(\mathbf{w}\) is feasible.</dd></div>
+        <div><dt>Hyperparameter \(C\)</dt><dd>The price of one unit of slack. \(C = 0\) gives \(\mathbf{w} = \mathbf{0}\); \(C = \infty\) gives the hard margin. Chosen by cross-validation.</dd></div>
+        <div><dt>Box constraints</dt><dd>\(0 \le \alpha_i \le C\) in the soft-margin dual; projecting onto them is clipping each \(\alpha_i\).</dd></div>
+        <div><dt>Danger zone</dt><dd>The lecture's name for the region between a class's supporting hyperplane and the separator; points there, and misclassified points, get \(\alpha^* = C\).</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Data lie within radius \(R = 20\), and two unit vectors separate them with margins 1 and 10. What does the perceptron bound give, and will perceptron output the margin-10 separator?</span><span class="tog"></span></summary>
+          <p>The bound holds for any separating \(\mathbf{w}^*\), so use the best margin: \(R^2/\gamma^2 = 400/100 = 4\) mistakes at most (the margin-1 separator would only give 400). Perceptron still stops at the first separator it reaches, which need not be the margin-10 one.</p></details>
+        <details><summary><span class="q">Q2</span><span>Why does \(\max_{\mathbf{w},\gamma} \gamma\) subject to \((\mathbf{w}^\top\mathbf{x}_i)y_i \ge \gamma\) have no useful solution, and what are the two fixes from Lecture 58?</span><span class="tog"></span></summary>
+          <p>Any feasible \((\mathbf{w}, \gamma)\) can be scaled to \((2\mathbf{w}, 2\gamma)\), so \(\gamma\) grows without bound. Fix either \(\lVert\mathbf{w}\rVert = 1\) and maximize \(\gamma\), or \(\gamma = 1\) and maximize the width, which leads to minimizing \(\tfrac12\lVert\mathbf{w}\rVert^2\).</p></details>
+        <details><summary><span class="q">Q3</span><span>For \(\mathbf{w} = (3, 4)\), how far apart are the lines \(\mathbf{w}^\top\mathbf{x} = 1\) and \(\mathbf{w}^\top\mathbf{x} = -1\)?</span><span class="tog"></span></summary>
+          <p>\(\lVert\mathbf{w}\rVert = 5\), so the distance is \(2/\lVert\mathbf{w}\rVert = 0.4\). The lecture's "width" quantity, half the squared distance, is \(2/\lVert\mathbf{w}\rVert^2 = 0.08\).</p></details>
+        <details><summary><span class="q">Q4</span><span>With \(f(\mathbf{w}) = -100\) and \(g(\mathbf{w}) = 5\), what is \(\max_{\alpha\ge0} f(\mathbf{w}) + \alpha g(\mathbf{w})\)? And with \(f(\mathbf{w}) = 100\), \(g(\mathbf{w}) = -5\)?</span><span class="tog"></span></summary>
+          <p>First case: \(-100 + 5\alpha\) is \(-95, -50, 400\) at \(\alpha = 1, 10, 100\) and grows without limit, so the max is \(+\infty\) (the constraint is violated). Second case: \(100 - 5\alpha\) is largest at \(\alpha = 0\), giving \(100 = f(\mathbf{w})\).</p></details>
+        <details><summary><span class="q">Q5</span><span>You have \(n = 1{,}000\) points in \(d = 10^6\) dimensions. Compare the variables and constraints of the hard-margin primal and dual.</span><span class="tog"></span></summary>
+          <p>Primal: \(10^6\) variables \(\mathbf{w}\) and 1,000 linear constraints. Dual: 1,000 variables \(\boldsymbol\alpha\) with only \(\boldsymbol\alpha \ge 0\). The dual is smaller and easier to project onto, and since it uses only \(X^\top X\) it can also be kernelized.</p></details>
+        <details><summary><span class="q">Q6</span><span>Hard margin: at the optimum one point has \((\mathbf{w}^{*\top}\mathbf{x}_i)y_i = 1.7\). What is its \(\alpha_i^*\)? Must a point with \((\mathbf{w}^{*\top}\mathbf{x}_i)y_i = 1\) have \(\alpha_i^* &gt; 0\)?</span><span class="tog"></span></summary>
+          <p>Its constraint value is \(1 - 1.7 = -0.7 \ne 0\), so complementary slackness forces \(\alpha_i^* = 0\). No: the implication only goes from \(\alpha_i^* &gt; 0\) to "on the hyperplane", so a point on the hyperplane may still have \(\alpha_i^* = 0\).</p></details>
+        <details><summary><span class="q">Q7</span><span>Soft margin with \(C = 2\). Point A has \(\alpha^* = 0.5\), point B has \(\alpha^* = 2\), and point D has \((\mathbf{w}^{*\top}\mathbf{x})y = -0.3\). What do you know about each?</span><span class="tog"></span></summary>
+          <p>A: \(0 &lt; \alpha^* &lt; C\), so it lies exactly on its supporting hyperplane with \(\xi^* = 0\). B: \(\alpha^* = C\), so its margin is at most 1 (inside the margin or misclassified) and \(\xi^* = 1 - \text{margin}\). D: margin below 1, so \(\alpha^* = C = 2\); it is misclassified, with slack \(\xi^* = 1 - (-0.3) = 1.3\).</p></details>
+        <details><summary><span class="q">Q8</span><span>Using the soft-margin dual, explain what happens as \(C \to 0\) and as \(C \to \infty\).</span><span class="tog"></span></summary>
+          <p>\(C = 0\) forces \(0 \le \alpha_i \le 0\), so \(\boldsymbol\alpha^* = \mathbf{0}\) and \(\mathbf{w}^* = \sum_i \alpha_i^* y_i \mathbf{x}_i = \mathbf{0}\). With \(C = \infty\) the upper bound disappears and the problem is the hard-margin dual, which needs linearly separable data.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-15.html"><span class="dir">← Part 15</span><span class="nm">Perceptron and logistic regression</span></a><a class="next" href="part-17.html"><span class="dir">Part 17 →</span><span class="nm">Ensembles: bagging and boosting</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+  /* Seeded PRNG (same rand/normal as part-02), one stream per widget. */
+  const prng = s => {
+    let seed = s;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    return { rand, normal };
+  };
+  /* Shared plot frame: data range [-5, 5] on both axes. */
+  const LO = -5, HI = 5, PAD = 22, SC = (400 - 2 * PAD) / (HI - LO);
+  const sx = x => PAD + (x - LO) * SC, sy = y => 400 - PAD - (y - LO) * SC;
+  const LONG = 20;
+  const lineAt = (el, c, u) => { const t = [-u[1], u[0]]; el.setAttribute('x1', sx(c * u[0] + LONG * t[0])); el.setAttribute('y1', sy(c * u[1] + LONG * t[1])); el.setAttribute('x2', sx(c * u[0] - LONG * t[0])); el.setAttribute('y2', sy(c * u[1] - LONG * t[1])); };
+  const bandAt = (el, h, u) => { const t = [-u[1], u[0]]; el.setAttribute('points', [[h, 1], [h, -1], [-h, -1], [-h, 1]].map(([c, s]) => `${sx(c * u[0] + s * LONG * t[0])},${sy(c * u[1] + s * LONG * t[1])}`).join(' ')); };
+  const dot = (g, p) => p.y > 0
+    ? mk('circle', { cx: sx(p.x[0]), cy: sy(p.x[1]), r: 5, style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.5' }, g)
+    : mk('rect', { x: sx(p.x[0]) - 4.5, y: sy(p.x[1]) - 4.5, width: 9, height: 9, style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.6' }, g);
+  const frame = (svg, id) => {
+    axes(svg, sx, sy, LO, HI, 2);
+    const defs = mk('defs', {}, svg);
+    const cp = mk('clipPath', { id }, defs); mk('rect', { x: PAD, y: PAD, width: 400 - 2 * PAD, height: 400 - 2 * PAD }, cp);
+    return defs;
+  };
+  /* Legend in a strip below the plot (the viewBox is 28px taller than the plot). */
+  const legend = (svg, rows) => {
+    const g = mk('g', {}, svg), y = 414; let x = PAD;
+    rows.forEach(r => { const iw = r.iw || 12; r.icon(g, x + iw / 2, y); mk('text', { x: x + iw + 6, y: y + 4, class: 'c-note' }, g).textContent = r.text; x += iw + 6 + r.text.length * 6.4 + 18; });
+  };
+  const iconPos = (g, x, y) => mk('circle', { cx: x, cy: y, r: 5, style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.5' }, g);
+  const iconNeg = (g, x, y) => mk('rect', { x: x - 4.5, y: y - 4.5, width: 9, height: 9, style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.6' }, g);
+
+  /* ---------- Maximum margin through the origin ---------- */
+  (() => {
+    const svg = document.getElementById('mm-svg'); if (!svg) return;
+    const { normal } = prng(5701);
+    const u0 = [Math.SQRT1_2, Math.SQRT1_2], pts = [];
+    const add = (cx, cy, y, k) => { let c = 0; while (c < k) { const p = [cx + 0.8 * normal(), cy + 0.8 * normal()]; if (y * (p[0] * u0[0] + p[1] * u0[1]) < 0.55 || Math.abs(p[0]) > 4.4 || Math.abs(p[1]) > 4.4) continue; pts.push({ x: p, y }); c++; } };
+    add(1.4, 2.1, 1, 12); add(-2.0, -1.3, -1, 12);
+    const marg = (r, p) => p.y * (p.x[0] * Math.cos(r) + p.x[1] * Math.sin(r));
+    const gam = r => Math.min(...pts.map(p => marg(r, p)));
+    let best = -Infinity, rStar = 0;
+    for (let i = 0; i < 3600; i++) { const r = i / 10 * Math.PI / 180, g = gam(r); if (g > best) { best = g; rStar = r; } }
+    let a = rStar - 0.003, b = rStar + 0.003;
+    for (let k = 0; k < 80; k++) { const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3; if (gam(m1) < gam(m2)) a = m1; else b = m2; }
+    rStar = (a + b) / 2; best = gam(rStar);
+    const thStar = rStar * 180 / Math.PI;
+
+    const defs = frame(svg, 'mm-clip');
+    const mkr = mk('marker', { id: 'mm-ah', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs);
+    mk('path', { d: 'M0,0 L10,5 L0,10 z', class: 'c-arrowhead' }, mkr);
+    const gClip = mk('g', { 'clip-path': 'url(#mm-clip)' }, svg);
+    const band = mk('polygon', { style: 'fill: var(--accent-soft); fill-opacity: .85' }, gClip);
+    const mPos = mk('line', { class: 'c-line', style: 'stroke-dasharray: 5 4' }, gClip);
+    const mNeg = mk('line', { class: 'c-line', style: 'stroke-dasharray: 5 4' }, gClip);
+    const sep = mk('line', { class: 'c-user' }, gClip);
+    const arrow = mk('line', { class: 'c-arrow', 'marker-end': 'url(#mm-ah)' }, svg);
+    const wLbl = mk('text', { class: 'c-lbl', 'text-anchor': 'middle' }, svg);
+    wLbl.textContent = 'w';
+    const gPts = mk('g', {}, svg);
+    pts.forEach(p => dot(gPts, p));
+    const gRing = mk('g', {}, svg);
+    legend(svg, [
+      { icon: iconPos, text: 'class +1' },
+      { icon: iconNeg, text: 'class −1' },
+      { icon: (g, x, y) => mk('circle', { cx: x, cy: y, r: 7, class: 'c-hl' }, g), text: 'nearest point(s)', iw: 14 }
+    ]);
+
+    const slider = document.getElementById('mm-th'), out = document.getElementById('mm-th-out');
+    const gOut = document.getElementById('mm-gam'), nOut = document.getElementById('mm-norm'), status = document.getElementById('mm-status');
+    document.getElementById('mm-best').textContent = best.toFixed(2);
+    let th = parseFloat(slider.value);
+    const draw = () => {
+      const r = th * Math.PI / 180, u = [Math.cos(r), Math.sin(r)], g = gam(r);
+      lineAt(sep, 0, u);
+      arrow.setAttribute('x1', sx(0)); arrow.setAttribute('y1', sy(0)); arrow.setAttribute('x2', sx(1.5 * u[0])); arrow.setAttribute('y2', sy(1.5 * u[1]));
+      wLbl.setAttribute('x', sx(1.95 * u[0])); wLbl.setAttribute('y', sy(1.95 * u[1]) + 4);
+      gRing.textContent = '';
+      const ring = p => mk('circle', { cx: sx(p.x[0]), cy: sy(p.x[1]), r: 9.5, class: 'c-hl' }, gRing);
+      out.textContent = Math.round(th) % 360 + '°';
+      gOut.textContent = g.toFixed(2);
+      if (g > 0) {
+        bandAt(band, g, u); lineAt(mPos, g, u); lineAt(mNeg, -g, u);
+        band.style.display = mPos.style.display = mNeg.style.display = '';
+        pts.forEach(p => { if (marg(r, p) < g + 1e-3) ring(p); });
+        nOut.textContent = (1 / g).toFixed(2);
+        const d = Math.abs(((th - thStar) % 360 + 540) % 360 - 180);
+        status.textContent = d < 0.25 ? `Maximum margin: γ* = ${best.toFixed(2)}, so the shortest feasible w has ‖w‖ = 1/γ* = ${(1 / best).toFixed(2)}. The ringed points are the support vectors.` : '';
+      } else {
+        band.style.display = mPos.style.display = mNeg.style.display = 'none';
+        const bad = pts.filter(p => marg(r, p) <= 0); bad.forEach(ring);
+        nOut.textContent = '—';
+        status.textContent = `Not a separator: ${bad.length} ringed point${bad.length === 1 ? ' is' : 's are'} on the wrong side, so no rescaling can make every margin at least 1.`;
+      }
+    };
+    draw();
+    slider.addEventListener('input', () => { th = parseFloat(slider.value); draw(); });
+    document.getElementById('mm-snap').addEventListener('click', () => {
+      const d = ((thStar - th) % 360 + 540) % 360 - 180;
+      tween(th, th + d, v => { th = ((v % 360) + 360) % 360; slider.value = Math.round(th) % 360; draw(); });
+    });
+  })();
+
+  /* ---------- Soft-margin SVM: the three cases of alpha ---------- */
+  (() => {
+    const svg = document.getElementById('sm-svg'); if (!svg) return;
+    const { normal } = prng(6686);
+    const pts = [];
+    const add = (cx, cy, y, k, sd) => { let c = 0; while (c < k) { const p = [cx + sd * normal(), cy + sd * normal()]; if (Math.abs(p[0]) > 4.3 || Math.abs(p[1]) > 4.3) continue; pts.push({ x: p, y }); c++; } };
+    add(1.6, 1.5, 1, 14, 0.8); add(-1.6, -1.5, -1, 14, 0.8);
+    add(-1.3, -1.0, 1, 1, 0.4); add(1.2, 0.9, -1, 1, 0.4); /* the two outliers */
+    const n = pts.length;
+    /* Dual coordinate ascent: maximize sum(a) - 1/2 ||sum a_i y_i x_i||^2 over 0 <= a <= C (no offset, so no equality constraint). */
+    const solve = C => {
+      const a = new Array(n).fill(0), w = [0, 0];
+      for (let sweep = 0; sweep < 50000; sweep++) {
+        let mx = 0;
+        for (let i = 0; i < n; i++) {
+          const p = pts[i], q = p.x[0] * p.x[0] + p.x[1] * p.x[1];
+          const g = 1 - p.y * (w[0] * p.x[0] + w[1] * p.x[1]);
+          const na = Math.min(C, Math.max(0, a[i] + g / q)), d = na - a[i];
+          if (d !== 0) { w[0] += d * p.y * p.x[0]; w[1] += d * p.y * p.x[1]; a[i] = na; if (Math.abs(d) > mx) mx = Math.abs(d); }
+        }
+        if (mx < 1e-12) break;
+      }
+      w[0] = 0; w[1] = 0;
+      for (let i = 0; i < n; i++) { w[0] += a[i] * pts[i].y * pts[i].x[0]; w[1] += a[i] * pts[i].y * pts[i].x[1]; }
+      return { a, w };
+    };
+
+    frame(svg, 'sm-clip');
+    const gClip = mk('g', { 'clip-path': 'url(#sm-clip)' }, svg);
+    const band = mk('polygon', { style: 'fill: var(--accent-soft); fill-opacity: .85' }, gClip);
+    const mPos = mk('line', { class: 'c-line', style: 'stroke-dasharray: 5 4' }, gClip);
+    const mNeg = mk('line', { class: 'c-line', style: 'stroke-dasharray: 5 4' }, gClip);
+    const sep = mk('line', { class: 'c-user' }, gClip);
+    const gSlack = mk('g', {}, svg), gHalo = mk('g', {}, svg), gPts = mk('g', {}, svg), gRing = mk('g', {}, svg);
+    pts.forEach(p => dot(gPts, p));
+    const halo = (g, x, y, r) => mk('circle', { cx: x, cy: y, r, style: 'fill: var(--mark); stroke: var(--ink); stroke-width: 1.2' }, g);
+    legend(svg, [
+      { icon: (g, x, y) => { halo(g, x, y, 8); iconPos(g, x, y); }, text: 'α* = C', iw: 16 },
+      { icon: (g, x, y) => { iconPos(g, x, y); mk('circle', { cx: x, cy: y, r: 8, class: 'c-hl' }, g); }, text: '0 < α* < C', iw: 16 },
+      { icon: (g, x, y) => { iconPos(g, x - 7, y); iconNeg(g, x + 7, y); }, text: 'α* = 0', iw: 24 },
+      { icon: iconPos, text: '+1' },
+      { icon: iconNeg, text: '−1' }
+    ]);
+
+    const slider = document.getElementById('sm-c'), out = document.getElementById('sm-c-out'), btn = document.getElementById('sm-slack');
+    const n0Out = document.getElementById('sm-n0'), n1Out = document.getElementById('sm-n1'), ncOut = document.getElementById('sm-nc'), wdOut = document.getElementById('sm-width'), status = document.getElementById('sm-status');
+    let showSlack = true;
+    const draw = () => {
+      const C = Math.pow(10, parseFloat(slider.value));
+      const { a, w } = solve(C);
+      const nw = Math.hypot(w[0], w[1]), u = [w[0] / nw, w[1] / nw], h = 1 / nw;
+      bandAt(band, h, u); lineAt(mPos, h, u); lineAt(mNeg, -h, u); lineAt(sep, 0, u);
+      gSlack.textContent = ''; gHalo.textContent = ''; gRing.textContent = '';
+      let n0 = 0, n1 = 0, nc = 0, mis = 0;
+      const tol = 1e-9 * Math.max(1, C);
+      pts.forEach((p, i) => {
+        const m = p.y * (w[0] * p.x[0] + w[1] * p.x[1]), cx = sx(p.x[0]), cy = sy(p.x[1]);
+        if (a[i] <= tol) { n0++; return; }
+        if (a[i] >= C - tol) {
+          nc++; if (m < 0) mis++;
+          halo(gHalo, cx, cy, 10);
+          const xi = Math.max(0, 1 - m), s = xi / (nw * nw);
+          if (showSlack && xi > 1e-9) mk('line', { x1: cx, y1: cy, x2: sx(p.x[0] + s * p.y * w[0]), y2: sy(p.x[1] + s * p.y * w[1]), class: 'c-err' }, gSlack);
+          return;
+        }
+        n1++; mk('circle', { cx, cy, r: 9.5, class: 'c-hl' }, gRing);
+      });
+      out.textContent = 'C = ' + (C >= 1 ? C.toFixed(1) : C.toPrecision(2));
+      n0Out.textContent = n0; n1Out.textContent = n1; ncOut.textContent = nc; wdOut.textContent = (2 / nw).toFixed(2);
+      status.textContent = `${n1 + nc} support vectors out of ${n}: ${n1} on a supporting hyperplane and ${nc} at α* = C, of which ${mis} ${mis === 1 ? 'is' : 'are'} misclassified.`;
+    };
+    draw();
+    slider.addEventListener('input', draw);
+    btn.addEventListener('click', () => { showSlack = !showSlack; btn.setAttribute('aria-pressed', String(showSlack)); btn.textContent = showSlack ? 'Hide slack ξ' : 'Show slack ξ'; draw(); });
+  })();
+})();
+</script>
+</body>
+</html>
