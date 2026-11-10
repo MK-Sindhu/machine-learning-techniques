@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 8 · Maximum likelihood and Bayesian estimation · MLT Notes</title>
+<meta name="description" content="Machine Learning Techniques (IIT Madras) notes, Part 8: lectures 19–21 on probabilistic models, maximum likelihood estimation, and Bayesian estimation with priors and posteriors.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html">MLT Notes</a><span class="sep">/</span><span>Part 8 of 18</span><span class="sep">·</span><a href="part-07.html">← Part 7</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Estimation: maximum likelihood and Bayesian updating</h1>
+    <p class="lede">Notes for lectures 19 to 21. The data is now assumed to come from a probabilistic model with unknown parameters, and estimation means guessing those parameters from the data. Maximum likelihood picks the value that makes the observed data most likely, and the Bayesian approach turns a prior belief into a posterior with Bayes' theorem.</p>
+    <div class="meta">
+      <span><b>Part 8</b> of 18</span>
+      <span>Instructor <b>Prof. Arun Rajkumar</b></span>
+      <span>About <b>84 min</b> of video</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L19 · 20:21</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L20 · 26:58</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Watch L21 · 36:49</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Lecture 19</h4>
+      <ul>
+        <li><a href="#probabilistic-view">A model for the data</a></li>
+        <li><a href="#coin-box">The coin in a box</a></li>
+        <li><a href="#first-guess">A first guess</a></li>
+        <li><a href="#iid">Independent, identical</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 20</h4>
+      <ul>
+        <li><a href="#likelihood">The likelihood function</a></li>
+        <li><a href="#bernoulli-mle">MLE for a coin</a></li>
+        <li><a href="#gaussian-model">Densities, not probabilities</a></li>
+        <li><a href="#gaussian-mean">MLE for a Gaussian mean</a></li>
+        <li><a href="#model-matters">The model decides</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Lecture 21</h4>
+      <ul>
+        <li><a href="#hunch">A hunch before data</a></li>
+        <li><a href="#prior">The prior</a></li>
+        <li><a href="#posterior">Bayes: prior to posterior</a></li>
+        <li><a href="#beta-prior">The Beta prior</a></li>
+        <li><a href="#beta-posterior">Beta in, Beta out</a></li>
+        <li><a href="#point-estimates">Mean, ghost data, MAP</a></li>
+        <li><a href="#two-ways">Two ways to estimate</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html">All parts</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li><dfn>Estimation</dfn> assumes a probabilistic model generated the data, with some unknown <b>parameters</b>, and uses the data to guess them. The parameter is a compressed description of the data.</li>
+        <li>The usual hidden assumption is that observations are <b>i.i.d.</b>, independent and identically distributed: one box, pressed \(n\) times.</li>
+        <li><b>Maximum likelihood</b> (Fisher) picks the parameter under which the observed data is most likely. For coin tosses it gives the fraction of heads, \(\hat p_{\text{ML}} = \frac1n\sum_i x_i\); for a Gaussian with known variance, the sample mean.</li>
+        <li>For continuous data the likelihood is built from <b>densities</b>, since every single value has probability zero. The estimator depends on the model: a Laplace model gives the sample median instead of the mean.</li>
+        <li><b>Bayesian estimation</b> writes a hunch as a <dfn>prior</dfn> \(P(\theta)\) and updates it with Bayes' theorem: posterior \(\propto\) likelihood \(\times\) prior.</li>
+        <li>A Beta\((\alpha, \beta)\) prior with coin-toss data gives a Beta\((\alpha + n_H,\ \beta + n_T)\) posterior. Its mean \((\alpha + n_H)/(\alpha + \beta + n)\) treats the prior as \(\alpha\) ghost heads and \(\beta\) ghost tails; the MAP estimate is its mode.</li>
+      </ul>
+    </div>
+
+    <!-- ============ LECTURE 19 ============ -->
+    <section id="probabilistic-view">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=12s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 0:12</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=119s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 1:59 estimation</a>
+        </div>
+        <h2>A probabilistic model for the data</h2>
+      </div>
+      <p>So far the course has studied two kinds of unsupervised learning. Representation learning found good representations with PCA, for linear relationships between features (<a href="part-03.html">Part 3</a>), and with kernel PCA for non-linear ones (<a href="part-05.html">Part 5</a>). Clustering grouped the points with Lloyd's algorithm, K-means (<a href="part-06.html">Parts 6</a> and <a href="part-07.html">7</a>).</p>
+      <p>None of these methods assumed anything about how the data was produced. Estimation does. It assumes a <dfn>probabilistic model</dfn>: some random mechanism that generated the data. We are still in unsupervised learning and still have only data, but the methods move from deterministic procedures to probability. The lecture adds that the same tools will be useful for supervised learning later in the course.</p>
+      <p>The hypothesis, at a high level: <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=150s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:30</a></p>
+      <ul>
+        <li>Some probabilistic mechanism generates the data.</li>
+        <li>Something about this mechanism is unknown to us.</li>
+        <li>Given the data, find (estimate) what is unknown.</li>
+      </ul>
+    </section>
+
+    <section id="coin-box">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=259s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 4:19</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=431s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 7:11 compression</a>
+        </div>
+        <h2>The coin in a box</h2>
+      </div>
+      <p>The lecture's picture is a black box with a button on top. Inside is a coin that need not be fair: the chance of heads is some value \(p\), perhaps 0.7 or 0.9, which we do not know. Each press of the button flips the coin and shows the outcome, written 1 for heads and 0 for tails. Four presses might give 1, 0, 1, 1. These are our <dfn>observations</dfn>.</p>
+      <p>Keep two sides apart. The observations are what we see. The box is a story we <i>assume</i> in order to explain them. It may or may not be true of the real world; for now we make the assumption and work with it, and the lecture postpones the question of how good such assumptions are. Within the story, the bias \(p\) is the <dfn>unknown parameter</dfn>.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 300" role="img" aria-label="Top row: a hidden box with a button and a coin of unknown bias p; pressing it n times gives the observed outcomes 1, 0, 1, 1. An arrow down from the observations gives the estimate p-hat equals 3/4, which fills our own box; pressing our box produces new data on demand.">
+            <defs>
+              <marker id="p08-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="p08-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <text class="d-row" x="20" y="24">Assumed: hidden from us</text>
+            <text class="d-row" x="292" y="24">Observed: known to us</text>
+            <rect class="b-unk" x="20" y="52" width="160" height="88" rx="8"/>
+            <rect class="d-box" x="85" y="42" width="30" height="10" rx="3"/>
+            <circle class="node" cx="100" cy="96" r="26"/>
+            <text class="d-t" x="100" y="100" text-anchor="middle">p = ?</text>
+            <text class="d-s" x="100" y="160" text-anchor="middle">coin with unknown bias p</text>
+            <line class="d-ln" x1="184" y1="96" x2="284" y2="96" marker-end="url(#p08-ah)"/>
+            <text class="d-s" x="234" y="86" text-anchor="middle">press the button</text>
+            <text class="d-s" x="234" y="114" text-anchor="middle">n times</text>
+            <rect class="d-box" x="292" y="77" width="34" height="38" rx="4"/><text class="d-t" x="309" y="101" text-anchor="middle">1</text>
+            <rect class="d-box" x="334" y="77" width="34" height="38" rx="4"/><text class="d-t" x="351" y="101" text-anchor="middle">0</text>
+            <rect class="d-box" x="376" y="77" width="34" height="38" rx="4"/><text class="d-t" x="393" y="101" text-anchor="middle">1</text>
+            <rect class="d-box" x="418" y="77" width="34" height="38" rx="4"/><text class="d-t" x="435" y="101" text-anchor="middle">1</text>
+            <text class="d-t" x="470" y="101">…</text>
+            <text class="d-al" x="309" y="132" text-anchor="middle">x₁</text><text class="d-al" x="351" y="132" text-anchor="middle">x₂</text><text class="d-al" x="393" y="132" text-anchor="middle">x₃</text><text class="d-al" x="435" y="132" text-anchor="middle">x₄</text>
+            <line class="d-ln-acc" x1="372" y1="142" x2="372" y2="180" marker-end="url(#p08-ah-acc)"/>
+            <text class="d-s" x="382" y="166" style="fill: var(--accent)">estimate: p̂ = fraction of 1s = 3/4</text>
+            <text class="d-s" x="346" y="183" text-anchor="end">your own box</text>
+            <rect class="d-box-acc" x="292" y="196" width="160" height="80" rx="8"/>
+            <rect class="d-box-acc" x="357" y="186" width="30" height="10" rx="3"/>
+            <circle class="node-acc" cx="372" cy="236" r="27"/>
+            <text class="d-t" x="372" y="240" text-anchor="middle" style="font-size: 12px">p̂ = 3/4</text>
+            <line class="d-ln" x1="456" y1="236" x2="536" y2="236" marker-end="url(#p08-ah)"/>
+            <text class="d-s" x="496" y="226" text-anchor="middle">press</text>
+            <rect class="d-box" x="544" y="217" width="34" height="38" rx="4"/><text class="d-t" x="561" y="241" text-anchor="middle">1</text>
+            <rect class="d-box" x="586" y="217" width="34" height="38" rx="4"/><text class="d-t" x="603" y="241" text-anchor="middle">1</text>
+            <rect class="d-box" x="628" y="217" width="34" height="38" rx="4"/><text class="d-t" x="645" y="241" text-anchor="middle">0</text>
+            <text class="d-t" x="670" y="241">…</text>
+            <text class="d-s" x="544" y="274">new data on demand</text>
+            <text class="d-s" x="20" y="214">p is the unknown parameter:</text>
+            <text class="d-s" x="20" y="230">one number that explains</text>
+            <text class="d-s" x="20" y="246">(compresses) all n tosses.</text>
+            <text class="d-s" x="20" y="272">The box is an assumption;</text>
+            <text class="d-s" x="20" y="288">it may or may not be true.</text>
+          </svg>
+        </div>
+        <figcaption><b>The generative story behind estimation.</b> We assume a hidden mechanism with an unknown parameter produced the data. Estimation runs the arrow backwards: from the observations to a guess \(\hat p\). With the guess in hand we own a copy of the box and can generate new data whenever we like.</figcaption>
+      </figure>
+
+      <p>The parameter is a compressed representation of the data. A thousand 0/1 values are explained by one number: if we knew \(p\), we would know the mechanism that produced them. This is the course's <i>comprehension is compression</i> theme from <a href="part-02.html">Part 2</a> in a new form.</p>
+      <div class="result">
+        <span class="lbl">Goal of estimation <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=463s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:43</a></span>
+        <p>Observe some data. Assume a probabilistic model that generates it. Estimate the unknown parameters of that model using the data.</p>
+      </div>
+    </section>
+
+    <section id="first-guess">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=526s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 8:46</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=725s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 12:05 other candidates</a>
+        </div>
+        <h2>A first guess, and why it is only a guess</h2>
+      </div>
+      <p>Twelve presses give</p>
+      <div class="eq">\[ 1,\ 0,\ 0,\ 1,\ 1,\ 0,\ 1,\ 1,\ 1,\ 1,\ 1,\ 1 \]</div>
+      <p>The model says each observation is a random variable \(x\) with \(P(x = 1) = p\) and \(P(x = 0) = 1 - p\). What would you guess for \(p\)? The natural guess counts heads. There are 9 ones and 3 zeros out of 12, so</p>
+      <div class="eq">\[ \hat p = \frac{9}{12} = \frac34 \]</div>
+      <p>With an estimate in hand we can build our own box, a coin with bias 3/4, and generate as many observations as we like <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=659s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:59</a>. The data mattered only because it told us about the mechanism. Once the parameter is fixed, we no longer need the data.</p>
+      <p>But 3/4 is a guess. As soon as probabilities enter, we can never be fully sure we have the true \(p\). Which values could have produced these twelve tosses?</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>True \(p\)</th><th>Could it give 9 heads in 12?</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>2/3</td><td>Yes</td><td>Nothing rules it out.</td></tr>
+            <tr><td>0.0001</td><td>Yes, barely</td><td>The chance is tiny but not zero. We would have had an extremely unlucky day.</td></tr>
+            <tr><td>0</td><td>No</td><td>Every toss would be tails, but we saw heads.</td></tr>
+            <tr><td>1</td><td>No</td><td>Every toss would be heads, but we saw tails.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>So the only values we can rule out are 0 and 1 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=828s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:48</a>. Every \(p\) strictly between them remains a contender, and still we chose 3/4. The lecture asks which assumptions went into that choice.</p>
+    </section>
+
+    <section id="iid">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=929s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 15:29</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=1165s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 19:25 the open question</a>
+        </div>
+        <h2>The hidden assumptions: independent and identically distributed</h2>
+      </div>
+      <p>Write the observations as \(x_1, x_2, \dots, x_n\), each 0 or 1. Two assumptions are almost always made about data like this, usually without saying so.</p>
+      <h3>Independent <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=1001s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 16:41</a></h3>
+      <p>Knowing one outcome does not change the probability of another:</p>
+      <div class="eq">\[ P(x_i = a \mid x_j = b) = P(x_i = a) \qquad \text{for all } i \ne j \]</div>
+      <p>If the third toss was heads, our uncertainty about the fourth toss is unchanged. The same holds when we condition on any set of the other observations.</p>
+      <h3>Identically distributed <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=382yNz5LoX0&amp;t=1064s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L19 · 17:44</a></h3>
+      <div class="eq">\[ P(x_i = 1) = P(x_j = 1) = p \qquad \text{for all } i, j \]</div>
+      <p>The same coin is flipped every time. There is one box and we press it \(n\) times. Two different coins tossed once each are still independent, because the first result says nothing about the second, but they are not identically distributed: their biases may differ.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 244" role="img" aria-label="Left: one box with bias p pressed four times gives x1 to x4, each with probability p of a 1: independent and identically distributed. Right: two different boxes with biases p1 and p2 each give one toss: independent but not identically distributed.">
+            <defs><marker id="p08-ah-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="20" y="24">One box, pressed n times</text>
+            <rect class="d-box-acc" x="30" y="84" width="96" height="66" rx="8"/>
+            <rect class="d-box-acc" x="63" y="74" width="30" height="10" rx="3"/>
+            <circle class="node-acc" cx="78" cy="117" r="21"/>
+            <text class="d-t" x="78" y="122" text-anchor="middle">p</text>
+            <line class="d-ln" x1="130" y1="112" x2="204" y2="59" marker-end="url(#p08-ah-b)"/>
+            <line class="d-ln" x1="130" y1="115" x2="204" y2="101" marker-end="url(#p08-ah-b)"/>
+            <line class="d-ln" x1="130" y1="119" x2="204" y2="143" marker-end="url(#p08-ah-b)"/>
+            <line class="d-ln" x1="130" y1="122" x2="204" y2="185" marker-end="url(#p08-ah-b)"/>
+            <rect class="d-box" x="210" y="44" width="34" height="30" rx="4"/><text class="d-t" x="227" y="64" text-anchor="middle">1</text>
+            <rect class="d-box" x="210" y="86" width="34" height="30" rx="4"/><text class="d-t" x="227" y="106" text-anchor="middle">0</text>
+            <rect class="d-box" x="210" y="128" width="34" height="30" rx="4"/><text class="d-t" x="227" y="148" text-anchor="middle">1</text>
+            <rect class="d-box" x="210" y="170" width="34" height="30" rx="4"/><text class="d-t" x="227" y="190" text-anchor="middle">1</text>
+            <text class="d-al" x="252" y="63">x₁</text><text class="d-al" x="252" y="105">x₂</text><text class="d-al" x="252" y="147">x₃</text><text class="d-al" x="252" y="189">x₄</text>
+            <text class="d-t" x="20" y="220" style="fill: var(--accent)">Independent and identically distributed</text>
+            <text class="d-s" x="20" y="237">same coin every time: P(xᵢ = 1) = p for every i</text>
+
+            <line class="d-rule" x1="340" y1="12" x2="340" y2="236"/>
+
+            <text class="d-h" x="360" y="24">Two different coins</text>
+            <rect class="d-box" x="370" y="56" width="96" height="62" rx="8"/>
+            <rect class="d-box" x="403" y="46" width="30" height="10" rx="3"/>
+            <circle class="node" cx="418" cy="87" r="20"/>
+            <text class="d-t" x="418" y="92" text-anchor="middle">p₁</text>
+            <rect class="d-box" x="370" y="140" width="96" height="62" rx="8"/>
+            <rect class="d-box" x="403" y="130" width="30" height="10" rx="3"/>
+            <circle class="node" cx="418" cy="171" r="20"/>
+            <text class="d-t" x="418" y="176" text-anchor="middle">p₂</text>
+            <line class="d-ln" x1="470" y1="87" x2="520" y2="87" marker-end="url(#p08-ah-b)"/>
+            <line class="d-ln" x1="470" y1="171" x2="520" y2="171" marker-end="url(#p08-ah-b)"/>
+            <rect class="d-box" x="526" y="72" width="34" height="30" rx="4"/><text class="d-t" x="543" y="92" text-anchor="middle">1</text>
+            <rect class="d-box" x="526" y="156" width="34" height="30" rx="4"/><text class="d-t" x="543" y="176" text-anchor="middle">0</text>
+            <text class="d-s" x="570" y="91">P(x₁ = 1) = p₁</text>
+            <text class="d-s" x="570" y="175">P(x₂ = 1) = p₂</text>
+            <text class="d-t" x="360" y="220">Independent, not identically distributed</text>
+            <text class="d-s" x="360" y="237">the two biases p₁ and p₂ may differ</text>
+          </svg>
+        </div>
+        <figcaption><b>What identical distribution adds.</b> On the left one law produces every observation, so a single \(p\) describes them all. On the right the tosses are still independent, but each comes from its own coin and needs its own parameter.</figcaption>
+      </figure>
+
+      <p>The standard abbreviation for the pair is <dfn>i.i.d.</dfn> Under these assumptions, is there a principled way to call one guess better than another? Can we argue that 2/3 beats 0.0001, or that 3/4 beats every other value? The fraction of heads is intuitive, but so far nothing more. Lecture 20 supplies the principle.</p>
+    </section>
+
+    <!-- ============ LECTURE 20 ============ -->
+    <section id="likelihood">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=12s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 0:12</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=200s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 3:20 Fisher's principle</a>
+        </div>
+        <h2>The likelihood function</h2>
+      </div>
+      <p>Take the four observations 1, 0, 1, 1. Put every candidate value of \(p\) from 0 to 1 on a horizontal axis and ask of each one: if this were the true bias, what is the chance of seeing exactly this data? Plot that chance against \(p\). The curve is 0 at \(p = 0\) and at \(p = 1\), which we already know cannot produce this data, and it peaks at \(p = 3/4\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=136s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:16</a>. That is the same as the fraction of ones.</p>
+      <p><dfn>Fisher's principle of maximum likelihood</dfn> turns this into a method. Among all the parameter values that could have generated the data, bet on the one under which the observed data is most probable. The idea is old, and the lecture treats it as a review for anyone who has met it in a statistics course.</p>
+
+      <h3>Writing it down <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=236s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 3:56</a></h3>
+      <p>The <dfn>likelihood function</dfn> is a function of the parameter, with the data held fixed:</p>
+      <div class="eq">\[ \begin{aligned} L(p;\, x_1, \dots, x_n) &= P(x_1, x_2, \dots, x_n;\, p) \\ &= \prod_{i=1}^n P(x_i;\, p) && \text{independence} \\ &= \prod_{i=1}^n p^{x_i}(1-p)^{1-x_i} && \text{the same } p \text{ for every toss} \end{aligned} \]</div>
+      <p>Here \(x_1, \dots, x_n\) are the specific observed values, so the first line is the joint probability that the first toss came out as \(x_1\), the second as \(x_2\), and so on, if the bias is \(p\). Independence splits it into a product, and identical distribution puts the same \(p\) in every factor <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=305s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:05</a>.</p>
+      <p>The compact form \(p^{x_i}(1-p)^{1-x_i}\) covers both outcomes at once. If \(x_i = 1\) it is \(p^1(1-p)^0 = p\); if \(x_i = 0\) it is \(p^0(1-p)^1 = 1-p\). For 1, 0, 1, 1:</p>
+      <div class="eq">\[ L(p) = p \cdot (1-p) \cdot p \cdot p = p^3(1-p) \]</div>
+      <p>That is the curve described above. Explore it below.</p>
+
+      <figure id="lik-fig">
+        <div class="controls">
+          <label for="lik-h">Heads \(n_H\)</label>
+          <input type="range" id="lik-h" min="0" max="30" step="1" value="3">
+          <output id="lik-h-out" for="lik-h">3</output>
+          <label for="lik-t">Tails \(n_T\)</label>
+          <input type="range" id="lik-t" min="0" max="30" step="1" value="1">
+          <output id="lik-t-out" for="lik-t">1</output>
+          <label for="lik-p">Candidate \(p\)</label>
+          <input type="range" id="lik-p" min="0" max="1" step="0.005" value="0.4">
+          <output id="lik-p-out" for="lik-p">0.400</output>
+          <label class="check" for="lik-log"><input type="checkbox" id="lik-log"> Plot \(\log L\)</label>
+          <button class="btn" id="lik-snap" type="button">Jump to the maximum</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">ML estimate (heads ÷ n)</span><span class="v mine" id="lik-mle">–</span></div>
+          <div><span class="k" id="lik-cur-k">L at your p</span><span class="v" id="lik-cur">–</span></div>
+          <div><span class="k" id="lik-max-k">L at p̂</span><span class="v" id="lik-max">–</span></div>
+        </div>
+        <div class="status" id="lik-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="lik-svg" viewBox="0 0 640 360" role="img" aria-label="The likelihood of the chosen coin tosses plotted against p from 0 to 1. For the lecture's data 1, 0, 1, 1 the curve is p cubed times one minus p: zero at both ends and highest at p = 0.75, marked as the ML estimate. A movable candidate p shows the likelihood at that value."></svg></div>
+        <figcaption><b>The likelihood of coin tosses.</b> The curve is \(L(p) = p^{n_H}(1-p)^{n_T}\) for the counts you set. The default is the lecture's 1, 0, 1, 1, so \(L(p) = p^3(1-p)\); set 9 heads and 3 tails for the twelve tosses of L19. The peak always sits at the fraction of heads, and more tosses make it narrower. Tick the box to plot \(\log L\) instead: the shape changes, the location of the peak does not.</figcaption>
+      </figure>
+    </section>
+
+    <section id="bernoulli-mle">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=436s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 7:16</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=502s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 8:22 take the log</a>
+        </div>
+        <h2>Maximizing the likelihood for coin tosses</h2>
+      </div>
+      <p>A hat marks a guess. The maximum likelihood (ML) guess is the value of \(p\) that maximizes \(L\):</p>
+      <div class="eq">\[ \hat p_{\text{ML}} = \arg\max_{p}\; \prod_{i=1}^n p^{x_i}(1-p)^{1-x_i} \]</div>
+      <p>Products are awkward to differentiate and sums are easy, so maximize the logarithm instead. This is safe because \(\log\) is monotonically increasing. If \(L(\hat p) > L(p)\) for every other \(p\), then \(\log L(\hat p) > \log L(p)\) as well, so the maximizer does not move. The log turns the product into a sum:</p>
+      <div class="eq">\[ \hat p_{\text{ML}} = \arg\max_{p}\; \sum_{i=1}^n \Big[\, x_i \log p + (1 - x_i)\log(1-p) \,\Big] \]</div>
+      <p>This <dfn>log-likelihood</dfn> is a concave function of \(p\), so the maximum is where its derivative is zero <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=569s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>9:29</a>. The lecture leaves the derivative as an exercise:</p>
+      <div class="eq">\[ \frac{d}{dp}\log L = \sum_{i=1}^n \Big[\frac{x_i}{p} - \frac{1-x_i}{1-p}\Big] = 0 \;\Longrightarrow\; (1-p)\sum_{i=1}^n x_i = p\sum_{i=1}^n (1-x_i) = p\Big(n - \sum_{i=1}^n x_i\Big) \]</div>
+      <p>Expanding the left side gives \(\sum x_i - p\sum x_i = pn - p\sum x_i\). The \(p\sum x_i\) terms cancel, leaving \(\sum x_i = pn\).</p>
+      <div class="result">
+        <span class="lbl">Result: ML estimate for coin tosses <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=633s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:33</a></span>
+        \[ \hat p_{\text{ML}} = \frac1n\sum_{i=1}^n x_i = \frac{n_H}{n} \]
+        <p>Each \(x_i\) is 0 or 1, so the sum counts the ones. The ML estimate is the fraction of heads, \(n_H\) heads out of \(n\) tosses.</p>
+      </div>
+      <p>Check it on 1, 0, 1, 1. The derivative of \(p^3(1-p) = p^3 - p^4\) is \(3p^2 - 4p^3 = p^2(3 - 4p)\), which is zero at \(p = 3/4\). For the twelve tosses of L19, \(9/12 = 3/4\) as well.</p>
+      <p>The intuitive guess now has a principle behind it: choose the \(p\) that makes the observed data most probable. It quietly relied on both assumptions <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=669s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>11:09</a>, independence to split the joint probability into a product and identical distribution to use one \(p\) in every factor.</p>
+    </section>
+
+    <section id="gaussian-model">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=706s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 11:46</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1032s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 17:12 Fisher's fix</a>
+        </div>
+        <h2>Real-valued data: densities replace probabilities</h2>
+      </div>
+      <p>Now let each \(x_i \in \mathbb{R}\), for example the heights of 100 people. A coin box can only produce 0s and 1s, so it cannot explain this data. We need a different box, which means a different probabilistic model. The simplest choice is a Gaussian <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=770s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:50</a>:</p>
+      <div class="eq">\[ x_i \sim \mathcal{N}(\mu, \sigma^2) \qquad \text{for all } i \]</div>
+      <p>To keep things simple, assume the variance \(\sigma^2\) is known and only the mean \(\mu\) is unknown <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=806s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:26</a>. With real data we would not know the variance either, but the simplification makes the method clear.</p>
+
+      <h3>First attempt: multiply probabilities <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=867s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 14:27</a></h3>
+      <p>Copying the coin recipe gives \(L(\mu, \sigma^2;\, x_1, \dots, x_n) = P(x_1, \dots, x_n;\, \mu, \sigma^2) = \prod_i P(x_i;\, \mu, \sigma^2)\) by independence. Suppose the first height measured is 162.53 cm and we try \(\mu = 150\). What is the chance that a Gaussian with mean 150 produces exactly 162.53?</p>
+      <p>For a continuous distribution, probabilities belong to intervals. \(P(a \le X \le b)\) is the area under the density curve between \(a\) and \(b\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=932s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>15:32</a>. A single value has zero width and so zero probability. Every factor of the product is 0, for every \(\mu\), however close to the data or far from it. A function that is 0 everywhere cannot tell one \(\mu\) from another, so there is nothing to maximize.</p>
+
+      <h3>Fisher's fix: multiply densities</h3>
+      <p>Fisher's proposal was to replace the probabilities by the probability density function (PDF). For independent data the joint density factorizes just as probabilities do:</p>
+      <div class="eq">\[ L(\mu, \sigma^2;\, x_1, \dots, x_n) = f(x_1, \dots, x_n;\, \mu, \sigma^2) = \prod_{i=1}^n f(x_i;\, \mu, \sigma^2) = \prod_{i=1}^n \frac{1}{\sqrt{2\pi}\,\sigma}\, e^{-\frac{(x_i - \mu)^2}{2\sigma^2}} \]</div>
+      <p>Each factor is the height of the bell curve at \(x_i\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1125s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:45</a>. It is not a probability, and it need not even lie between 0 and 1. But it is nonzero, and it is larger when \(\mu\) puts \(x_i\) near the peak, so it works as a proxy for the probability. This is also why the function is called a <i>likelihood</i> and not a probability: it is not strictly the probability of the data <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1187s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:47</a>.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 292" role="img" aria-label="Left: a Gaussian density with mean 150; the shaded area between 155 and 170 is a probability, about 0.29, while the single value 162.53 has zero width and zero probability. Right: Gaussian densities with means 150 and 160; at x1 = 162.53 their heights are 0.018 and 0.039, so the densities can tell the two means apart.">
+            <text class="d-h" x="20" y="24">Probability: an area</text>
+            <path d="M194.3 212.0 L194.3 93.1 L195.2 94.6 L196.2 96.2 L197.2 97.8 L198.1 99.4 L199.1 101.2 L200.1 102.9 L201.0 104.7 L202.0 106.5 L203.0 108.4 L203.9 110.3 L204.9 112.2 L205.9 114.1 L206.8 116.1 L207.8 118.1 L208.8 120.1 L209.7 122.1 L210.7 124.1 L211.6 126.2 L212.6 128.2 L213.6 130.3 L214.5 132.3 L215.5 134.4 L216.5 136.4 L217.4 138.4 L218.4 140.4 L219.4 142.4 L220.3 144.4 L221.3 146.4 L222.2 148.4 L223.2 150.3 L224.2 152.2 L225.1 154.1 L226.1 156.0 L227.1 157.8 L228.0 159.6 L229.0 161.4 L230.0 163.2 L230.9 164.9 L231.9 166.6 L232.9 168.3 L233.8 169.9 L234.8 171.5 L235.8 173.0 L236.7 174.5 L237.7 176.0 L238.6 177.5 L239.6 178.9 L240.6 180.2 L241.5 181.6 L242.5 182.9 L243.5 184.1 L244.4 185.3 L245.4 186.5 L246.4 187.7 L247.3 188.8 L248.3 189.8 L249.2 190.9 L250.2 191.9 L251.2 192.8 L252.1 193.8 L252.1 212.0 Z" style="fill: var(--accent-soft); stroke: none"/>
+            <line class="d-ln-acc" x1="194.3" y1="212" x2="194.3" y2="93.1" style="stroke-width: 1.2"/>
+            <line class="d-ln-acc" x1="252.1" y1="212" x2="252.1" y2="193.8" style="stroke-width: 1.2"/>
+            <path class="d-ln" d="M40.0 211.7 L41.9 211.6 L43.9 211.6 L45.8 211.5 L47.7 211.4 L49.6 211.3 L51.6 211.2 L53.5 211.1 L55.4 210.9 L57.4 210.7 L59.3 210.5 L61.2 210.3 L63.1 210.0 L65.1 209.7 L67.0 209.3 L68.9 208.9 L70.9 208.5 L72.8 208.0 L74.7 207.4 L76.6 206.8 L78.6 206.1 L80.5 205.3 L82.4 204.4 L84.4 203.5 L86.3 202.4 L88.2 201.3 L90.1 200.0 L92.1 198.6 L94.0 197.1 L95.9 195.5 L97.9 193.8 L99.8 191.9 L101.7 189.8 L103.6 187.7 L105.6 185.3 L107.5 182.9 L109.4 180.2 L111.4 177.5 L113.3 174.5 L115.2 171.5 L117.1 168.3 L119.1 164.9 L121.0 161.4 L122.9 157.8 L124.9 154.1 L126.8 150.3 L128.7 146.4 L130.6 142.4 L132.6 138.4 L134.5 134.4 L136.4 130.3 L138.4 126.2 L140.3 122.1 L142.2 118.1 L144.1 114.1 L146.1 110.3 L148.0 106.5 L149.9 102.9 L151.9 99.4 L153.8 96.2 L155.7 93.1 L157.6 90.2 L159.6 87.6 L161.5 85.3 L163.4 83.2 L165.4 81.4 L167.3 79.9 L169.2 78.8 L171.1 77.9 L173.1 77.4 L175.0 77.2 L176.9 77.4 L178.9 77.9 L180.8 78.8 L182.7 79.9 L184.6 81.4 L186.6 83.2 L188.5 85.3 L190.4 87.6 L192.4 90.2 L194.3 93.1 L196.2 96.2 L198.1 99.4 L200.1 102.9 L202.0 106.5 L203.9 110.3 L205.9 114.1 L207.8 118.1 L209.7 122.1 L211.6 126.2 L213.6 130.3 L215.5 134.4 L217.4 138.4 L219.4 142.4 L221.3 146.4 L223.2 150.3 L225.1 154.1 L227.1 157.8 L229.0 161.4 L230.9 164.9 L232.9 168.3 L234.8 171.5 L236.7 174.5 L238.6 177.5 L240.6 180.2 L242.5 182.9 L244.4 185.3 L246.4 187.7 L248.3 189.8 L250.2 191.9 L252.1 193.8 L254.1 195.5 L256.0 197.1 L257.9 198.6 L259.9 200.0 L261.8 201.3 L263.7 202.4 L265.6 203.5 L267.6 204.4 L269.5 205.3 L271.4 206.1 L273.4 206.8 L275.3 207.4 L277.2 208.0 L279.1 208.5 L281.1 208.9 L283.0 209.3 L284.9 209.7 L286.9 210.0 L288.8 210.3 L290.7 210.5 L292.6 210.7 L294.6 210.9 L296.5 211.1 L298.4 211.2 L300.4 211.3 L302.3 211.4 L304.2 211.5 L306.1 211.6 L308.1 211.6 L310.0 211.7"/>
+            <line class="d-ln" x1="40" y1="212" x2="310" y2="212"/>
+            <line class="d-ln" x1="97.9" y1="212" x2="97.9" y2="216"/><text class="d-al" x="97.9" y="228" text-anchor="middle">130</text>
+            <line class="d-ln" x1="175.0" y1="212" x2="175.0" y2="216"/><text class="d-al" x="175.0" y="228" text-anchor="middle">150</text>
+            <line class="d-ln" x1="252.1" y1="212" x2="252.1" y2="216"/><text class="d-al" x="252.1" y="228" text-anchor="middle">170</text>
+            <text class="d-s" x="99.6" y="182" text-anchor="end">μ = 150</text>
+            <circle class="pt-new" cx="223.3" cy="212" r="4.5"/>
+            <text class="d-s" x="223.3" y="246" text-anchor="middle">x₁ = 162.53</text>
+            <text class="d-s" x="40" y="48">shaded area = P(155 ≤ X ≤ 170) ≈ 0.29</text>
+            <text class="d-s" x="20" y="268">a single value has zero width, so</text>
+            <text class="d-s" x="20" y="284">P(X = 162.53) = 0 whatever μ is</text>
+            <line class="d-rule" x1="340" y1="12" x2="340" y2="284"/>
+            <text class="d-h" x="360" y="24">Density: a height</text>
+            <path class="d-ln" d="M380.0 211.7 L381.9 211.6 L383.9 211.6 L385.8 211.5 L387.7 211.4 L389.6 211.3 L391.6 211.2 L393.5 211.1 L395.4 210.9 L397.4 210.7 L399.3 210.5 L401.2 210.3 L403.1 210.0 L405.1 209.7 L407.0 209.3 L408.9 208.9 L410.9 208.5 L412.8 208.0 L414.7 207.4 L416.6 206.8 L418.6 206.1 L420.5 205.3 L422.4 204.4 L424.4 203.5 L426.3 202.4 L428.2 201.3 L430.1 200.0 L432.1 198.6 L434.0 197.1 L435.9 195.5 L437.9 193.8 L439.8 191.9 L441.7 189.8 L443.6 187.7 L445.6 185.3 L447.5 182.9 L449.4 180.2 L451.4 177.5 L453.3 174.5 L455.2 171.5 L457.1 168.3 L459.1 164.9 L461.0 161.4 L462.9 157.8 L464.9 154.1 L466.8 150.3 L468.7 146.4 L470.6 142.4 L472.6 138.4 L474.5 134.4 L476.4 130.3 L478.4 126.2 L480.3 122.1 L482.2 118.1 L484.1 114.1 L486.1 110.3 L488.0 106.5 L489.9 102.9 L491.9 99.4 L493.8 96.2 L495.7 93.1 L497.6 90.2 L499.6 87.6 L501.5 85.3 L503.4 83.2 L505.4 81.4 L507.3 79.9 L509.2 78.8 L511.1 77.9 L513.1 77.4 L515.0 77.2 L516.9 77.4 L518.9 77.9 L520.8 78.8 L522.7 79.9 L524.6 81.4 L526.6 83.2 L528.5 85.3 L530.4 87.6 L532.4 90.2 L534.3 93.1 L536.2 96.2 L538.1 99.4 L540.1 102.9 L542.0 106.5 L543.9 110.3 L545.9 114.1 L547.8 118.1 L549.7 122.1 L551.6 126.2 L553.6 130.3 L555.5 134.4 L557.4 138.4 L559.4 142.4 L561.3 146.4 L563.2 150.3 L565.1 154.1 L567.1 157.8 L569.0 161.4 L570.9 164.9 L572.9 168.3 L574.8 171.5 L576.7 174.5 L578.6 177.5 L580.6 180.2 L582.5 182.9 L584.4 185.3 L586.4 187.7 L588.3 189.8 L590.2 191.9 L592.1 193.8 L594.1 195.5 L596.0 197.1 L597.9 198.6 L599.9 200.0 L601.8 201.3 L603.7 202.4 L605.6 203.5 L607.6 204.4 L609.5 205.3 L611.4 206.1 L613.4 206.8 L615.3 207.4 L617.2 208.0 L619.1 208.5 L621.1 208.9 L623.0 209.3 L624.9 209.7 L626.9 210.0 L628.8 210.3 L630.7 210.5 L632.6 210.7 L634.6 210.9 L636.5 211.1 L638.4 211.2 L640.4 211.3 L642.3 211.4 L644.2 211.5 L646.1 211.6 L648.1 211.6 L650.0 211.7"/>
+            <path class="d-ln-acc" d="M380.0 212.0 L381.9 212.0 L383.9 212.0 L385.8 212.0 L387.7 212.0 L389.6 212.0 L391.6 212.0 L393.5 212.0 L395.4 212.0 L397.4 212.0 L399.3 212.0 L401.2 211.9 L403.1 211.9 L405.1 211.9 L407.0 211.9 L408.9 211.9 L410.9 211.9 L412.8 211.8 L414.7 211.8 L416.6 211.8 L418.6 211.7 L420.5 211.6 L422.4 211.6 L424.4 211.5 L426.3 211.4 L428.2 211.3 L430.1 211.2 L432.1 211.1 L434.0 210.9 L435.9 210.7 L437.9 210.5 L439.8 210.3 L441.7 210.0 L443.6 209.7 L445.6 209.3 L447.5 208.9 L449.4 208.5 L451.4 208.0 L453.3 207.4 L455.2 206.8 L457.1 206.1 L459.1 205.3 L461.0 204.4 L462.9 203.5 L464.9 202.4 L466.8 201.3 L468.7 200.0 L470.6 198.6 L472.6 197.1 L474.5 195.5 L476.4 193.8 L478.4 191.9 L480.3 189.8 L482.2 187.7 L484.1 185.3 L486.1 182.9 L488.0 180.2 L489.9 177.5 L491.9 174.5 L493.8 171.5 L495.7 168.3 L497.6 164.9 L499.6 161.4 L501.5 157.8 L503.4 154.1 L505.4 150.3 L507.3 146.4 L509.2 142.4 L511.1 138.4 L513.1 134.4 L515.0 130.3 L516.9 126.2 L518.9 122.1 L520.8 118.1 L522.7 114.1 L524.6 110.3 L526.6 106.5 L528.5 102.9 L530.4 99.4 L532.4 96.2 L534.3 93.1 L536.2 90.2 L538.1 87.6 L540.1 85.3 L542.0 83.2 L543.9 81.4 L545.9 79.9 L547.8 78.8 L549.7 77.9 L551.6 77.4 L553.6 77.2 L555.5 77.4 L557.4 77.9 L559.4 78.8 L561.3 79.9 L563.2 81.4 L565.1 83.2 L567.1 85.3 L569.0 87.6 L570.9 90.2 L572.9 93.1 L574.8 96.2 L576.7 99.4 L578.6 102.9 L580.6 106.5 L582.5 110.3 L584.4 114.1 L586.4 118.1 L588.3 122.1 L590.2 126.2 L592.1 130.3 L594.1 134.4 L596.0 138.4 L597.9 142.4 L599.9 146.4 L601.8 150.3 L603.7 154.1 L605.6 157.8 L607.6 161.4 L609.5 164.9 L611.4 168.3 L613.4 171.5 L615.3 174.5 L617.2 177.5 L619.1 180.2 L621.1 182.9 L623.0 185.3 L624.9 187.7 L626.9 189.8 L628.8 191.9 L630.7 193.8 L632.6 195.5 L634.6 197.1 L636.5 198.6 L638.4 200.0 L640.4 201.3 L642.3 202.4 L644.2 203.5 L646.1 204.4 L648.1 205.3 L650.0 206.1"/>
+            <line class="d-ln" x1="380" y1="212" x2="650" y2="212"/>
+            <line class="d-ln" x1="437.9" y1="212" x2="437.9" y2="216"/><text class="d-al" x="437.9" y="228" text-anchor="middle">130</text>
+            <line class="d-ln" x1="515.0" y1="212" x2="515.0" y2="216"/><text class="d-al" x="515.0" y="228" text-anchor="middle">150</text>
+            <line class="d-ln" x1="592.1" y1="212" x2="592.1" y2="216"/><text class="d-al" x="592.1" y="228" text-anchor="middle">170</text>
+            <line class="d-ln d-dash" x1="563.3" y1="212" x2="563.3" y2="81.5"/>
+            <circle class="pt-plain" cx="563.3" cy="150.5" r="4.5"/>
+            <circle class="pt-tree" cx="563.3" cy="81.5" r="5"/>
+            <text class="d-s" x="572.3" y="83.5" style="fill: var(--accent)">0.039</text>
+            <text class="d-s" x="555.3" y="154.5" text-anchor="end">0.018</text>
+            <text class="d-s" x="458.9" y="150" text-anchor="end">μ = 150</text>
+            <text class="d-s" x="617.7" y="160" style="fill: var(--accent)">μ = 160</text>
+            <circle class="pt-new" cx="563.3" cy="212" r="4.5"/>
+            <text class="d-s" x="563.3" y="246" text-anchor="middle">x₁ = 162.53</text>
+            <text class="d-s" x="360" y="268">heights at x₁ differ, so the density can</text>
+            <text class="d-s" x="360" y="284">rank μ = 160 above μ = 150 for this point</text>
+            </svg>
+        </div>
+        <figcaption><b>Why the Gaussian likelihood uses densities.</b> Left: probability is area, so an interval has positive probability but the single value 162.53 has none, under any mean. Right: the density's height at 162.53 is positive and depends on \(\mu\), so it can rank candidate means. The value \(\sigma = 10\) is chosen for illustration.</figcaption>
+      </figure>
+    </section>
+
+    <section id="gaussian-mean">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1222s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 20:22</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1286s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 21:26 sample mean</a>
+        </div>
+        <h2>The ML estimate of a Gaussian mean</h2>
+      </div>
+      <p>Same drill as before: take the logarithm. It is the natural log, so it cancels the exponential:</p>
+      <div class="eq">\[ \log L(\mu, \sigma^2;\, x_1, \dots, x_n) = \sum_{i=1}^n \Big[\log\frac{1}{\sqrt{2\pi}\,\sigma} - \frac{(x_i-\mu)^2}{2\sigma^2}\Big] \]</div>
+      <p>We maximize over \(\mu\). The first term does not contain \(\mu\), so it can be dropped. Since \(\sigma^2\) is a known constant, the factor \(\frac{1}{2\sigma^2}\) does not change the maximizer either:</p>
+      <div class="eq">\[ \hat\mu_{\text{ML}} = \arg\max_{\mu}\; -\sum_{i=1}^n (x_i - \mu)^2 \]</div>
+      <p>The lecture leaves the remaining two steps as an exercise. Setting the derivative to zero gives \(2\sum_i (x_i - \mu) = 0\), so \(\sum_i x_i = n\mu\).</p>
+      <div class="result">
+        <span class="lbl">Result: ML estimate of a Gaussian mean</span>
+        \[ \hat\mu_{\text{ML}} = \frac1n\sum_{i=1}^n x_i \]
+        <p>If the data is assumed Gaussian with unknown mean, the maximum likelihood guess for the mean is the <b>sample mean</b>.</p>
+      </div>
+    </section>
+
+    <section id="model-matters">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1318s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 21:58</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1416s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L20 · 23:36 a general recipe</a>
+        </div>
+        <h2>The model decides the estimator</h2>
+      </div>
+      <p>The sample mean may look like an obvious guess anyway, so why the machinery? Because the sample mean is the ML answer <i>because</i> we assumed a Gaussian. Suppose domain knowledge suggests a different model, say a <dfn>Laplace distribution</dfn>, which looks like a Gaussian with a sharper peak <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1352s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>22:32</a>. Maximum likelihood then gives the <b>sample median</b> instead of the mean. The estimator is tied to the probabilistic model you assume, and the method adapts to that model because it works with the model's own density.</p>
+      <p class="note">Standard context, not derived in the lecture: the Laplace density is proportional to \(e^{-|x - \mu|/b}\), so its log-likelihood is \(-\frac1b\sum_i |x_i - \mu|\) plus a constant. Maximizing it means minimizing the sum of absolute distances, which the median does.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 244" role="img" aria-label="Left: a Gaussian and a Laplace density with the same centre and variance; the Laplace one has a sharper peak. Right: the same five illustrative points 2, 3, 4, 5, 11; maximum likelihood under the Gaussian model gives the sample mean 5, under the Laplace model the sample median 4.">
+            <text class="d-h" x="20" y="24">Two models for real-valued data</text>
+            <path class="d-ln" d="M40.0 199.8 L41.9 199.8 L43.9 199.8 L45.8 199.7 L47.7 199.7 L49.6 199.6 L51.6 199.5 L53.5 199.4 L55.4 199.3 L57.4 199.2 L59.3 199.1 L61.2 199.0 L63.1 198.8 L65.1 198.6 L67.0 198.4 L68.9 198.2 L70.9 197.9 L72.8 197.6 L74.7 197.3 L76.6 196.9 L78.6 196.5 L80.5 196.0 L82.4 195.5 L84.4 195.0 L86.3 194.3 L88.2 193.7 L90.1 192.9 L92.1 192.1 L94.0 191.2 L95.9 190.2 L97.9 189.2 L99.8 188.1 L101.7 186.9 L103.6 185.6 L105.6 184.2 L107.5 182.7 L109.4 181.2 L111.4 179.5 L113.3 177.8 L115.2 176.0 L117.1 174.1 L119.1 172.1 L121.0 170.1 L122.9 167.9 L124.9 165.7 L126.8 163.5 L128.7 161.2 L130.6 158.8 L132.6 156.4 L134.5 154.0 L136.4 151.6 L138.4 149.2 L140.3 146.8 L142.2 144.4 L144.1 142.1 L146.1 139.8 L148.0 137.5 L149.9 135.4 L151.9 133.4 L153.8 131.4 L155.7 129.6 L157.6 127.9 L159.6 126.3 L161.5 125.0 L163.4 123.7 L165.4 122.7 L167.3 121.8 L169.2 121.1 L171.1 120.6 L173.1 120.3 L175.0 120.2 L176.9 120.3 L178.9 120.6 L180.8 121.1 L182.7 121.8 L184.6 122.7 L186.6 123.7 L188.5 125.0 L190.4 126.3 L192.4 127.9 L194.3 129.6 L196.2 131.4 L198.1 133.4 L200.1 135.4 L202.0 137.5 L203.9 139.8 L205.9 142.1 L207.8 144.4 L209.7 146.8 L211.6 149.2 L213.6 151.6 L215.5 154.0 L217.4 156.4 L219.4 158.8 L221.3 161.2 L223.2 163.5 L225.1 165.7 L227.1 167.9 L229.0 170.1 L230.9 172.1 L232.9 174.1 L234.8 176.0 L236.7 177.8 L238.6 179.5 L240.6 181.2 L242.5 182.7 L244.4 184.2 L246.4 185.6 L248.3 186.9 L250.2 188.1 L252.1 189.2 L254.1 190.2 L256.0 191.2 L257.9 192.1 L259.9 192.9 L261.8 193.7 L263.7 194.3 L265.6 195.0 L267.6 195.5 L269.5 196.0 L271.4 196.5 L273.4 196.9 L275.3 197.3 L277.2 197.6 L279.1 197.9 L281.1 198.2 L283.0 198.4 L284.9 198.6 L286.9 198.8 L288.8 199.0 L290.7 199.1 L292.6 199.2 L294.6 199.3 L296.5 199.4 L298.4 199.5 L300.4 199.6 L302.3 199.7 L304.2 199.7 L306.1 199.8 L308.1 199.8 L310.0 199.8"/>
+            <path class="d-ln-acc" d="M40.0 199.0 L41.9 198.9 L43.9 198.8 L45.8 198.8 L47.7 198.7 L49.6 198.6 L51.6 198.5 L53.5 198.4 L55.4 198.2 L57.4 198.1 L59.3 198.0 L61.2 197.8 L63.1 197.7 L65.1 197.5 L67.0 197.3 L68.9 197.1 L70.9 196.9 L72.8 196.7 L74.7 196.4 L76.6 196.2 L78.6 195.9 L80.5 195.6 L82.4 195.3 L84.4 194.9 L86.3 194.5 L88.2 194.1 L90.1 193.7 L92.1 193.2 L94.0 192.7 L95.9 192.2 L97.9 191.6 L99.8 191.0 L101.7 190.4 L103.6 189.7 L105.6 188.9 L107.5 188.1 L109.4 187.2 L111.4 186.3 L113.3 185.3 L115.2 184.2 L117.1 183.0 L119.1 181.8 L121.0 180.5 L122.9 179.0 L124.9 177.5 L126.8 175.9 L128.7 174.1 L130.6 172.2 L132.6 170.2 L134.5 168.0 L136.4 165.6 L138.4 163.1 L140.3 160.4 L142.2 157.5 L144.1 154.4 L146.1 151.0 L148.0 147.4 L149.9 143.6 L151.9 139.5 L153.8 135.0 L155.7 130.3 L157.6 125.2 L159.6 119.7 L161.5 113.8 L163.4 107.5 L165.4 100.7 L167.3 93.4 L169.2 85.6 L171.1 77.2 L173.1 68.2 L175.0 58.6 L176.9 68.2 L178.9 77.2 L180.8 85.6 L182.7 93.4 L184.6 100.7 L186.6 107.5 L188.5 113.8 L190.4 119.7 L192.4 125.2 L194.3 130.3 L196.2 135.0 L198.1 139.5 L200.1 143.6 L202.0 147.4 L203.9 151.0 L205.9 154.4 L207.8 157.5 L209.7 160.4 L211.6 163.1 L213.6 165.6 L215.5 168.0 L217.4 170.2 L219.4 172.2 L221.3 174.1 L223.2 175.9 L225.1 177.5 L227.1 179.0 L229.0 180.5 L230.9 181.8 L232.9 183.0 L234.8 184.2 L236.7 185.3 L238.6 186.3 L240.6 187.2 L242.5 188.1 L244.4 188.9 L246.4 189.7 L248.3 190.4 L250.2 191.0 L252.1 191.6 L254.1 192.2 L256.0 192.7 L257.9 193.2 L259.9 193.7 L261.8 194.1 L263.7 194.5 L265.6 194.9 L267.6 195.3 L269.5 195.6 L271.4 195.9 L273.4 196.2 L275.3 196.4 L277.2 196.7 L279.1 196.9 L281.1 197.1 L283.0 197.3 L284.9 197.5 L286.9 197.7 L288.8 197.8 L290.7 198.0 L292.6 198.1 L294.6 198.2 L296.5 198.4 L298.4 198.5 L300.4 198.6 L302.3 198.7 L304.2 198.8 L306.1 198.8 L308.1 198.9 L310.0 199.0"/>
+            <line class="d-ln" x1="40" y1="200" x2="310" y2="200"/>
+            <line class="d-ln" x1="175.0" y1="200" x2="175.0" y2="204"/><text class="d-al" x="175.0" y="216" text-anchor="middle">μ</text>
+            <text class="d-s" x="187.0" y="64" style="fill: var(--accent)">Laplace: sharper peak</text>
+            <text class="d-s" x="120.8" y="159.5" text-anchor="end">Gaussian</text>
+            <text class="d-s" x="20" y="236">same centre, same variance</text>
+            <line class="d-rule" x1="340" y1="12" x2="340" y2="236"/>
+            <text class="d-h" x="360" y="24">Same data, two ML estimates</text>
+            <text class="d-t" x="380" y="70">Gaussian model: μ̂ = sample mean = 5</text>
+            <line class="d-ln" x1="380" y1="96" x2="640" y2="96"/>
+            <line class="d-ln-acc" x1="488.3" y1="80" x2="488.3" y2="112" style="stroke-width: 2.6"/>
+            <circle class="pt-plain" cx="423.3" cy="96" r="4.5"/>
+            <circle class="pt-plain" cx="445.0" cy="96" r="4.5"/>
+            <circle class="pt-plain" cx="466.7" cy="96" r="4.5"/>
+            <circle class="pt-plain" cx="488.3" cy="96" r="4.5"/>
+            <circle class="pt-plain" cx="618.3" cy="96" r="4.5"/>
+            <text class="d-t" x="380" y="150">Laplace model: μ̂ = sample median = 4</text>
+            <line class="d-ln" x1="380" y1="176" x2="640" y2="176"/>
+            <line class="d-ln-acc" x1="466.7" y1="160" x2="466.7" y2="192" style="stroke-width: 2.6"/>
+            <circle class="pt-plain" cx="423.3" cy="176" r="4.5"/>
+            <circle class="pt-plain" cx="445.0" cy="176" r="4.5"/>
+            <circle class="pt-plain" cx="466.7" cy="176" r="4.5"/>
+            <circle class="pt-plain" cx="488.3" cy="176" r="4.5"/>
+            <circle class="pt-plain" cx="618.3" cy="176" r="4.5"/>
+            <text class="d-al" x="380.0" y="212" text-anchor="middle">0</text>
+            <text class="d-al" x="423.3" y="212" text-anchor="middle">2</text>
+            <text class="d-al" x="466.7" y="212" text-anchor="middle">4</text>
+            <text class="d-al" x="510.0" y="212" text-anchor="middle">6</text>
+            <text class="d-al" x="553.3" y="212" text-anchor="middle">8</text>
+            <text class="d-al" x="596.7" y="212" text-anchor="middle">10</text>
+            <text class="d-al" x="640.0" y="212" text-anchor="middle">12</text>
+            <text class="d-s" x="360" y="236">illustrative points: 2, 3, 4, 5, 11</text>
+            </svg>
+        </div>
+        <figcaption><b>Change the model, change the estimator.</b> Left: Gaussian and Laplace densities with the same centre and variance. Right: for the same five illustrative points, maximum likelihood gives the mean (5) under the Gaussian model and the median (4) under the Laplace model.</figcaption>
+      </figure>
+
+      <ol class="algo">
+        <li class="algo-title">Maximum likelihood, for any model</li>
+        <li>Assume a probabilistic model for the data, with unknown parameters \(\theta\).</li>
+        <li>Write down its probability (discrete data) or its PDF (continuous data).</li>
+        <li>Under i.i.d. data, the likelihood is the product over data points: \(L(\theta;\, x_1, \dots, x_n) = \prod_{i} f(x_i;\, \theta)\).</li>
+        <li>Take the logarithm, turning the product into a sum.</li>
+        <li>Maximize over \(\theta\), often by setting the derivative to zero. The maximizer is \(\hat\theta_{\text{ML}}\).</li>
+      </ol>
+      <p>The method is simple and, more importantly, general. Once you have a model, you have an estimator. The resulting estimators need not be intuitive in advance. Here they matched intuition (the fraction of heads, the sample mean), which is reassuring, but the method still produces estimates when we have no intuition at all. That is why it is so popular in statistics and machine learning.</p>
+      <p>A statistics course would go on to prove good properties of the ML estimator, and in some well-defined senses show that no estimator can do better <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1481s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>24:41</a>. This course takes it as a good estimator that gives reasonable guesses. The lecture ends with a question <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=9dQSEn0ooTc&amp;t=1553s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>25:53</a>: is something besides the data often available in practice, and if so, can we do better than maximum likelihood?</p>
+    </section>
+
+    <!-- ============ LECTURE 21 ============ -->
+    <section id="hunch">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=33s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 0:33</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=100s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 1:40 the hunch</a>
+        </div>
+        <h2>A hunch before any data</h2>
+      </div>
+      <p>Back to the coin box. Coin tosses are called <dfn>Bernoulli trials</dfn>: \(x_i \sim \text{Bernoulli}(p)\), meaning \(P(x_i = 1) = p\) for every \(i\). The setup is the same as before.</p>
+      <p>Now add one thing. Before you have seen any data, someone walks in and says, "I believe the bias p is somewhere close to 1." That is an English sentence, yet it carries information about the coin in the box. Other statements are possible, such as: \(p\) is either small or large, but certainly not near 0.5.</p>
+      <p>The lecture calls this <dfn>domain knowledge</dfn>, or a <dfn>hunch</dfn>, perhaps built from a practitioner's experience <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=230s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:50</a>. It is a hunch about the <i>parameter</i>, not about the data, and it exists before a single data point is seen.</p>
+      <p>Maximum likelihood has no way to use it. Ask the ML method for a guess before any data arrives and it can say nothing, because it depends only on data <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=265s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:25</a>.</p>
+      <p class="rule-of-thumb">Goal: codify a hunch about the parameters in precise mathematical form and build it into the estimation procedure. This leads to Bayesian modelling.</p>
+    </section>
+
+    <section id="prior">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=408s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 6:48</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=612s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 10:12 the prior P(θ)</a>
+        </div>
+        <h2>Treat the parameter as a random variable</h2>
+      </div>
+      <p>The approach is to treat the unknown parameter as a <b>random variable</b> and encode the hunch as a probability distribution over its possible values. Values we believe more get more weight. The lecture sketches three examples <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=442s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:22</a>:</p>
+      <ul>
+        <li>\(p\) is close to 1: a density on \([0, 1]\) that peaks near 0.9.</li>
+        <li>\(p\) is small or large, not near 0.5: a U-shaped density on \([0, 1]\), high at both ends and low in the middle <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=514s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:34</a>.</li>
+        <li>For a Gaussian mean \(\mu\): a bump around the value we think most likely.</li>
+      </ul>
+      <p>In general, call the parameter \(\theta\). The hunch becomes a distribution \(P(\theta)\), the <dfn>prior</dfn>. When \(\theta\) is continuous, like \(p\) or \(\mu\), \(P(\theta)\) is a PDF whose support is the set of values \(\theta\) can take; for \(p\) that is \([0, 1]\). Its shape records our belief before we see data. To get the chance that \(\theta\) lies in some range, integrate the density over that range.</p>
+    </section>
+
+    <section id="posterior">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=711s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 11:51</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=849s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 14:09 Bayes' theorem</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1036s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 17:16 example</a>
+        </div>
+        <h2>From prior to posterior with Bayes' theorem</h2>
+      </div>
+      <p>Then the data arrives and the belief must be updated. Suppose we believed \(p \approx 0.9\), so we expected mostly heads, but 1000 tosses come out with 900 tails. The data contradicts the belief and should pull it away. If instead the data agrees with the belief, it should strengthen it and make us more confident.</p>
+      <p>The updated hunch is again a distribution, now conditioned on the data: \(P(\theta \mid \text{data})\). Moving from the <dfn>prior</dfn> \(P(\theta)\) to the <dfn>posterior</dfn> \(P(\theta \mid \text{data})\) is the Bayesian way of doing things <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=812s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:32</a>. You have a hunch, you see data, you update the hunch.</p>
+
+      <h3>Where Bayes comes in</h3>
+      <p>Bayes' theorem from school says \(P(A \mid B) = P(B \mid A)\,P(A)/P(B)\). Take \(A\) to be the parameter \(\theta\) and \(B\) the data \(x_1, \dots, x_n\):</p>
+      <div class="eq">\[ \underbrace{P(\theta \mid x_1, \dots, x_n)}_{\text{posterior}} = \frac{\overbrace{P(x_1, \dots, x_n \mid \theta)}^{\text{likelihood}}\;\overbrace{P(\theta)}^{\text{prior}}}{\underbrace{P(x_1, \dots, x_n)}_{\text{evidence}}} \]</div>
+      <p>The first factor in the numerator is the chance of the data when the parameter is \(\theta\), which is the likelihood from Lecture 20 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=974s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:14</a>. The denominator is called the <dfn>evidence</dfn>: the chance of observing the data at all. It does not depend on \(\theta\).</p>
+      <div class="result">
+        <span class="lbl">Bayesian update</span>
+        \[ P(\theta \mid \text{data}) \;\propto\; P(\text{data} \mid \theta)\; P(\theta) \qquad \text{posterior} \propto \text{likelihood} \times \text{prior} \]
+        <p>Bayes' theorem is a multiplicative update: the prior belief is re-weighted by the likelihood.</p>
+      </div>
+
+      <h3>The lecture's sketch</h3>
+      <p>Start with a prior peaking at 0.9. Observe 10 tosses, 8 zeros and 2 ones. The likelihood alone points to \(2/10 = 0.2\) and the prior to 0.9, so the posterior lands somewhere between; the lecture's freehand sketch puts its peak near 0.27, a number made up for illustration. With the flipped data, nine 1s and one 0, data and hunch agree, and the posterior rises even more sharply at 0.9 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1149s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>19:09</a>. Both cases are reproduced, with an actual prior, in the interactive figure further down.</p>
+    </section>
+
+    <section id="beta-prior">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1183s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 19:43</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1316s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 21:56 shapes</a>
+        </div>
+        <h2>A prior for a coin: the Beta distribution</h2>
+      </div>
+      <p>For Bernoulli data the parameter is \(\theta = p\). How do we write a prior on it mathematically? We need a continuous distribution supported only on \([0, 1]\), since \(p\) is a probability. A Gaussian will not do, because it gives positive density to every real number. A good choice is the <dfn>Beta distribution</dfn> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1216s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:16</a>, which has two positive parameters \(\alpha\) and \(\beta\):</p>
+      <div class="eq">\[ f(p;\, \alpha, \beta) = \frac{p^{\alpha - 1}(1-p)^{\beta - 1}}{Z}, \qquad p \in [0, 1],\quad \alpha, \beta > 0 \]</div>
+      <p>\(Z\) is a normalizing constant that does not depend on \(p\) and makes the density integrate to 1. What matters for us is the functional form: a power of \(p\) times a power of \(1 - p\).</p>
+      <p>The two parameters make it very flexible:</p>
+      <ul>
+        <li>\(\alpha = 2,\ \beta = 2\): the density is \(p(1-p)/Z\), symmetric and highest at 0.5. We believe the coin is roughly fair, but spread our bets.</li>
+        <li>\(\alpha = 2,\ \beta = 5\): small \(\alpha\) and large \(\beta\) push the mass toward 0. We believe \(p\) is closer to 0 than to 1.</li>
+        <li>\(\alpha = 0.5,\ \beta = 0.5\): U-shaped <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1418s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:38</a>. The coin is biased one way or the other, but \(p\) is not near 0.5. This encodes the second hunch above.</li>
+      </ul>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 250" role="img" aria-label="Three Beta densities on the same scale. Alpha 2, beta 2: a symmetric hump peaking at 0.5. Alpha 2, beta 5: mass near 0, peaking at 0.2. Alpha 0.5, beta 0.5: U-shaped, high near 0 and 1 and lowest at 0.5.">
+            <line class="d-rule" x1="40" y1="143.3" x2="215" y2="143.3"/>
+            <line class="d-rule" x1="40" y1="96.7" x2="215" y2="96.7"/>
+            <line class="d-rule" x1="40" y1="50.0" x2="215" y2="50.0"/>
+            <path d="M40.0 190.0 L40.0 190.0 L40.6 189.1 L41.2 188.1 L41.8 187.2 L42.3 186.3 L42.9 185.4 L43.5 184.5 L44.1 183.6 L44.7 182.7 L45.2 181.9 L45.8 181.0 L46.4 180.1 L47.0 179.2 L47.6 178.4 L48.2 177.5 L48.8 176.7 L49.3 175.9 L49.9 175.0 L50.5 174.2 L51.1 173.4 L51.7 172.6 L52.2 171.8 L52.8 171.0 L53.4 170.2 L54.0 169.4 L54.6 168.6 L55.2 167.8 L55.8 167.1 L56.3 166.3 L56.9 165.5 L57.5 164.8 L58.1 164.1 L58.7 163.3 L59.2 162.6 L59.8 161.9 L60.4 161.1 L61.0 160.4 L61.6 159.7 L62.2 159.0 L62.8 158.3 L63.3 157.6 L63.9 157.0 L64.5 156.3 L65.1 155.6 L65.7 155.0 L66.2 154.3 L66.8 153.6 L67.4 153.0 L68.0 152.4 L68.6 151.7 L69.2 151.1 L69.8 150.5 L70.3 149.9 L70.9 149.3 L71.5 148.7 L72.1 148.1 L72.7 147.5 L73.2 146.9 L73.8 146.3 L74.4 145.8 L75.0 145.2 L75.6 144.6 L76.2 144.1 L76.8 143.5 L77.3 143.0 L77.9 142.5 L78.5 142.0 L79.1 141.4 L79.7 140.9 L80.2 140.4 L80.8 139.9 L81.4 139.4 L82.0 138.9 L82.6 138.4 L83.2 138.0 L83.8 137.5 L84.3 137.0 L84.9 136.6 L85.5 136.1 L86.1 135.7 L86.7 135.2 L87.2 134.8 L87.8 134.4 L88.4 134.0 L89.0 133.6 L89.6 133.1 L90.2 132.7 L90.8 132.3 L91.3 132.0 L91.9 131.6 L92.5 131.2 L93.1 130.8 L93.7 130.5 L94.2 130.1 L94.8 129.8 L95.4 129.4 L96.0 129.1 L96.6 128.7 L97.2 128.4 L97.8 128.1 L98.3 127.8 L98.9 127.5 L99.5 127.2 L100.1 126.9 L100.7 126.6 L101.2 126.3 L101.8 126.0 L102.4 125.8 L103.0 125.5 L103.6 125.2 L104.2 125.0 L104.8 124.7 L105.3 124.5 L105.9 124.3 L106.5 124.0 L107.1 123.8 L107.7 123.6 L108.2 123.4 L108.8 123.2 L109.4 123.0 L110.0 122.8 L110.6 122.6 L111.2 122.4 L111.8 122.3 L112.3 122.1 L112.9 121.9 L113.5 121.8 L114.1 121.6 L114.7 121.5 L115.2 121.4 L115.8 121.2 L116.4 121.1 L117.0 121.0 L117.6 120.9 L118.2 120.8 L118.8 120.7 L119.3 120.6 L119.9 120.5 L120.5 120.4 L121.1 120.4 L121.7 120.3 L122.2 120.3 L122.8 120.2 L123.4 120.2 L124.0 120.1 L124.6 120.1 L125.2 120.0 L125.8 120.0 L126.3 120.0 L126.9 120.0 L127.5 120.0 L128.1 120.0 L128.7 120.0 L129.2 120.0 L129.8 120.0 L130.4 120.1 L131.0 120.1 L131.6 120.2 L132.2 120.2 L132.8 120.3 L133.3 120.3 L133.9 120.4 L134.5 120.4 L135.1 120.5 L135.7 120.6 L136.2 120.7 L136.8 120.8 L137.4 120.9 L138.0 121.0 L138.6 121.1 L139.2 121.2 L139.8 121.4 L140.3 121.5 L140.9 121.6 L141.5 121.8 L142.1 121.9 L142.7 122.1 L143.2 122.3 L143.8 122.4 L144.4 122.6 L145.0 122.8 L145.6 123.0 L146.2 123.2 L146.8 123.4 L147.3 123.6 L147.9 123.8 L148.5 124.0 L149.1 124.3 L149.7 124.5 L150.2 124.7 L150.8 125.0 L151.4 125.2 L152.0 125.5 L152.6 125.8 L153.2 126.0 L153.8 126.3 L154.3 126.6 L154.9 126.9 L155.5 127.2 L156.1 127.5 L156.7 127.8 L157.2 128.1 L157.8 128.4 L158.4 128.7 L159.0 129.1 L159.6 129.4 L160.2 129.8 L160.8 130.1 L161.3 130.5 L161.9 130.8 L162.5 131.2 L163.1 131.6 L163.7 132.0 L164.2 132.3 L164.8 132.7 L165.4 133.1 L166.0 133.6 L166.6 134.0 L167.2 134.4 L167.8 134.8 L168.3 135.2 L168.9 135.7 L169.5 136.1 L170.1 136.6 L170.7 137.0 L171.2 137.5 L171.8 138.0 L172.4 138.4 L173.0 138.9 L173.6 139.4 L174.2 139.9 L174.8 140.4 L175.3 140.9 L175.9 141.4 L176.5 142.0 L177.1 142.5 L177.7 143.0 L178.2 143.5 L178.8 144.1 L179.4 144.6 L180.0 145.2 L180.6 145.8 L181.2 146.3 L181.8 146.9 L182.3 147.5 L182.9 148.1 L183.5 148.7 L184.1 149.3 L184.7 149.9 L185.2 150.5 L185.8 151.1 L186.4 151.7 L187.0 152.4 L187.6 153.0 L188.2 153.6 L188.8 154.3 L189.3 155.0 L189.9 155.6 L190.5 156.3 L191.1 157.0 L191.7 157.6 L192.2 158.3 L192.8 159.0 L193.4 159.7 L194.0 160.4 L194.6 161.1 L195.2 161.9 L195.8 162.6 L196.3 163.3 L196.9 164.1 L197.5 164.8 L198.1 165.5 L198.7 166.3 L199.2 167.1 L199.8 167.8 L200.4 168.6 L201.0 169.4 L201.6 170.2 L202.2 171.0 L202.8 171.8 L203.3 172.6 L203.9 173.4 L204.5 174.2 L205.1 175.0 L205.7 175.9 L206.2 176.7 L206.8 177.5 L207.4 178.4 L208.0 179.2 L208.6 180.1 L209.2 181.0 L209.8 181.9 L210.3 182.7 L210.9 183.6 L211.5 184.5 L212.1 185.4 L212.7 186.3 L213.2 187.2 L213.8 188.1 L214.4 189.1 L215.0 190.0 L215.0 190.0 Z" style="fill: var(--accent-soft); stroke: none"/>
+            <path class="d-ln-acc" d="M40.0 190.0 L40.6 189.1 L41.2 188.1 L41.8 187.2 L42.3 186.3 L42.9 185.4 L43.5 184.5 L44.1 183.6 L44.7 182.7 L45.2 181.9 L45.8 181.0 L46.4 180.1 L47.0 179.2 L47.6 178.4 L48.2 177.5 L48.8 176.7 L49.3 175.9 L49.9 175.0 L50.5 174.2 L51.1 173.4 L51.7 172.6 L52.2 171.8 L52.8 171.0 L53.4 170.2 L54.0 169.4 L54.6 168.6 L55.2 167.8 L55.8 167.1 L56.3 166.3 L56.9 165.5 L57.5 164.8 L58.1 164.1 L58.7 163.3 L59.2 162.6 L59.8 161.9 L60.4 161.1 L61.0 160.4 L61.6 159.7 L62.2 159.0 L62.8 158.3 L63.3 157.6 L63.9 157.0 L64.5 156.3 L65.1 155.6 L65.7 155.0 L66.2 154.3 L66.8 153.6 L67.4 153.0 L68.0 152.4 L68.6 151.7 L69.2 151.1 L69.8 150.5 L70.3 149.9 L70.9 149.3 L71.5 148.7 L72.1 148.1 L72.7 147.5 L73.2 146.9 L73.8 146.3 L74.4 145.8 L75.0 145.2 L75.6 144.6 L76.2 144.1 L76.8 143.5 L77.3 143.0 L77.9 142.5 L78.5 142.0 L79.1 141.4 L79.7 140.9 L80.2 140.4 L80.8 139.9 L81.4 139.4 L82.0 138.9 L82.6 138.4 L83.2 138.0 L83.8 137.5 L84.3 137.0 L84.9 136.6 L85.5 136.1 L86.1 135.7 L86.7 135.2 L87.2 134.8 L87.8 134.4 L88.4 134.0 L89.0 133.6 L89.6 133.1 L90.2 132.7 L90.8 132.3 L91.3 132.0 L91.9 131.6 L92.5 131.2 L93.1 130.8 L93.7 130.5 L94.2 130.1 L94.8 129.8 L95.4 129.4 L96.0 129.1 L96.6 128.7 L97.2 128.4 L97.8 128.1 L98.3 127.8 L98.9 127.5 L99.5 127.2 L100.1 126.9 L100.7 126.6 L101.2 126.3 L101.8 126.0 L102.4 125.8 L103.0 125.5 L103.6 125.2 L104.2 125.0 L104.8 124.7 L105.3 124.5 L105.9 124.3 L106.5 124.0 L107.1 123.8 L107.7 123.6 L108.2 123.4 L108.8 123.2 L109.4 123.0 L110.0 122.8 L110.6 122.6 L111.2 122.4 L111.8 122.3 L112.3 122.1 L112.9 121.9 L113.5 121.8 L114.1 121.6 L114.7 121.5 L115.2 121.4 L115.8 121.2 L116.4 121.1 L117.0 121.0 L117.6 120.9 L118.2 120.8 L118.8 120.7 L119.3 120.6 L119.9 120.5 L120.5 120.4 L121.1 120.4 L121.7 120.3 L122.2 120.3 L122.8 120.2 L123.4 120.2 L124.0 120.1 L124.6 120.1 L125.2 120.0 L125.8 120.0 L126.3 120.0 L126.9 120.0 L127.5 120.0 L128.1 120.0 L128.7 120.0 L129.2 120.0 L129.8 120.0 L130.4 120.1 L131.0 120.1 L131.6 120.2 L132.2 120.2 L132.8 120.3 L133.3 120.3 L133.9 120.4 L134.5 120.4 L135.1 120.5 L135.7 120.6 L136.2 120.7 L136.8 120.8 L137.4 120.9 L138.0 121.0 L138.6 121.1 L139.2 121.2 L139.8 121.4 L140.3 121.5 L140.9 121.6 L141.5 121.8 L142.1 121.9 L142.7 122.1 L143.2 122.3 L143.8 122.4 L144.4 122.6 L145.0 122.8 L145.6 123.0 L146.2 123.2 L146.8 123.4 L147.3 123.6 L147.9 123.8 L148.5 124.0 L149.1 124.3 L149.7 124.5 L150.2 124.7 L150.8 125.0 L151.4 125.2 L152.0 125.5 L152.6 125.8 L153.2 126.0 L153.8 126.3 L154.3 126.6 L154.9 126.9 L155.5 127.2 L156.1 127.5 L156.7 127.8 L157.2 128.1 L157.8 128.4 L158.4 128.7 L159.0 129.1 L159.6 129.4 L160.2 129.8 L160.8 130.1 L161.3 130.5 L161.9 130.8 L162.5 131.2 L163.1 131.6 L163.7 132.0 L164.2 132.3 L164.8 132.7 L165.4 133.1 L166.0 133.6 L166.6 134.0 L167.2 134.4 L167.8 134.8 L168.3 135.2 L168.9 135.7 L169.5 136.1 L170.1 136.6 L170.7 137.0 L171.2 137.5 L171.8 138.0 L172.4 138.4 L173.0 138.9 L173.6 139.4 L174.2 139.9 L174.8 140.4 L175.3 140.9 L175.9 141.4 L176.5 142.0 L177.1 142.5 L177.7 143.0 L178.2 143.5 L178.8 144.1 L179.4 144.6 L180.0 145.2 L180.6 145.8 L181.2 146.3 L181.8 146.9 L182.3 147.5 L182.9 148.1 L183.5 148.7 L184.1 149.3 L184.7 149.9 L185.2 150.5 L185.8 151.1 L186.4 151.7 L187.0 152.4 L187.6 153.0 L188.2 153.6 L188.8 154.3 L189.3 155.0 L189.9 155.6 L190.5 156.3 L191.1 157.0 L191.7 157.6 L192.2 158.3 L192.8 159.0 L193.4 159.7 L194.0 160.4 L194.6 161.1 L195.2 161.9 L195.8 162.6 L196.3 163.3 L196.9 164.1 L197.5 164.8 L198.1 165.5 L198.7 166.3 L199.2 167.1 L199.8 167.8 L200.4 168.6 L201.0 169.4 L201.6 170.2 L202.2 171.0 L202.8 171.8 L203.3 172.6 L203.9 173.4 L204.5 174.2 L205.1 175.0 L205.7 175.9 L206.2 176.7 L206.8 177.5 L207.4 178.4 L208.0 179.2 L208.6 180.1 L209.2 181.0 L209.8 181.9 L210.3 182.7 L210.9 183.6 L211.5 184.5 L212.1 185.4 L212.7 186.3 L213.2 187.2 L213.8 188.1 L214.4 189.1 L215.0 190.0"/>
+            <line class="d-ln" x1="40" y1="190" x2="215" y2="190"/>
+            <line class="d-ln" x1="40" y1="190" x2="40" y2="50"/>
+            <text class="d-al" x="40.0" y="205" text-anchor="middle">0</text>
+            <text class="d-al" x="127.5" y="205" text-anchor="middle">0.5</text>
+            <text class="d-al" x="215.0" y="205" text-anchor="middle">1</text>
+            <text class="d-al" x="34" y="147.3" text-anchor="end">1</text>
+            <text class="d-al" x="34" y="100.7" text-anchor="end">2</text>
+            <text class="d-al" x="34" y="54.0" text-anchor="end">3</text>
+            <text class="d-t" x="40" y="36">α = 2, β = 2</text>
+            <text class="d-s" x="40" y="226">shape p(1 − p), highest at 0.5</text>
+            <text class="d-s" x="40" y="242">roughly fair coin, bets spread</text>
+            <line class="d-rule" x1="258" y1="143.3" x2="433" y2="143.3"/>
+            <line class="d-rule" x1="258" y1="96.7" x2="433" y2="96.7"/>
+            <line class="d-rule" x1="258" y1="50.0" x2="433" y2="50.0"/>
+            <path d="M258.0 190.0 L258.0 190.0 L258.6 185.4 L259.2 180.9 L259.8 176.6 L260.3 172.3 L260.9 168.2 L261.5 164.2 L262.1 160.3 L262.7 156.5 L263.2 152.8 L263.8 149.3 L264.4 145.8 L265.0 142.4 L265.6 139.2 L266.2 136.0 L266.8 133.0 L267.3 130.0 L267.9 127.2 L268.5 124.4 L269.1 121.8 L269.7 119.2 L270.2 116.7 L270.8 114.3 L271.4 112.0 L272.0 109.8 L272.6 107.6 L273.2 105.6 L273.8 103.6 L274.3 101.7 L274.9 99.9 L275.5 98.1 L276.1 96.5 L276.7 94.9 L277.2 93.4 L277.8 91.9 L278.4 90.6 L279.0 89.3 L279.6 88.0 L280.2 86.8 L280.8 85.7 L281.3 84.7 L281.9 83.7 L282.5 82.8 L283.1 81.9 L283.7 81.1 L284.2 80.4 L284.8 79.7 L285.4 79.1 L286.0 78.5 L286.6 77.9 L287.2 77.5 L287.8 77.0 L288.3 76.7 L288.9 76.3 L289.5 76.1 L290.1 75.8 L290.7 75.6 L291.2 75.5 L291.8 75.4 L292.4 75.3 L293.0 75.3 L293.6 75.3 L294.2 75.4 L294.8 75.5 L295.3 75.6 L295.9 75.8 L296.5 76.0 L297.1 76.2 L297.7 76.5 L298.2 76.8 L298.8 77.1 L299.4 77.5 L300.0 77.9 L300.6 78.3 L301.2 78.8 L301.8 79.3 L302.3 79.8 L302.9 80.3 L303.5 80.8 L304.1 81.4 L304.7 82.0 L305.2 82.7 L305.8 83.3 L306.4 84.0 L307.0 84.7 L307.6 85.4 L308.2 86.1 L308.8 86.8 L309.3 87.6 L309.9 88.4 L310.5 89.2 L311.1 90.0 L311.7 90.8 L312.2 91.6 L312.8 92.5 L313.4 93.3 L314.0 94.2 L314.6 95.1 L315.2 96.0 L315.8 96.9 L316.3 97.8 L316.9 98.7 L317.5 99.7 L318.1 100.6 L318.7 101.6 L319.2 102.5 L319.8 103.5 L320.4 104.5 L321.0 105.4 L321.6 106.4 L322.2 107.4 L322.8 108.4 L323.3 109.4 L323.9 110.4 L324.5 111.4 L325.1 112.4 L325.7 113.4 L326.2 114.4 L326.8 115.4 L327.4 116.4 L328.0 117.4 L328.6 118.4 L329.2 119.4 L329.8 120.4 L330.3 121.5 L330.9 122.5 L331.5 123.5 L332.1 124.5 L332.7 125.5 L333.2 126.5 L333.8 127.4 L334.4 128.4 L335.0 129.4 L335.6 130.4 L336.2 131.4 L336.8 132.4 L337.3 133.3 L337.9 134.3 L338.5 135.2 L339.1 136.2 L339.7 137.1 L340.2 138.1 L340.8 139.0 L341.4 139.9 L342.0 140.9 L342.6 141.8 L343.2 142.7 L343.8 143.6 L344.3 144.5 L344.9 145.4 L345.5 146.2 L346.1 147.1 L346.7 148.0 L347.2 148.8 L347.8 149.7 L348.4 150.5 L349.0 151.4 L349.6 152.2 L350.2 153.0 L350.8 153.8 L351.3 154.6 L351.9 155.4 L352.5 156.2 L353.1 156.9 L353.7 157.7 L354.2 158.4 L354.8 159.2 L355.4 159.9 L356.0 160.6 L356.6 161.3 L357.2 162.0 L357.8 162.7 L358.3 163.4 L358.9 164.1 L359.5 164.7 L360.1 165.4 L360.7 166.0 L361.2 166.7 L361.8 167.3 L362.4 167.9 L363.0 168.5 L363.6 169.1 L364.2 169.7 L364.8 170.2 L365.3 170.8 L365.9 171.4 L366.5 171.9 L367.1 172.4 L367.7 173.0 L368.2 173.5 L368.8 174.0 L369.4 174.5 L370.0 175.0 L370.6 175.4 L371.2 175.9 L371.8 176.3 L372.3 176.8 L372.9 177.2 L373.5 177.7 L374.1 178.1 L374.7 178.5 L375.2 178.9 L375.8 179.3 L376.4 179.6 L377.0 180.0 L377.6 180.4 L378.2 180.7 L378.8 181.1 L379.3 181.4 L379.9 181.7 L380.5 182.1 L381.1 182.4 L381.7 182.7 L382.2 183.0 L382.8 183.3 L383.4 183.5 L384.0 183.8 L384.6 184.1 L385.2 184.3 L385.8 184.6 L386.3 184.8 L386.9 185.0 L387.5 185.3 L388.1 185.5 L388.7 185.7 L389.2 185.9 L389.8 186.1 L390.4 186.3 L391.0 186.5 L391.6 186.6 L392.2 186.8 L392.8 187.0 L393.3 187.1 L393.9 187.3 L394.5 187.4 L395.1 187.6 L395.7 187.7 L396.2 187.8 L396.8 188.0 L397.4 188.1 L398.0 188.2 L398.6 188.3 L399.2 188.4 L399.8 188.5 L400.3 188.6 L400.9 188.7 L401.5 188.8 L402.1 188.9 L402.7 189.0 L403.2 189.0 L403.8 189.1 L404.4 189.2 L405.0 189.2 L405.6 189.3 L406.2 189.3 L406.8 189.4 L407.3 189.4 L407.9 189.5 L408.5 189.5 L409.1 189.6 L409.7 189.6 L410.2 189.7 L410.8 189.7 L411.4 189.7 L412.0 189.7 L412.6 189.8 L413.2 189.8 L413.8 189.8 L414.3 189.8 L414.9 189.9 L415.5 189.9 L416.1 189.9 L416.7 189.9 L417.2 189.9 L417.8 189.9 L418.4 189.9 L419.0 189.9 L419.6 190.0 L420.2 190.0 L420.8 190.0 L421.3 190.0 L421.9 190.0 L422.5 190.0 L423.1 190.0 L423.7 190.0 L424.2 190.0 L424.8 190.0 L425.4 190.0 L426.0 190.0 L426.6 190.0 L427.2 190.0 L427.8 190.0 L428.3 190.0 L428.9 190.0 L429.5 190.0 L430.1 190.0 L430.7 190.0 L431.2 190.0 L431.8 190.0 L432.4 190.0 L433.0 190.0 L433.0 190.0 Z" style="fill: var(--accent-soft); stroke: none"/>
+            <path class="d-ln-acc" d="M258.0 190.0 L258.6 185.4 L259.2 180.9 L259.8 176.6 L260.3 172.3 L260.9 168.2 L261.5 164.2 L262.1 160.3 L262.7 156.5 L263.2 152.8 L263.8 149.3 L264.4 145.8 L265.0 142.4 L265.6 139.2 L266.2 136.0 L266.8 133.0 L267.3 130.0 L267.9 127.2 L268.5 124.4 L269.1 121.8 L269.7 119.2 L270.2 116.7 L270.8 114.3 L271.4 112.0 L272.0 109.8 L272.6 107.6 L273.2 105.6 L273.8 103.6 L274.3 101.7 L274.9 99.9 L275.5 98.1 L276.1 96.5 L276.7 94.9 L277.2 93.4 L277.8 91.9 L278.4 90.6 L279.0 89.3 L279.6 88.0 L280.2 86.8 L280.8 85.7 L281.3 84.7 L281.9 83.7 L282.5 82.8 L283.1 81.9 L283.7 81.1 L284.2 80.4 L284.8 79.7 L285.4 79.1 L286.0 78.5 L286.6 77.9 L287.2 77.5 L287.8 77.0 L288.3 76.7 L288.9 76.3 L289.5 76.1 L290.1 75.8 L290.7 75.6 L291.2 75.5 L291.8 75.4 L292.4 75.3 L293.0 75.3 L293.6 75.3 L294.2 75.4 L294.8 75.5 L295.3 75.6 L295.9 75.8 L296.5 76.0 L297.1 76.2 L297.7 76.5 L298.2 76.8 L298.8 77.1 L299.4 77.5 L300.0 77.9 L300.6 78.3 L301.2 78.8 L301.8 79.3 L302.3 79.8 L302.9 80.3 L303.5 80.8 L304.1 81.4 L304.7 82.0 L305.2 82.7 L305.8 83.3 L306.4 84.0 L307.0 84.7 L307.6 85.4 L308.2 86.1 L308.8 86.8 L309.3 87.6 L309.9 88.4 L310.5 89.2 L311.1 90.0 L311.7 90.8 L312.2 91.6 L312.8 92.5 L313.4 93.3 L314.0 94.2 L314.6 95.1 L315.2 96.0 L315.8 96.9 L316.3 97.8 L316.9 98.7 L317.5 99.7 L318.1 100.6 L318.7 101.6 L319.2 102.5 L319.8 103.5 L320.4 104.5 L321.0 105.4 L321.6 106.4 L322.2 107.4 L322.8 108.4 L323.3 109.4 L323.9 110.4 L324.5 111.4 L325.1 112.4 L325.7 113.4 L326.2 114.4 L326.8 115.4 L327.4 116.4 L328.0 117.4 L328.6 118.4 L329.2 119.4 L329.8 120.4 L330.3 121.5 L330.9 122.5 L331.5 123.5 L332.1 124.5 L332.7 125.5 L333.2 126.5 L333.8 127.4 L334.4 128.4 L335.0 129.4 L335.6 130.4 L336.2 131.4 L336.8 132.4 L337.3 133.3 L337.9 134.3 L338.5 135.2 L339.1 136.2 L339.7 137.1 L340.2 138.1 L340.8 139.0 L341.4 139.9 L342.0 140.9 L342.6 141.8 L343.2 142.7 L343.8 143.6 L344.3 144.5 L344.9 145.4 L345.5 146.2 L346.1 147.1 L346.7 148.0 L347.2 148.8 L347.8 149.7 L348.4 150.5 L349.0 151.4 L349.6 152.2 L350.2 153.0 L350.8 153.8 L351.3 154.6 L351.9 155.4 L352.5 156.2 L353.1 156.9 L353.7 157.7 L354.2 158.4 L354.8 159.2 L355.4 159.9 L356.0 160.6 L356.6 161.3 L357.2 162.0 L357.8 162.7 L358.3 163.4 L358.9 164.1 L359.5 164.7 L360.1 165.4 L360.7 166.0 L361.2 166.7 L361.8 167.3 L362.4 167.9 L363.0 168.5 L363.6 169.1 L364.2 169.7 L364.8 170.2 L365.3 170.8 L365.9 171.4 L366.5 171.9 L367.1 172.4 L367.7 173.0 L368.2 173.5 L368.8 174.0 L369.4 174.5 L370.0 175.0 L370.6 175.4 L371.2 175.9 L371.8 176.3 L372.3 176.8 L372.9 177.2 L373.5 177.7 L374.1 178.1 L374.7 178.5 L375.2 178.9 L375.8 179.3 L376.4 179.6 L377.0 180.0 L377.6 180.4 L378.2 180.7 L378.8 181.1 L379.3 181.4 L379.9 181.7 L380.5 182.1 L381.1 182.4 L381.7 182.7 L382.2 183.0 L382.8 183.3 L383.4 183.5 L384.0 183.8 L384.6 184.1 L385.2 184.3 L385.8 184.6 L386.3 184.8 L386.9 185.0 L387.5 185.3 L388.1 185.5 L388.7 185.7 L389.2 185.9 L389.8 186.1 L390.4 186.3 L391.0 186.5 L391.6 186.6 L392.2 186.8 L392.8 187.0 L393.3 187.1 L393.9 187.3 L394.5 187.4 L395.1 187.6 L395.7 187.7 L396.2 187.8 L396.8 188.0 L397.4 188.1 L398.0 188.2 L398.6 188.3 L399.2 188.4 L399.8 188.5 L400.3 188.6 L400.9 188.7 L401.5 188.8 L402.1 188.9 L402.7 189.0 L403.2 189.0 L403.8 189.1 L404.4 189.2 L405.0 189.2 L405.6 189.3 L406.2 189.3 L406.8 189.4 L407.3 189.4 L407.9 189.5 L408.5 189.5 L409.1 189.6 L409.7 189.6 L410.2 189.7 L410.8 189.7 L411.4 189.7 L412.0 189.7 L412.6 189.8 L413.2 189.8 L413.8 189.8 L414.3 189.8 L414.9 189.9 L415.5 189.9 L416.1 189.9 L416.7 189.9 L417.2 189.9 L417.8 189.9 L418.4 189.9 L419.0 189.9 L419.6 190.0 L420.2 190.0 L420.8 190.0 L421.3 190.0 L421.9 190.0 L422.5 190.0 L423.1 190.0 L423.7 190.0 L424.2 190.0 L424.8 190.0 L425.4 190.0 L426.0 190.0 L426.6 190.0 L427.2 190.0 L427.8 190.0 L428.3 190.0 L428.9 190.0 L429.5 190.0 L430.1 190.0 L430.7 190.0 L431.2 190.0 L431.8 190.0 L432.4 190.0 L433.0 190.0"/>
+            <line class="d-ln" x1="258" y1="190" x2="433" y2="190"/>
+            <line class="d-ln" x1="258" y1="190" x2="258" y2="50"/>
+            <text class="d-al" x="258.0" y="205" text-anchor="middle">0</text>
+            <text class="d-al" x="345.5" y="205" text-anchor="middle">0.5</text>
+            <text class="d-al" x="433.0" y="205" text-anchor="middle">1</text>
+            <text class="d-t" x="258" y="36">α = 2, β = 5</text>
+            <text class="d-s" x="258" y="226">small α, large β</text>
+            <text class="d-s" x="258" y="242">p believed closer to 0</text>
+            <line class="d-rule" x1="476" y1="143.3" x2="651" y2="143.3"/>
+            <line class="d-rule" x1="476" y1="96.7" x2="651" y2="96.7"/>
+            <line class="d-rule" x1="476" y1="50.0" x2="651" y2="50.0"/>
+            <path d="M478.0 190.0 L478.0 50.0 L478.6 66.3 L479.1 78.0 L479.7 86.8 L480.3 93.8 L480.8 99.4 L481.4 104.2 L482.0 108.3 L482.6 111.8 L483.1 114.8 L483.7 117.5 L484.3 120.0 L484.8 122.1 L485.4 124.1 L486.0 125.9 L486.5 127.6 L487.1 129.1 L487.7 130.5 L488.3 131.8 L488.8 133.0 L489.4 134.1 L490.0 135.2 L490.5 136.2 L491.1 137.1 L491.7 138.0 L492.2 138.8 L492.8 139.6 L493.4 140.3 L494.0 141.0 L494.5 141.7 L495.1 142.4 L495.7 143.0 L496.2 143.5 L496.8 144.1 L497.4 144.6 L497.9 145.1 L498.5 145.6 L499.1 146.1 L499.7 146.6 L500.2 147.0 L500.8 147.4 L501.4 147.8 L501.9 148.2 L502.5 148.6 L503.1 148.9 L503.6 149.3 L504.2 149.6 L504.8 149.9 L505.4 150.2 L505.9 150.5 L506.5 150.8 L507.1 151.1 L507.6 151.4 L508.2 151.7 L508.8 151.9 L509.3 152.2 L509.9 152.4 L510.5 152.7 L511.1 152.9 L511.6 153.1 L512.2 153.3 L512.8 153.5 L513.3 153.7 L513.9 153.9 L514.5 154.1 L515.0 154.3 L515.6 154.5 L516.2 154.7 L516.8 154.9 L517.3 155.0 L517.9 155.2 L518.5 155.3 L519.0 155.5 L519.6 155.7 L520.2 155.8 L520.7 155.9 L521.3 156.1 L521.9 156.2 L522.5 156.4 L523.0 156.5 L523.6 156.6 L524.2 156.7 L524.7 156.9 L525.3 157.0 L525.9 157.1 L526.4 157.2 L527.0 157.3 L527.6 157.4 L528.2 157.5 L528.7 157.6 L529.3 157.7 L529.9 157.8 L530.4 157.9 L531.0 158.0 L531.6 158.1 L532.1 158.2 L532.7 158.3 L533.3 158.3 L533.9 158.4 L534.4 158.5 L535.0 158.6 L535.6 158.7 L536.1 158.7 L536.7 158.8 L537.3 158.9 L537.8 158.9 L538.4 159.0 L539.0 159.1 L539.6 159.1 L540.1 159.2 L540.7 159.2 L541.3 159.3 L541.8 159.3 L542.4 159.4 L543.0 159.4 L543.5 159.5 L544.1 159.5 L544.7 159.6 L545.3 159.6 L545.8 159.7 L546.4 159.7 L547.0 159.7 L547.5 159.8 L548.1 159.8 L548.7 159.9 L549.2 159.9 L549.8 159.9 L550.4 160.0 L551.0 160.0 L551.5 160.0 L552.1 160.0 L552.7 160.1 L553.2 160.1 L553.8 160.1 L554.4 160.1 L554.9 160.1 L555.5 160.2 L556.1 160.2 L556.7 160.2 L557.2 160.2 L557.8 160.2 L558.4 160.2 L558.9 160.3 L559.5 160.3 L560.1 160.3 L560.6 160.3 L561.2 160.3 L561.8 160.3 L562.4 160.3 L562.9 160.3 L563.5 160.3 L564.1 160.3 L564.6 160.3 L565.2 160.3 L565.8 160.3 L566.4 160.3 L566.9 160.3 L567.5 160.3 L568.1 160.3 L568.6 160.2 L569.2 160.2 L569.8 160.2 L570.3 160.2 L570.9 160.2 L571.5 160.2 L572.1 160.1 L572.6 160.1 L573.2 160.1 L573.8 160.1 L574.3 160.1 L574.9 160.0 L575.5 160.0 L576.0 160.0 L576.6 160.0 L577.2 159.9 L577.8 159.9 L578.3 159.9 L578.9 159.8 L579.5 159.8 L580.0 159.7 L580.6 159.7 L581.2 159.7 L581.7 159.6 L582.3 159.6 L582.9 159.5 L583.5 159.5 L584.0 159.4 L584.6 159.4 L585.2 159.3 L585.7 159.3 L586.3 159.2 L586.9 159.2 L587.4 159.1 L588.0 159.1 L588.6 159.0 L589.2 158.9 L589.7 158.9 L590.3 158.8 L590.9 158.7 L591.4 158.7 L592.0 158.6 L592.6 158.5 L593.1 158.4 L593.7 158.3 L594.3 158.3 L594.9 158.2 L595.4 158.1 L596.0 158.0 L596.6 157.9 L597.1 157.8 L597.7 157.7 L598.3 157.6 L598.8 157.5 L599.4 157.4 L600.0 157.3 L600.6 157.2 L601.1 157.1 L601.7 157.0 L602.3 156.9 L602.8 156.7 L603.4 156.6 L604.0 156.5 L604.5 156.4 L605.1 156.2 L605.7 156.1 L606.3 155.9 L606.8 155.8 L607.4 155.7 L608.0 155.5 L608.5 155.3 L609.1 155.2 L609.7 155.0 L610.2 154.9 L610.8 154.7 L611.4 154.5 L612.0 154.3 L612.5 154.1 L613.1 153.9 L613.7 153.7 L614.2 153.5 L614.8 153.3 L615.4 153.1 L615.9 152.9 L616.5 152.7 L617.1 152.4 L617.7 152.2 L618.2 151.9 L618.8 151.7 L619.4 151.4 L619.9 151.1 L620.5 150.8 L621.1 150.5 L621.6 150.2 L622.2 149.9 L622.8 149.6 L623.4 149.3 L623.9 148.9 L624.5 148.6 L625.1 148.2 L625.6 147.8 L626.2 147.4 L626.8 147.0 L627.3 146.6 L627.9 146.1 L628.5 145.6 L629.1 145.1 L629.6 144.6 L630.2 144.1 L630.8 143.5 L631.3 143.0 L631.9 142.4 L632.5 141.7 L633.0 141.0 L633.6 140.3 L634.2 139.6 L634.8 138.8 L635.3 138.0 L635.9 137.1 L636.5 136.2 L637.0 135.2 L637.6 134.1 L638.2 133.0 L638.7 131.8 L639.3 130.5 L639.9 129.1 L640.5 127.6 L641.0 125.9 L641.6 124.1 L642.2 122.1 L642.7 120.0 L643.3 117.5 L643.9 114.8 L644.4 111.8 L645.0 108.3 L645.6 104.2 L646.2 99.4 L646.7 93.8 L647.3 86.8 L647.9 78.0 L648.4 66.3 L649.0 50.0 L649.0 190.0 Z" style="fill: var(--accent-soft); stroke: none"/>
+            <path class="d-ln-acc" d="M478.0 50.0 L478.6 66.3 L479.1 78.0 L479.7 86.8 L480.3 93.8 L480.8 99.4 L481.4 104.2 L482.0 108.3 L482.6 111.8 L483.1 114.8 L483.7 117.5 L484.3 120.0 L484.8 122.1 L485.4 124.1 L486.0 125.9 L486.5 127.6 L487.1 129.1 L487.7 130.5 L488.3 131.8 L488.8 133.0 L489.4 134.1 L490.0 135.2 L490.5 136.2 L491.1 137.1 L491.7 138.0 L492.2 138.8 L492.8 139.6 L493.4 140.3 L494.0 141.0 L494.5 141.7 L495.1 142.4 L495.7 143.0 L496.2 143.5 L496.8 144.1 L497.4 144.6 L497.9 145.1 L498.5 145.6 L499.1 146.1 L499.7 146.6 L500.2 147.0 L500.8 147.4 L501.4 147.8 L501.9 148.2 L502.5 148.6 L503.1 148.9 L503.6 149.3 L504.2 149.6 L504.8 149.9 L505.4 150.2 L505.9 150.5 L506.5 150.8 L507.1 151.1 L507.6 151.4 L508.2 151.7 L508.8 151.9 L509.3 152.2 L509.9 152.4 L510.5 152.7 L511.1 152.9 L511.6 153.1 L512.2 153.3 L512.8 153.5 L513.3 153.7 L513.9 153.9 L514.5 154.1 L515.0 154.3 L515.6 154.5 L516.2 154.7 L516.8 154.9 L517.3 155.0 L517.9 155.2 L518.5 155.3 L519.0 155.5 L519.6 155.7 L520.2 155.8 L520.7 155.9 L521.3 156.1 L521.9 156.2 L522.5 156.4 L523.0 156.5 L523.6 156.6 L524.2 156.7 L524.7 156.9 L525.3 157.0 L525.9 157.1 L526.4 157.2 L527.0 157.3 L527.6 157.4 L528.2 157.5 L528.7 157.6 L529.3 157.7 L529.9 157.8 L530.4 157.9 L531.0 158.0 L531.6 158.1 L532.1 158.2 L532.7 158.3 L533.3 158.3 L533.9 158.4 L534.4 158.5 L535.0 158.6 L535.6 158.7 L536.1 158.7 L536.7 158.8 L537.3 158.9 L537.8 158.9 L538.4 159.0 L539.0 159.1 L539.6 159.1 L540.1 159.2 L540.7 159.2 L541.3 159.3 L541.8 159.3 L542.4 159.4 L543.0 159.4 L543.5 159.5 L544.1 159.5 L544.7 159.6 L545.3 159.6 L545.8 159.7 L546.4 159.7 L547.0 159.7 L547.5 159.8 L548.1 159.8 L548.7 159.9 L549.2 159.9 L549.8 159.9 L550.4 160.0 L551.0 160.0 L551.5 160.0 L552.1 160.0 L552.7 160.1 L553.2 160.1 L553.8 160.1 L554.4 160.1 L554.9 160.1 L555.5 160.2 L556.1 160.2 L556.7 160.2 L557.2 160.2 L557.8 160.2 L558.4 160.2 L558.9 160.3 L559.5 160.3 L560.1 160.3 L560.6 160.3 L561.2 160.3 L561.8 160.3 L562.4 160.3 L562.9 160.3 L563.5 160.3 L564.1 160.3 L564.6 160.3 L565.2 160.3 L565.8 160.3 L566.4 160.3 L566.9 160.3 L567.5 160.3 L568.1 160.3 L568.6 160.2 L569.2 160.2 L569.8 160.2 L570.3 160.2 L570.9 160.2 L571.5 160.2 L572.1 160.1 L572.6 160.1 L573.2 160.1 L573.8 160.1 L574.3 160.1 L574.9 160.0 L575.5 160.0 L576.0 160.0 L576.6 160.0 L577.2 159.9 L577.8 159.9 L578.3 159.9 L578.9 159.8 L579.5 159.8 L580.0 159.7 L580.6 159.7 L581.2 159.7 L581.7 159.6 L582.3 159.6 L582.9 159.5 L583.5 159.5 L584.0 159.4 L584.6 159.4 L585.2 159.3 L585.7 159.3 L586.3 159.2 L586.9 159.2 L587.4 159.1 L588.0 159.1 L588.6 159.0 L589.2 158.9 L589.7 158.9 L590.3 158.8 L590.9 158.7 L591.4 158.7 L592.0 158.6 L592.6 158.5 L593.1 158.4 L593.7 158.3 L594.3 158.3 L594.9 158.2 L595.4 158.1 L596.0 158.0 L596.6 157.9 L597.1 157.8 L597.7 157.7 L598.3 157.6 L598.8 157.5 L599.4 157.4 L600.0 157.3 L600.6 157.2 L601.1 157.1 L601.7 157.0 L602.3 156.9 L602.8 156.7 L603.4 156.6 L604.0 156.5 L604.5 156.4 L605.1 156.2 L605.7 156.1 L606.3 155.9 L606.8 155.8 L607.4 155.7 L608.0 155.5 L608.5 155.3 L609.1 155.2 L609.7 155.0 L610.2 154.9 L610.8 154.7 L611.4 154.5 L612.0 154.3 L612.5 154.1 L613.1 153.9 L613.7 153.7 L614.2 153.5 L614.8 153.3 L615.4 153.1 L615.9 152.9 L616.5 152.7 L617.1 152.4 L617.7 152.2 L618.2 151.9 L618.8 151.7 L619.4 151.4 L619.9 151.1 L620.5 150.8 L621.1 150.5 L621.6 150.2 L622.2 149.9 L622.8 149.6 L623.4 149.3 L623.9 148.9 L624.5 148.6 L625.1 148.2 L625.6 147.8 L626.2 147.4 L626.8 147.0 L627.3 146.6 L627.9 146.1 L628.5 145.6 L629.1 145.1 L629.6 144.6 L630.2 144.1 L630.8 143.5 L631.3 143.0 L631.9 142.4 L632.5 141.7 L633.0 141.0 L633.6 140.3 L634.2 139.6 L634.8 138.8 L635.3 138.0 L635.9 137.1 L636.5 136.2 L637.0 135.2 L637.6 134.1 L638.2 133.0 L638.7 131.8 L639.3 130.5 L639.9 129.1 L640.5 127.6 L641.0 125.9 L641.6 124.1 L642.2 122.1 L642.7 120.0 L643.3 117.5 L643.9 114.8 L644.4 111.8 L645.0 108.3 L645.6 104.2 L646.2 99.4 L646.7 93.8 L647.3 86.8 L647.9 78.0 L648.4 66.3 L649.0 50.0"/>
+            <line class="d-ln" x1="476" y1="190" x2="651" y2="190"/>
+            <line class="d-ln" x1="476" y1="190" x2="476" y2="50"/>
+            <text class="d-al" x="476.0" y="205" text-anchor="middle">0</text>
+            <text class="d-al" x="563.5" y="205" text-anchor="middle">0.5</text>
+            <text class="d-al" x="651.0" y="205" text-anchor="middle">1</text>
+            <text class="d-t" x="476" y="36">α = β = 0.5</text>
+            <text class="d-s" x="476" y="226">U-shaped: p small or large</text>
+            <text class="d-s" x="476" y="242">not near 0.5 (unbounded at ends)</text>
+            </svg>
+        </div>
+        <figcaption><b>Three Beta priors, the lecture's examples, drawn to scale.</b> All three panels share one vertical scale; the U-shaped density grows without bound at 0 and 1, so it is cut at 3. A hunch that \(p\) is close to 1 needs large \(\alpha\) and small \(\beta\); the interactive below uses \(\alpha = 5.5,\ \beta = 1.5\), whose peak is at 0.9 (our choice, not the lecture's).</figcaption>
+      </figure>
+    </section>
+
+    <section id="beta-posterior">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1454s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 24:14</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1594s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 26:34 same form</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1735s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 28:55 parameters</a>
+        </div>
+        <h2>Beta prior, Bernoulli data, Beta posterior</h2>
+      </div>
+      <p>Now apply posterior \(\propto\) likelihood \(\times\) prior. The likelihood is the Bernoulli likelihood from Lecture 20 and the prior is the Beta density:</p>
+      <div class="eq">\[ f(p \mid x_1, \dots, x_n) \;\propto\; \underbrace{\prod_{i=1}^n p^{x_i}(1-p)^{1-x_i}}_{\text{likelihood}} \;\times\; \underbrace{p^{\alpha-1}(1-p)^{\beta-1}}_{\text{prior}} \]</div>
+      <p>Both factors are a power of \(p\) times a power of \(1 - p\), so the exponents simply add <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1520s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>25:20</a>:</p>
+      <div class="eq">\[ f(p \mid x_1, \dots, x_n) \;\propto\; p^{\,\sum_i x_i + \alpha - 1}\,(1-p)^{\,\sum_i (1 - x_i) + \beta - 1} \]</div>
+      <p>We write \(\propto\) because the evidence and the normalizing constant are left out. They are not needed, as the next step shows.</p>
+      <p>This has the same functional form as the prior. Any density on \([0, 1]\) of the form \(p^{a-1}(1-p)^{b-1}\) is a Beta density, so the posterior is a Beta distribution. Only its parameters have changed, and they now depend on both the prior's \(\alpha, \beta\) and the data. We never have to compute the posterior density point by point: knowing its two parameters gives us the whole function.</p>
+      <div class="result">
+        <span class="lbl">Result: Beta–Bernoulli update</span>
+        \[ \text{prior } \text{Beta}(\alpha, \beta) \;\xrightarrow{\ n_H \text{ heads},\ n_T \text{ tails}\ }\; \text{posterior } \text{Beta}(\alpha + n_H,\ \beta + n_T) \]
+        <p>Here \(n_H = \sum_i x_i\) is the number of heads and \(n_T = \sum_i (1 - x_i)\) the number of tails, with \(n_H + n_T = n\).</p>
+      </div>
+      <p>This convenience comes from the pairing <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1664s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>27:44</a>. Another prior on \([0, 1]\) would still give a posterior when multiplied by the Bernoulli likelihood, and it might be useful, but it need not have the same form as the prior. Standard name: a prior whose posterior stays in the same family is called a <dfn>conjugate prior</dfn>. The Beta is conjugate to the Bernoulli.</p>
+    </section>
+
+    <section id="point-estimates">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1801s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 30:01</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1867s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 31:07 ghost data</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1968s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 32:48 MAP</a>
+        </div>
+        <h2>Turning the posterior into one number</h2>
+      </div>
+      <p>Maximum likelihood uses only the counts: \(\hat p_{\text{ML}} = n_H/(n_H + n_T) = n_H/n\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1770s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>29:30</a>. The Bayesian approach gives a whole distribution over \(p\). If we must commit to a single guess, there are several sensible choices.</p>
+
+      <h3>The posterior mean</h3>
+      <p>The expected value of a Beta\((\alpha, \beta)\) distribution is \(\alpha/(\alpha+\beta)\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1832s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>30:32</a>. The posterior is Beta\((\alpha + n_H,\ \beta + n_T)\), so its mean is</p>
+      <div class="eq">\[ \hat p_{\text{mean}} = \frac{\alpha + n_H}{(\alpha + n_H) + (\beta + n_T)} = \frac{\alpha + n_H}{\alpha + \beta + n} \]</div>
+
+      <h3>The prior as ghost data</h3>
+      <p>Compare this with \(n_H/n\). The posterior mean is exactly what maximum likelihood would give if, besides the \(n\) real tosses, we had \(\alpha + \beta\) extra <dfn>pseudo-observations</dfn>, which the lecture calls <dfn>ghost data</dfn>: \(\alpha\) ghost heads and \(\beta\) ghost tails. A Beta prior acts as if someone had already done \(\alpha + \beta\) experiments. If someone tells us they did 100 experiments and saw 80 heads and 20 tails, we can encode that as the prior Beta(80, 20) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=1938s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>32:18</a>. The posterior then takes these ghost samples into account along with the real ones.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 252" role="img" aria-label="Bars drawn to scale by count. Prior Beta(80, 20) as 80 ghost heads and 20 ghost tails. Real data: 9 heads and 3 tails. Posterior Beta(89, 23) pools them: 89 heads and 23 tails, posterior mean 89/112, about 0.795.">
+            <text class="d-t" x="20" y="47">Prior</text><text class="d-s" x="20" y="63">ghost data, Beta(80, 20)</text>
+            <rect class="pill d-dash" x="180.0" y="34" width="240.0" height="28"/>
+            <rect class="d-off" x="420.0" y="34" width="60.0" height="28"/>
+            <text class="d-s" x="300.0" y="52" text-anchor="middle">80 ghost heads</text>
+            <text class="d-s" x="450.0" y="52" text-anchor="middle">20</text>
+            <text class="d-s" x="492.0" y="52">prior mean 80/100 = 0.80</text>
+            <text class="d-t" x="20" y="117">+ Data</text><text class="d-s" x="20" y="133">the 12 tosses of L19</text>
+            <rect class="pill" x="180.0" y="104" width="27.0" height="28"/>
+            <rect class="d-box" x="207.0" y="104" width="9.0" height="28"/>
+            <text class="d-s" x="228.0" y="122">9 heads, 3 tails · ML estimate 9/12 = 0.75</text>
+            <text class="d-t" x="20" y="187">= Posterior</text><text class="d-s" x="20" y="203">pooled counts</text>
+            <rect class="pill d-dash" x="180.0" y="174" width="240.0" height="28"/>
+            <rect class="pill" x="420.0" y="174" width="27.0" height="28"/>
+            <rect class="d-off" x="447.0" y="174" width="60.0" height="28"/>
+            <rect class="d-box" x="507.0" y="174" width="9.0" height="28"/>
+            <text class="d-s" x="313.5" y="218" text-anchor="middle">80 + 9 = 89 heads</text>
+            <text class="d-s" x="481.5" y="218" text-anchor="middle">20 + 3 = 23 tails</text>
+            <text class="d-t" x="528.0" y="186" style="fill: var(--accent)">Beta(89, 23)</text>
+            <text class="d-s" x="528.0" y="202">mean 89/112 ≈ 0.795</text>
+            <text class="d-s" x="20" y="244">Posterior mean = the ML estimate computed as if the 100 ghost tosses were real: (α + heads)/(α + β + n).</text>
+            </svg>
+        </div>
+        <figcaption><b>Conjugate updating is adding counts.</b> Bars are drawn to scale by count; dashed outlines are ghost tosses, solid outlines real ones, tinted blocks heads. Combining the lecture's Beta(80, 20) prior with the twelve tosses of L19 gives Beta(89, 23). Its mean, 0.795, sits close to the prior's 0.80, because 100 ghost tosses outweigh 12 real ones.</figcaption>
+      </figure>
+
+      <h3>Maximum a posteriori (MAP)</h3>
+      <p>Maximum likelihood picks the maximizer of the likelihood. The <dfn>maximum a posteriori</dfn> (MAP) estimator picks the maximizer of the posterior density, its mode, written \(\hat p_{\text{MAP}}\). For the Beta posterior it differs slightly from the posterior mean. The lecture does not write the formula; the standard result is that for \(a, b > 1\) the mode of Beta\((a, b)\) is \((a-1)/(a+b-2)\), so</p>
+      <div class="eq">\[ \hat p_{\text{MAP}} = \frac{\alpha + n_H - 1}{\alpha + \beta + n - 2} \qquad (\alpha + n_H > 1,\ \beta + n_T > 1) \]</div>
+      <p>Because we hold an entire distribution, the choice is ours <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=2038s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>33:58</a>: take its mode (MAP), its mean, or even draw samples from it and average them. Until we choose, the posterior is a belief over every possible value of \(p\) that does not commit to any single one.</p>
+
+      <figure id="bay-fig">
+        <div class="controls">
+          <label for="bay-a">Prior \(\alpha\)</label>
+          <input type="range" id="bay-a" min="0.5" max="30" step="0.5" value="5.5">
+          <output id="bay-a-out" for="bay-a">5.5</output>
+          <label for="bay-b">Prior \(\beta\)</label>
+          <input type="range" id="bay-b" min="0.5" max="30" step="0.5" value="1.5">
+          <output id="bay-b-out" for="bay-b">1.5</output>
+          <label for="bay-h">Heads \(n_H\)</label>
+          <input type="range" id="bay-h" min="0" max="40" step="1" value="2">
+          <output id="bay-h-out" for="bay-h">2</output>
+          <label for="bay-t">Tails \(n_T\)</label>
+          <input type="range" id="bay-t" min="0" max="40" step="1" value="8">
+          <output id="bay-t-out" for="bay-t">8</output>
+          <button class="btn" id="bay-ex1" type="button">Hunch 0.9, data 2 H / 8 T</button>
+          <button class="btn" id="bay-ex2" type="button">Hunch 0.9, data 9 H / 1 T</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">ML estimate</span><span class="v" id="bay-ml">–</span></div>
+          <div><span class="k">Posterior mean</span><span class="v mine" id="bay-mean">–</span></div>
+          <div><span class="k">MAP (posterior mode)</span><span class="v" id="bay-map">–</span></div>
+        </div>
+        <div class="status" id="bay-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="bay-svg" viewBox="0 0 640 380" role="img" aria-label="Prior, rescaled likelihood and posterior densities over p from 0 to 1. With the default Beta(5.5, 1.5) prior peaking at 0.9 and data of 2 heads and 8 tails, the likelihood peaks at 0.2 and the posterior, Beta(7.5, 9.5), peaks at about 0.43 between them."></svg></div>
+        <figcaption><b>Prior \(\times\) likelihood \(\to\) posterior, for a coin.</b> The default prior Beta(5.5, 1.5) is our choice for a hunch that \(p\) is near 0.9 (its peak is at 0.9). With the lecture's 2 heads and 8 tails the posterior lands between hunch and data; with 9 heads and 1 tail it sharpens near 0.9. The likelihood is rescaled to area 1 so it can share the axis. Try \(\alpha = \beta = 0.5\) for the U-shaped hunch, or large \(\alpha\) and \(\beta\) to watch a confident prior resist the data.</figcaption>
+      </figure>
+    </section>
+
+    <section id="two-ways">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=2069s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 34:29</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=ZnkRbtZLPm4&amp;t=2103s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L21 · 35:03 what comes next</a>
+        </div>
+        <h2>Two ways to estimate, and what comes next</h2>
+      </div>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>Maximum likelihood</th><th>Bayesian</th></tr></thead>
+          <tbody>
+            <tr><td>Uses</td><td>Data only</td><td>A prior hunch and the data</td></tr>
+            <tr><td>The parameter is</td><td>A fixed unknown value</td><td>A random variable with a distribution</td></tr>
+            <tr><td>Method</td><td>Write down the likelihood and maximize it</td><td>Update prior to posterior with Bayes' theorem</td></tr>
+            <tr><td>Output</td><td>A point estimate \(\hat\theta_{\text{ML}}\)</td><td>A posterior distribution \(P(\theta \mid \text{data})\)</td></tr>
+            <tr><td>One number</td><td>The maximizer itself</td><td>Posterior mean, MAP (mode), or another summary</td></tr>
+            <tr><td>Coin tosses</td><td>\(n_H/n\)</td><td>Beta\((\alpha + n_H,\ \beta + n_T)\), mean \(\frac{\alpha + n_H}{\alpha + \beta + n}\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The lecture calls these basic statistical ideas. Next they are put to work on a specific unsupervised learning problem. K-means assumed no probabilistic model for the data. With a reasonable model, maximum likelihood gives a probabilistic counterpart of K-means clustering: the Gaussian mixture model of <a href="part-09.html">Part 9</a>. The lecture raises the same question for representation learning.</p>
+      <p class="callout">Both principles come back in supervised learning: maximum likelihood in the probabilistic view of regression (<a href="part-11.html">Part 11</a>), Gaussian priors and ridge regression (<a href="part-12.html">Part 12</a>), and generative classifiers such as naive Bayes (<a href="part-14.html">Part 14</a>).</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Estimation</dt><dd>Assuming a probabilistic model generated the data and using the data to guess its unknown parameters.</dd></div>
+        <div><dt>Probabilistic model</dt><dd>The assumed random mechanism (the box in the lecture's picture) behind the data, such as a coin with bias \(p\) or a Gaussian \(\mathcal{N}(\mu, \sigma^2)\).</dd></div>
+        <div><dt>i.i.d.</dt><dd>Independent (one outcome does not change the probability of another) and identically distributed (the same law, such as one \(p\), for every observation).</dd></div>
+        <div><dt>Likelihood function</dt><dd>\(L(\theta;\, x_1, \dots, x_n)\): the probability (or density) of the observed data, viewed as a function of the parameter.</dd></div>
+        <div><dt>Maximum likelihood estimator</dt><dd>\(\hat\theta_{\text{ML}} = \arg\max_\theta L(\theta;\, x_1, \dots, x_n)\), Fisher's principle. For coins, the fraction of heads.</dd></div>
+        <div><dt>Log-likelihood</dt><dd>\(\log L\). It has the same maximizer as \(L\) because log is increasing, and turns products into sums.</dd></div>
+        <div><dt>Bernoulli trial</dt><dd>A 0/1 outcome with \(P(x = 1) = p\): one coin toss.</dd></div>
+        <div><dt>Prior</dt><dd>\(P(\theta)\): a distribution over the parameter that encodes a hunch before any data is seen.</dd></div>
+        <div><dt>Posterior</dt><dd>\(P(\theta \mid \text{data}) \propto P(\text{data} \mid \theta)\,P(\theta)\): the hunch updated by the data.</dd></div>
+        <div><dt>Evidence</dt><dd>\(P(x_1, \dots, x_n)\), the denominator in Bayes' theorem. It does not depend on \(\theta\).</dd></div>
+        <div><dt>Beta distribution</dt><dd>Density \(\propto p^{\alpha-1}(1-p)^{\beta-1}\) on \([0, 1]\), with \(\alpha, \beta > 0\) and mean \(\alpha/(\alpha + \beta)\).</dd></div>
+        <div><dt>Conjugate prior</dt><dd>A prior whose posterior has the same form. Beta prior with Bernoulli data gives Beta\((\alpha + n_H, \beta + n_T)\).</dd></div>
+        <div><dt>Ghost data</dt><dd>Reading a Beta\((\alpha, \beta)\) prior as \(\alpha\) imaginary heads and \(\beta\) imaginary tails added to the real tosses.</dd></div>
+        <div><dt>MAP estimate</dt><dd>Maximum a posteriori: the value of \(\theta\) where the posterior density is highest (its mode).</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Ten tosses give 7 heads and 3 tails. What is \(\hat p_{\text{ML}}\), and which values of \(p\) are ruled out completely?</span><span class="tog"></span></summary>
+          <p>\(\hat p_{\text{ML}} = 7/10 = 0.7\), the fraction of heads. Only \(p = 0\) and \(p = 1\) are ruled out, since the data contains both heads and tails. Every other value has a nonzero chance of producing it.</p></details>
+        <details><summary><span class="q">Q2</span><span>Write the likelihood of the data 0, 0, 1 and find where it peaks.</span><span class="tog"></span></summary>
+          <p>\(L(p) = (1-p)(1-p)\,p = p(1-p)^2\). Its derivative is \((1-p)^2 - 2p(1-p) = (1-p)(1-3p)\), which is zero at \(p = 1/3\) and at \(p = 1\), where \(L = 0\). So \(\hat p_{\text{ML}} = 1/3\), the fraction of ones.</p></details>
+        <details><summary><span class="q">Q3</span><span>Why may we maximize \(\log L\) instead of \(L\)?</span><span class="tog"></span></summary>
+          <p>Log is monotonically increasing, so the \(p\) with the largest \(L\) also has the largest \(\log L\). The maximizer does not change, and the log turns the product over data points into a sum that is easy to differentiate.</p></details>
+        <details><summary><span class="q">Q4</span><span>For Gaussian data, why does the product of probabilities \(\prod_i P(x_i;\, \mu, \sigma^2)\) fail as a likelihood?</span><span class="tog"></span></summary>
+          <p>Under a continuous distribution every single value has probability 0, so the product is 0 for every \(\mu\) and cannot rank one \(\mu\) above another. Fisher's fix uses the density \(f(x_i;\, \mu, \sigma^2)\), which is positive and larger when \(\mu\) is near \(x_i\).</p></details>
+        <details><summary><span class="q">Q5</span><span>Heights 160, 165 and 180 cm. What is the ML estimate of the mean under a Gaussian model with known variance? Under a Laplace model?</span><span class="tog"></span></summary>
+          <p>Gaussian: the sample mean, \((160 + 165 + 180)/3 \approx 168.3\) cm. Laplace: the sample median, 165 cm. Same data, a different model, a different estimator.</p></details>
+        <details><summary><span class="q">Q6</span><span>Prior Beta(2, 2), data 3 heads and 1 tail. Give the posterior, its mean, the MAP estimate and the ML estimate.</span><span class="tog"></span></summary>
+          <p>Posterior Beta\((2 + 3,\ 2 + 1)\) = Beta(5, 3). Mean \(5/8 = 0.625\). MAP \((5-1)/(5+3-2) = 4/6 \approx 0.667\). ML \(3/4 = 0.75\). The prior, centred on 0.5, pulls both Bayesian estimates toward 0.5.</p></details>
+        <details><summary><span class="q">Q7</span><span>A colleague reports 100 earlier tosses with 80 heads. You encode this as a prior, then observe 2 heads and 8 tails. What is the posterior mean, and why does it barely move?</span><span class="tog"></span></summary>
+          <p>Prior Beta(80, 20), posterior Beta(82, 28), mean \(82/110 \approx 0.745\). The prior mean was 0.80 and the new data alone says 0.2. The prior counts as 100 ghost tosses against only 10 real ones, so it dominates.</p></details>
+        <details><summary><span class="q">Q8</span><span>With no data at all, what does maximum likelihood give, and what does the Bayesian approach give?</span><span class="tog"></span></summary>
+          <p>Maximum likelihood gives nothing useful: with no observations the likelihood is 1 for every \(p\), so there is nothing to maximize. The Bayesian posterior is simply the prior, Beta\((\alpha + 0,\ \beta + 0)\), so the hunch is still there to use.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="part-07.html"><span class="dir">← Part 7</span><span class="nm">K-means: geometry, initialization, choosing K</span></a><a class="next" href="index.html"><span class="dir">Part 9 · coming</span><span class="nm">Gaussian mixture models and EM</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist. Timestamp links open the video at that moment. Charts marked synthetic use data generated for these notes.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const $ = id => document.getElementById(id);
+  const show = (el, on) => el.setAttribute('visibility', on ? 'visible' : 'hidden');
+  const niceStep = (span, target) => { const raw = span / target, p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; };
+  const fmtTick = (v, step) => {
+    if (Math.abs(v) < step * 1e-6) return '0';
+    if (step >= 1) return String(Math.round(v)).replace('-', '−');
+    if (step >= 1e-3) return v.toFixed(Math.ceil(-Math.log10(step) - 1e-9));
+    return v.toExponential(1);
+  };
+  /* A plot frame with p in [0, 1] on the x-axis and a y-axis that is redrawn on every update. */
+  const frame = (svg, clipId, W, H, L, R, T, B, xTitle) => {
+    const PW = W - L - R, PH = H - T - B, sx = p => L + p * PW;
+    const defs = mk('defs', {}, svg), cp = mk('clipPath', { id: clipId }, defs);
+    mk('rect', { x: L, y: T - 3, width: PW, height: PH + 3 }, cp);
+    const gx = mk('g', { class: 'c-grid' }, svg);
+    for (let i = 0; i <= 10; i++) {
+      mk('line', { x1: sx(i / 10), x2: sx(i / 10), y1: T, y2: T + PH }, gx);
+      if (i % 2 === 0) mk('text', { x: sx(i / 10), y: T + PH + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = i === 0 ? '0' : i === 10 ? '1' : (i / 10).toFixed(1);
+    }
+    const gy = mk('g', {}, svg);
+    mk('line', { x1: L, x2: L + PW, y1: T + PH, y2: T + PH, class: 'c-axis' }, svg);
+    mk('line', { x1: L, x2: L, y1: T, y2: T + PH, class: 'c-axis' }, svg);
+    mk('text', { x: L + PW / 2, y: H - 8, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = xTitle;
+    const yTitle = mk('text', { x: 14, y: T + PH / 2, 'text-anchor': 'middle', class: 'c-title', transform: `rotate(-90 14 ${T + PH / 2})` }, svg);
+    const setY = (lo, hi) => {
+      while (gy.firstChild) gy.removeChild(gy.firstChild);
+      const step = niceStep(hi - lo, 5), sy = v => T + PH - (v - lo) / (hi - lo) * PH;
+      for (let k = Math.ceil(lo / step - 1e-9); k * step <= hi + step * 1e-6; k++) {
+        const v = k * step;
+        mk('line', { x1: L, x2: L + PW, y1: sy(v), y2: sy(v), class: 'c-faint' }, gy);
+        mk('text', { x: L - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, gy).textContent = fmtTick(v, step);
+      }
+      return sy;
+    };
+    return { L, T, PW, PH, sx, setY, yTitle };
+  };
+
+  /* ---------- Likelihood of coin tosses ---------- */
+  (() => {
+    const svg = $('lik-svg'); if (!svg) return;
+    const W = 640, H = 360;
+    const F = frame(svg, 'lik-clip', W, H, 74, 20, 20, 46, 'p, the bias of the coin');
+    const clip = 'url(#lik-clip)';
+    const curve = mk('path', { class: 'c-user', style: 'fill: none', 'clip-path': clip }, svg);
+    const candLine = mk('line', { class: 'c-line', style: 'stroke-dasharray: 2 4' }, svg);
+    const mleLine = mk('line', { class: 'c-err' }, svg);
+    const candDot = mk('circle', { r: 5.5, class: 'c-proxy' }, svg);
+    const mleDot = mk('circle', { r: 6, class: 'c-pt-hi' }, svg);
+    const mleLbl = mk('text', { class: 'c-lbl' }, svg);
+    const candLbl = mk('text', { class: 'c-note' }, svg);
+    const hS = $('lik-h'), tS = $('lik-t'), pS = $('lik-p'), logC = $('lik-log');
+    const hO = $('lik-h-out'), tO = $('lik-t-out'), pO = $('lik-p-out');
+    const rMle = $('lik-mle'), rCur = $('lik-cur'), rMax = $('lik-max'), kCur = $('lik-cur-k'), kMax = $('lik-max-k'), status = $('lik-status');
+    let pc = parseFloat(pS.value);
+    const logL = (p, h, t) => (h ? h * Math.log(p) : 0) + (t ? t * Math.log(1 - p) : 0);
+    const fmt = v => v === 0 ? '0' : v >= 0.001 ? v.toFixed(4) : v.toExponential(2);
+    const draw = () => {
+      const h = +hS.value, t = +tS.value, n = h + t, useLog = logC.checked;
+      hO.textContent = h; tO.textContent = t; pO.textContent = pc.toFixed(3);
+      const ph = n ? h / n : null, lmax = n ? logL(ph, h, t) : 0;
+      let lo, hi;
+      if (useLog) { const span = 10 + 0.5 * n; lo = lmax - span; hi = lmax + 0.08 * span; }
+      else { lo = 0; hi = Math.exp(lmax) * 1.12; }
+      const sy = F.setY(lo, hi);
+      F.yTitle.textContent = useLog ? 'log L(p)' : 'L(p)';
+      const floor = lo - (hi - lo), base = F.T + F.PH;
+      const val = p => { const v = logL(p, h, t); return useLog ? v : Math.exp(v); };
+      const yOf = p => { const v = val(p); return sy(isFinite(v) ? Math.max(v, floor) : floor); };
+      let d = '';
+      for (let i = 0; i <= 400; i++) { const p = i / 400; d += (i ? ' L' : 'M') + F.sx(p).toFixed(1) + ' ' + yOf(p).toFixed(1); }
+      curve.setAttribute('d', d);
+      /* the maximum */
+      show(mleLine, !!n); show(mleDot, !!n); show(mleLbl, !!n);
+      let mSide = 1;
+      if (n) {
+        const mx = F.sx(ph), my = sy(useLog ? lmax : Math.exp(lmax));
+        mleLine.setAttribute('x1', mx); mleLine.setAttribute('x2', mx); mleLine.setAttribute('y1', base); mleLine.setAttribute('y2', my);
+        mleDot.setAttribute('cx', mx); mleDot.setAttribute('cy', my);
+        mSide = ph > 0.6 ? -1 : 1;
+        mleLbl.setAttribute('x', mx + 10 * mSide); mleLbl.setAttribute('y', Math.max(F.T + 12, my - 10));
+        mleLbl.setAttribute('text-anchor', mSide > 0 ? 'start' : 'end');
+        mleLbl.textContent = `p̂ = ${h}/${n} = ${ph.toFixed(3)}`;
+      }
+      /* the candidate */
+      const vc = val(pc), cx = F.sx(pc), cy = Math.min(base, Math.max(F.T, yOf(pc)));
+      candLine.setAttribute('x1', cx); candLine.setAttribute('x2', cx); candLine.setAttribute('y1', base); candLine.setAttribute('y2', cy);
+      candDot.setAttribute('cx', cx); candDot.setAttribute('cy', cy);
+      const near = n && Math.abs(pc - ph) < 0.2;
+      let cSide = near ? -mSide : (pc < (n ? ph : 0.5) ? -1 : 1);
+      if (cSide > 0 && cx > F.L + F.PW - 150) cSide = -1;
+      if (cSide < 0 && cx < F.L + 150) cSide = 1;
+      const vtxt = useLog ? (isFinite(vc) ? vc.toFixed(2).replace('-', '−') : '−∞') : fmt(vc);
+      candLbl.setAttribute('x', cx + 10 * cSide); candLbl.setAttribute('text-anchor', cSide > 0 ? 'start' : 'end');
+      candLbl.setAttribute('y', Math.min(base - 8, near ? cy + 26 : Math.max(F.T + 12, cy - 10)));
+      candLbl.textContent = `${useLog ? 'log L' : 'L'}(${pc.toFixed(2)}) = ${vtxt}`;
+      show(candLbl, !(n && Math.abs(pc - ph) < 0.004));
+      /* readouts */
+      rMle.textContent = n ? ph.toFixed(3) : '–';
+      kCur.textContent = useLog ? 'log L at your p' : 'L at your p';
+      kMax.textContent = useLog ? 'log L at p̂' : 'L at p̂';
+      rCur.textContent = vtxt;
+      rMax.textContent = n ? (useLog ? lmax.toFixed(2).replace('-', '−') : fmt(Math.exp(lmax))) : '–';
+      status.textContent = !n ? 'No tosses: L(p) = 1 for every p, so maximum likelihood has nothing to prefer.'
+        : Math.abs(pc - ph) < 0.004 ? `At the maximum: p̂ = ${h}/${n}, the fraction of heads.`
+        : (!h || !t) ? 'Only one face has appeared, so the likelihood peaks at the edge of [0, 1].' : '';
+    };
+    draw();
+    [hS, tS].forEach(s => s.addEventListener('input', draw));
+    pS.addEventListener('input', () => { pc = parseFloat(pS.value); draw(); });
+    logC.addEventListener('change', draw);
+    $('lik-snap').addEventListener('click', () => {
+      const h = +hS.value, n = h + +tS.value; if (!n) return;
+      tween(pc, h / n, v => { pc = v; pS.value = v; draw(); });
+    });
+  })();
+
+  /* ---------- Beta prior, Bernoulli data, Beta posterior ---------- */
+  (() => {
+    const svg = $('bay-svg'); if (!svg) return;
+    const G = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    const lgamma = z => { if (z < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * z))) - lgamma(1 - z); z -= 1; let x = G[0]; for (let i = 1; i < 9; i++) x += G[i] / (z + i); const t = z + 7.5; return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x); };
+    const lbeta = (a, b) => lgamma(a) + lgamma(b) - lgamma(a + b);
+    const pdf = (p, a, b, lb) => Math.exp((a - 1) * Math.log(p) + (b - 1) * Math.log(1 - p) - lb);
+    const W = 640, H = 380;
+    const F = frame(svg, 'bay-clip', W, H, 56, 20, 46, 46, 'p, the bias of the coin');
+    F.yTitle.textContent = 'density';
+    const clip = 'url(#bay-clip)';
+    const kinds = [
+      ['prior', 'c-line', 'fill: none; stroke-dasharray: 6 4'],
+      ['likelihood, rescaled to area 1', 'c-line', 'fill: none; stroke: var(--muted); stroke-dasharray: 2 3'],
+      ['posterior', 'c-user', 'fill: none']
+    ];
+    let lx = F.L;
+    const paths = kinds.map(([name, cls, st]) => {
+      mk('line', { x1: lx, x2: lx + 26, y1: 20, y2: 20, class: cls, style: st }, svg);
+      mk('text', { x: lx + 32, y: 24, class: 'c-note' }, svg).textContent = name;
+      lx += 32 + name.length * 5.8 + 24;
+      return mk('path', { class: cls, style: st, 'clip-path': clip }, svg);
+    });
+    const mlLine = mk('line', { class: 'c-line', style: 'stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 3 4' }, svg);
+    const mlLbl = mk('text', { class: 'c-note' }, svg);
+    const mapDot = mk('circle', { r: 6, class: 'c-pt-hi' }, svg);
+    const mapLbl = mk('text', { class: 'c-lbl' }, svg);
+    const aS = $('bay-a'), bS = $('bay-b'), hS = $('bay-h'), tS = $('bay-t');
+    const aO = $('bay-a-out'), bO = $('bay-b-out'), hO = $('bay-h-out'), tO = $('bay-t-out');
+    const rMl = $('bay-ml'), rMean = $('bay-mean'), rMap = $('bay-map'), status = $('bay-status');
+    const ps = []; for (let i = 0; i <= 400; i++) ps.push(Math.min(0.9995, Math.max(0.0005, i / 400)));
+    const mode = (a, b) => {
+      if (a > 1 && b > 1) return (a - 1) / (a + b - 2);
+      if (a <= 1 && b > 1) return 0;
+      if (a > 1 && b <= 1) return 1;
+      if (a < 1 && b === 1) return 0;
+      if (a === 1 && b < 1) return 1;
+      return null;
+    };
+    const draw = () => {
+      const a0 = +aS.value, b0 = +bS.value, h = +hS.value, t = +tS.value, n = h + t, a = a0 + h, b = b0 + t;
+      aO.textContent = a0; bO.textContent = b0; hO.textContent = h; tO.textContent = t;
+      const curves = [[a0, b0], [h + 1, t + 1], [a, b]].map(([u, v]) => { const lb = lbeta(u, v); return ps.map(p => pdf(p, u, v, lb)); });
+      let mP = 0, mL = 0, mQ = 0; for (let i = 4; i <= 396; i++) { mP = Math.max(mP, curves[0][i]); mL = Math.max(mL, curves[1][i]); mQ = Math.max(mQ, curves[2][i]); }
+      const m = Math.max(mP, mQ, Math.min(mL, 1.5 * Math.max(mP, mQ)));
+      const hi = Math.max(1.2, m * 1.1), sy = F.setY(0, hi), base = F.T + F.PH;
+      curves.forEach((c, k) => paths[k].setAttribute('d', c.map((v, i) => (i ? 'L' : 'M') + F.sx(ps[i]).toFixed(1) + ' ' + sy(Math.min(v, hi * 2)).toFixed(1)).join(' ')));
+      show(mlLine, n > 0); show(mlLbl, n > 0);
+      if (n) {
+        const x = F.sx(h / n), right = h / n < 0.9;
+        mlLine.setAttribute('x1', x); mlLine.setAttribute('x2', x); mlLine.setAttribute('y1', base); mlLine.setAttribute('y2', F.T);
+        mlLbl.setAttribute('x', x + (right ? 5 : -5)); mlLbl.setAttribute('y', base - 6); mlLbl.setAttribute('text-anchor', right ? 'start' : 'end');
+        mlLbl.textContent = 'ML';
+      }
+      const md = mode(a, b), dotOn = md !== null && a >= 1 && b >= 1;
+      show(mapDot, dotOn); show(mapLbl, dotOn);
+      if (dotOn) {
+        const pm = Math.min(0.9995, Math.max(0.0005, md)), x = F.sx(md), y = sy(Math.min(pdf(pm, a, b, lbeta(a, b)), hi));
+        const side = md > 0.8 ? -1 : 1;
+        mapDot.setAttribute('cx', x); mapDot.setAttribute('cy', y);
+        mapLbl.setAttribute('x', x + 10 * side); mapLbl.setAttribute('y', Math.max(F.T + 12, y - 8)); mapLbl.setAttribute('text-anchor', side > 0 ? 'start' : 'end');
+        mapLbl.textContent = 'MAP';
+      }
+      rMl.textContent = n ? (h / n).toFixed(3) : '–';
+      rMean.textContent = (a / (a + b)).toFixed(3);
+      rMap.textContent = md === null ? (a === 1 && b === 1 ? 'any p' : '0 or 1') : md.toFixed(3);
+      status.textContent = n ? `Posterior = Beta(${a0} + ${h}, ${b0} + ${t}) = Beta(${a}, ${b}).`
+        : `No tosses yet: the posterior is the prior, Beta(${a0}, ${b0}). Maximum likelihood has nothing to go on.`;
+    };
+    draw();
+    [aS, bS, hS, tS].forEach(s => s.addEventListener('input', draw));
+    const set = (a, b, h, t) => { aS.value = a; bS.value = b; hS.value = h; tS.value = t; draw(); };
+    $('bay-ex1').addEventListener('click', () => set(5.5, 1.5, 2, 8));
+    $('bay-ex2').addEventListener('click', () => set(5.5, 1.5, 9, 1));
+  })();
+})();
+</script>
+</body>
+</html>
