@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MLT Notes · Machine Learning Techniques</title>
+<meta name="description" content="Lecture notes for all 74 lectures of IIT Madras Machine Learning Techniques (Prof. Arun Rajkumar), with diagrams, maths and self-tests.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <div class="eyebrow">Machine Learning Techniques · IIT Madras BS Degree</div>
+    <h1>Lecture notes for all 74 lectures</h1>
+    <p class="lede">Notes for Prof. Arun Rajkumar's course, grouped into 18 parts by topic. Each part has diagrams of the key ideas, the maths written out, timestamp links into the videos, and questions to test yourself.</p>
+    <div class="watch">
+      <a class="btn solid" href="part-01.html">Start with Part 1</a>
+      <a class="btn" href="https://www.youtube.com/playlist?list=PLZ2ps__7DhBbA_e6_G3FI-BA1f7lCINUu" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>Open the playlist</a>
+    </div>
+  </div>
+</header>
+
+<div class="hub gutter">
+  <main class="hub-main">
+    <section id="course-map">
+      <div class="sec-head"><h2>Course map</h2></div>
+      <p>Parts follow topic boundaries, so some cover two lectures and some cover nine.</p>
+      <div class="tbl-wrap">
+        <table class="course">
+          <thead><tr><th>Part</th><th>Topic</th><th>Lectures</th><th>Notes</th></tr></thead>
+          <tbody><!-- COURSE-MAP:START -->
+<tr class="group"><td colspan="4">Introduction</td></tr>
+<tr><td>01</td><td><a href="part-01.html">Introduction and paradigms</a></td><td>L1–L2</td><td><span class="chip ready">Ready</span></td></tr>
+<tr class="group"><td colspan="4">Unsupervised learning</td></tr>
+<tr><td>02</td><td>Representation learning</td><td>L3–L5</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>03</td><td>Principal component analysis</td><td>L6–L7</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>04</td><td>Issues with PCA, and computing it fast</td><td>L8–L9</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>05</td><td>Feature maps, kernels and kernel PCA</td><td>L10–L12</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>06</td><td>K-means: the algorithm and its convergence</td><td>L13–L15</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>07</td><td>K-means: geometry, initialization, choosing K</td><td>L16–L18</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>08</td><td>Estimation: maximum likelihood and Bayesian</td><td>L19–L21</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>09</td><td>Gaussian mixture models and EM</td><td>L22–L26</td><td><span class="chip planned">Coming</span></td></tr>
+<tr class="group"><td colspan="4">Supervised learning</td></tr>
+<tr><td>10</td><td>Linear regression and gradient descent</td><td>L27–L31</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>11</td><td>Kernel and probabilistic regression</td><td>L32–L35</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>12</td><td>Ridge and LASSO</td><td>L36–L40</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>13</td><td>Classification: k-NN and decision trees</td><td>L41–L44</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>14</td><td>Generative models and Naive Bayes</td><td>L45–L51</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>15</td><td>Perceptron and logistic regression</td><td>L52–L56</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>16</td><td>Support vector machines</td><td>L57–L65</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>17</td><td>Ensembles: bagging and boosting</td><td>L66–L68</td><td><span class="chip planned">Coming</span></td></tr>
+<tr><td>18</td><td>Loss functions, neural networks and summary</td><td>L69–L74</td><td><span class="chip planned">Coming</span></td></tr>
+<!-- COURSE-MAP:END --></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <div class="sec-head"><h2>How the course is laid out</h2></div>
+      <p>The course starts with unsupervised learning and then moves to supervised learning. Sequential learning (online learning, bandits, reinforcement learning) is mentioned in Part 1 but not taught.</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 148" role="img" aria-label="Course roadmap: from here (L1 to L2) through unsupervised learning (representation learning L3 to L12, clustering L13 to L18, estimation L19 to L26) and supervised learning (basic algorithms L27 to L44, advanced algorithms L45 to L65, advanced topics L66 to L74) to the finish.">
+            <text class="d-row" x="207" y="24" text-anchor="middle">Unsupervised</text>
+            <path class="d-ln" d="M108 42 V34 H307 V42"/>
+            <text class="d-row" x="473" y="24" text-anchor="middle">Supervised</text>
+            <path class="d-ln" d="M373 42 V34 H572 V42"/>
+            <line class="d-ln" x1="30" y1="78" x2="650" y2="78"/>
+            <text class="d-t" x="18" y="62" style="fill: var(--accent)">Start (L1–L2)</text>
+            <text class="d-t" x="662" y="62" text-anchor="end">Finish</text>
+            <circle class="st-start" cx="30" cy="78" r="8"/>
+            <circle class="st" cx="119" cy="78" r="6"/>
+            <circle class="st" cx="207" cy="78" r="6"/>
+            <circle class="st" cx="296" cy="78" r="6"/>
+            <circle class="st" cx="384" cy="78" r="6"/>
+            <circle class="st" cx="473" cy="78" r="6"/>
+            <circle class="st" cx="561" cy="78" r="6"/>
+            <circle class="st-end" cx="650" cy="78" r="8"/>
+            <text class="d-s" x="119" y="104" text-anchor="middle">Representation</text><text class="d-s" x="119" y="118" text-anchor="middle">learning</text><text class="d-al" x="119" y="136" text-anchor="middle">L3–L12</text>
+            <text class="d-s" x="207" y="104" text-anchor="middle">Clustering</text><text class="d-al" x="207" y="136" text-anchor="middle">L13–L18</text>
+            <text class="d-s" x="296" y="104" text-anchor="middle">Estimation</text><text class="d-al" x="296" y="136" text-anchor="middle">L19–L26</text>
+            <text class="d-s" x="384" y="104" text-anchor="middle">Basic</text><text class="d-s" x="384" y="118" text-anchor="middle">algorithms</text><text class="d-al" x="384" y="136" text-anchor="middle">L27–L44</text>
+            <text class="d-s" x="473" y="104" text-anchor="middle">Advanced</text><text class="d-s" x="473" y="118" text-anchor="middle">algorithms</text><text class="d-al" x="473" y="136" text-anchor="middle">L45–L65</text>
+            <text class="d-s" x="561" y="104" text-anchor="middle">Advanced</text><text class="d-s" x="561" y="118" text-anchor="middle">topics</text><text class="d-al" x="561" y="136" text-anchor="middle">L66–L74</text>
+          </svg>
+        </div>
+        <figcaption><b>The course in six levels.</b> The level names are the lecturer's. The lecture ranges are mapped from the playlist titles for these notes.</figcaption>
+      </figure>
+    </section>
+
+    <section id="how">
+      <div class="sec-head"><h2>Using these notes</h2></div>
+      <ul>
+        <li>Every section starts with a timestamp chip, such as <span class="ts" style="pointer-events:none"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>L6 · 12:40</span>, that opens the video at that moment.</li>
+        <li>Each part ends with key terms and questions whose answers stay hidden until you open them.</li>
+        <li>Charts built on synthetic data say so in their caption. They illustrate the idea, not a dataset from the course.</li>
+        <li>The notes follow the lectures, not a textbook. For more depth the lecturer recommends Bishop's <i>Pattern Recognition and Machine Learning</i>.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the lecture transcripts (IITM-OD English captions) of the Machine Learning Techniques playlist on YouTube. Not an official IIT Madras resource.</div>
+</footer>
+</body>
+</html>
