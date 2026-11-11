@@ -11,6 +11,7 @@ Written from the lecture transcripts. Not an official IIT Madras resource.
 | `index.html` | Hub page with the course map |
 | `part-01.html` … `part-18.html` | One page per part |
 | `notes.css`, `notes.js` | Styles and behaviour shared by every page |
+| `theme.js` | Light/dark theme switch (button in the top-right corner; remembers your choice) |
 | `scripts/sync_nav.py` | Regenerates the course map and prev/next links |
 
 It is a plain static site: no build step, no dependencies. Maths is rendered by MathJax from a CDN.

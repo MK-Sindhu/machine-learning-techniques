@@ -74,7 +74,7 @@ def check(path: Path) -> list[str]:
     for name in ("PARTNAV", "PAGER"):
         if f"<!-- {name}:START -->" not in text or f"<!-- {name}:END -->" not in text:
             problems.append(f"missing <!-- {name}:START/END --> markers")
-    for needed in ('href="notes.css"', 'src="notes.js"', "<!doctype html>", '<meta charset="utf-8">', "<title>"):
+    for needed in ('href="notes.css"', 'src="notes.js"', 'src="theme.js"', "<!doctype html>", '<meta charset="utf-8">', "<title>"):
         if needed not in text:
             problems.append(f"missing {needed}")
 

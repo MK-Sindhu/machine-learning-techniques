@@ -300,3 +300,9 @@ code, .code { font-family: var(--font-mono); font-size: .88em; background: var(-
 
 /* Labels that can contain maths must keep their case (uppercase turns x→X, γ→Γ). */
 .readouts .k, .result .lbl, .eq-label, .algo-title, th, .dg .d-row { text-transform: none; letter-spacing: .02em; }
+
+/* Theme switch (added by theme.js) */
+.theme-toggle { position: fixed; z-index: 50; top: calc(env(safe-area-inset-top, 0px) + 12px); right: max(12px, env(safe-area-inset-right, 0px)); width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; box-shadow: 0 1px 4px var(--rule); }
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.theme-toggle svg path[d^="M20.5"] { fill: currentColor; stroke: none; }
