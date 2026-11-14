@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 4 · Naive Bayes and KNN · ML in 6 hours · MLT Notes</title>
+<meta name="description" content="Notes on Krish Naik's Complete Machine Learning in 6 Hours, Part 4: Bayes' theorem, the Naive Bayes classifier worked on the play-tennis table, and k-nearest neighbours for classification and regression.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script src="theme.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html#extra">All notes</a><span class="sep">/</span><span>ML in 6 hours · Part 4 of 8</span></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Krish Naik · Complete Machine Learning in 6 Hours</div>
+    <h1>Naive Bayes and <span style="white-space:nowrap">k-nearest</span> neighbours</h1>
+    <p class="lede">Krish derives Bayes' theorem from dependent events, turns it into the Naive Bayes classifier by treating the features as independent, and works the play-tennis table by hand. He then explains KNN for classification and regression, the two distances it uses, how to pick K, and where it fails.</p>
+    <div class="meta">
+      <span><b>Part 4</b> of 8</span>
+      <span>Teacher <b>Krish Naik</b></span>
+      <span>About <b>29 min</b> of video</span>
+      <span><b>2</b> chapters</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10461s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:54:21 · Naive Bayes</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11762s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:16:02 · KNN intuition</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Naive Bayes</h4>
+      <ul>
+        <li><a href="#nb-events">Independent and dependent events</a></li>
+        <li><a href="#bayes-theorem">Bayes' theorem</a></li>
+        <li><a href="#nb-model">The naive step</a></li>
+        <li><a href="#compare-classes">Score, drop, normalize</a></li>
+        <li><a href="#play-tennis">The play-tennis table</a></li>
+        <li><a href="#sunny-hot">Sunny and hot</a></li>
+        <li><a href="#nb-exercise">Exercise and variants</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>KNN intuition</h4>
+      <ul>
+        <li><a href="#knn-classify">A vote of K neighbours</a></li>
+        <li><a href="#distances">Euclidean and Manhattan</a></li>
+        <li><a href="#knn-regress">KNN regression</a></li>
+        <li><a href="#choosing-k">Choosing K</a></li>
+        <li><a href="#knn-weak">Outliers and imbalance</a></li>
+        <li><a href="#trees-preview">Next: decision trees</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html#extra">All notes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li><dfn>Naive Bayes</dfn> is a classification algorithm built on <b>Bayes' theorem</b>, \(P(B \mid A) = P(B)\,P(A \mid B) / P(A)\), which follows from writing \(P(A \text{ and } B)\) in two orders.</li>
+        <li>The naive step: treat the features as <b>independent given the class</b>, so \(P(x_1, \dots, x_n \mid y)\) becomes a product of one-feature terms \(P(x_j \mid y)\) that you can count from a table.</li>
+        <li>The denominator is the same for every class, so compare \(P(y)\prod_j P(x_j \mid y)\) and <b>normalize</b> at the end. On the play-tennis table a sunny, hot day gives 27% yes and 73% no.</li>
+        <li><dfn>KNN</dfn> predicts from the K closest training points: a <b>majority vote</b> for classification, an <b>average</b> for regression. Closeness is Euclidean or Manhattan distance.</li>
+        <li>K is a <b>hyperparameter</b>: try a range (he suggests 1 to 50) and keep the K with the lowest error. KNN works badly with <b>outliers</b> and <b>imbalanced</b> data.</li>
+      </ul>
+    </div>
+
+    <!-- ============ NAIVE BAYES ============ -->
+    <section id="nb-events">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10461s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:54:21</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10478s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:54:38 rolling a die</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10510s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:55:10 a bag of marbles</a>
+        </div>
+        <h2>Independent and dependent events</h2>
+      </div>
+      <p>Naive Bayes is a classification algorithm, and it rests on <b>Bayes' theorem</b>. To build up to the theorem, Krish first separates two kinds of events.</p>
+      <p><dfn>Independent events.</dfn> Roll a die. The probability of a 1 is \(1/6\), and so is the probability of a 2 or a 3. Getting a 1 on one roll has no effect on what the next roll shows, so the rolls are independent.</p>
+      <p><dfn>Dependent events.</dfn> A bag holds 3 red and 2 green marbles. Take one out: the probability that it is red is \(3/5\). Keep it out and draw again. Only 4 marbles are left, 2 of them green, so the probability of green is now \(2/4 = 1/2\). The first draw changed the bag, so the second event depends on the first.</p>
+      <p>The probability of red and then green multiplies the two steps. The second factor is a <dfn>conditional probability</dfn>: the probability of green given that red has already happened.</p>
+      <div class="eq">\[ P(R \text{ and } G) = P(R)\,P(G \mid R) = \frac{3}{5} \cdot \frac{2}{4} = \frac{3}{10} \]</div>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 270" role="img" aria-label="Probability tree for two draws without replacement from a bag of 3 red and 2 green marbles. First draw: red with probability 3/5 or green with 2/5. After a red, 2 red and 2 green are left, so green has probability 2/4. The highlighted path, red then green, has probability 3/5 times 2/4, which is 0.3.">
+            <text class="d-row" x="80" y="18" text-anchor="middle">Bag</text>
+            <text class="d-row" x="280" y="18" text-anchor="middle">First draw</text>
+            <text class="d-row" x="460" y="18" text-anchor="middle">Second draw</text>
+            <text class="d-row" x="508" y="18">Path probability</text>
+
+            <rect class="d-box" x="30" y="105" width="100" height="80" rx="12"/>
+            <circle class="d-box-acc" cx="52" cy="132" r="11"/><text class="d-s" x="52" y="136" text-anchor="middle">R</text>
+            <circle class="d-box-acc" cx="80" cy="132" r="11"/><text class="d-s" x="80" y="136" text-anchor="middle">R</text>
+            <circle class="d-box-acc" cx="108" cy="132" r="11"/><text class="d-s" x="108" y="136" text-anchor="middle">R</text>
+            <circle class="b-ok" cx="66" cy="160" r="11"/><text class="d-s" x="66" y="164" text-anchor="middle">G</text>
+            <circle class="b-ok" cx="94" cy="160" r="11"/><text class="d-s" x="94" y="164" text-anchor="middle">G</text>
+            <text class="d-s" x="80" y="205" text-anchor="middle">3 R, 2 G</text>
+
+            <line class="d-ln-acc" x1="130" y1="145" x2="266.1" y2="90.6" style="stroke-width:2.2"/>
+            <text class="d-t" x="192" y="108" text-anchor="middle" style="fill: var(--accent)">3/5</text>
+            <line class="d-ln" x1="130" y1="145" x2="266.1" y2="199.4"/>
+            <text class="d-t" x="192" y="190" text-anchor="middle">2/5</text>
+
+            <circle class="d-box-acc" cx="280" cy="85" r="15"/><text class="d-t" x="280" y="90" text-anchor="middle">R</text>
+            <text class="d-s" x="280" y="58" text-anchor="middle">2 R, 2 G left</text>
+            <circle class="b-ok" cx="280" cy="205" r="15"/><text class="d-t" x="280" y="210" text-anchor="middle">G</text>
+            <text class="d-s" x="280" y="240" text-anchor="middle">3 R, 1 G left</text>
+
+            <line class="d-ln" x1="294.7" y1="82.1" x2="445.3" y2="52.9"/>
+            <text class="d-t" x="370" y="58" text-anchor="middle">2/4</text>
+            <line class="d-ln-acc" x1="294.7" y1="87.9" x2="445.3" y2="117.1" style="stroke-width:2.2"/>
+            <text class="d-t" x="370" y="122" text-anchor="middle" style="fill: var(--accent)">2/4</text>
+            <line class="d-ln" x1="294.7" y1="202.1" x2="445.3" y2="172.9"/>
+            <text class="d-t" x="370" y="178" text-anchor="middle">3/4</text>
+            <line class="d-ln" x1="294.7" y1="207.9" x2="445.3" y2="237.1"/>
+            <text class="d-t" x="370" y="242" text-anchor="middle">1/4</text>
+
+            <circle class="d-box-acc" cx="460" cy="50" r="15"/><text class="d-t" x="460" y="55" text-anchor="middle">R</text>
+            <circle class="b-ok" cx="460" cy="120" r="15"/><text class="d-t" x="460" y="125" text-anchor="middle">G</text>
+            <circle class="d-box-acc" cx="460" cy="170" r="15"/><text class="d-t" x="460" y="175" text-anchor="middle">R</text>
+            <circle class="b-ok" cx="460" cy="240" r="15"/><text class="d-t" x="460" y="245" text-anchor="middle">G</text>
+
+            <text class="d-s" x="508" y="54">R, R:  3/5 × 2/4 = 0.3</text>
+            <text class="d-t" x="508" y="124" style="fill: var(--accent)">R, G:  3/5 × 2/4 = 0.3</text>
+            <text class="d-s" x="508" y="174">G, R:  2/5 × 3/4 = 0.3</text>
+            <text class="d-s" x="508" y="244">G, G:  2/5 × 1/4 = 0.1</text>
+          </svg>
+        </div>
+        <figcaption><b>Two draws without putting the first marble back.</b> His example is the highlighted path: red first (3 of 5), then green from the 4 marbles left (2 of 4). The second-draw probabilities change with the first draw, which is what makes the events dependent. Blue nodes are red marbles (R) and green nodes green ones (G); the other three paths are added for these notes.</figcaption>
+      </figure>
+      <p class="note">At one point the audio calls the two marble draws independent. From everything around it he means dependent.</p>
+    </section>
+
+    <section id="bayes-theorem">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10607s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:56:47</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10641s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:57:21 two orders</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10701s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:58:21 the theorem</a>
+        </div>
+        <h2>Deriving Bayes' theorem</h2>
+      </div>
+      <p>Write the marble rule for any two events \(A\) and \(B\): the probability of both is the probability of the first times the probability of the second given the first.</p>
+      <div class="eq">\[ P(A \text{ and } B) = P(A)\,P(B \mid A) \]</div>
+      <p>The order of the two events does not matter, so \(P(A \text{ and } B) = P(B \text{ and } A)\). Expanding the right-hand side the same way gives \(P(B)\,P(A \mid B)\). Set the two expansions equal and divide by \(P(A)\):</p>
+      <div class="eq">\[ P(A)\,P(B \mid A) = P(B)\,P(A \mid B) \quad\Longrightarrow\quad P(B \mid A) = \frac{P(B)\,P(A \mid B)}{P(A)} \]</div>
+      <div class="result">
+        <span class="lbl">Bayes' theorem</span>
+        \[ P(B \mid A) = \frac{P(B)\,P(A \mid B)}{P(A)} \]
+        <p>He calls this the crux of Naive Bayes. In the next step \(A\) becomes the input features and \(B\) the output \(y\).</p>
+      </div>
+      <p class="note">The spoken derivation trips over a few terms, at one point dividing where it should multiply. The lines above are the standard derivation he is building. Not in the video: the usual names are <i>prior</i> for \(P(B)\), <i>likelihood</i> for \(P(A \mid B)\), <i>evidence</i> for \(P(A)\) and <i>posterior</i> for \(P(B \mid A)\).</p>
+    </section>
+
+    <section id="nb-model">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10736s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:58:56</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10768s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:59:28 P(y | x)</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10839s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:00:39 expanding the product</a>
+        </div>
+        <h2>From Bayes' theorem to Naive Bayes</h2>
+      </div>
+      <p>A training set has independent features \(x_1, x_2, \dots, x_n\) and an output \(y\), the dependent feature. The model is trained on rows where both are known; afterwards it must predict \(y\) from the inputs alone. Put the features in place of \(A\) and the output in place of \(B\):</p>
+      <div class="eq">\[ P(y \mid x_1, x_2, \dots, x_n) = \frac{P(y)\,P(x_1, x_2, \dots, x_n \mid y)}{P(x_1, x_2, \dots, x_n)} \]</div>
+      <p>The joint term \(P(x_1, \dots, x_n \mid y)\) is hard to estimate. Naive Bayes treats the features as <b>independent of each other once \(y\) is fixed</b>, so the term splits into one factor per feature. He expands the denominator the same way:</p>
+      <div class="eq">\[ P(y \mid x_1, \dots, x_n) = \frac{P(y)\,P(x_1 \mid y)\,P(x_2 \mid y) \cdots P(x_n \mid y)}{P(x_1)\,P(x_2) \cdots P(x_n)} \]</div>
+      <p>The output \(y\) can be binary (yes or no) or have several classes; the formula is the same.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 216" role="img" aria-label="The class y at the top with an arrow to each feature x1, x2, x3 up to xn below. Each arrow carries its own factor P of x j given y. There are no links between the features, which is the naive assumption.">
+            <defs><marker id="kml04-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-t" x="20" y="36">Naive assumption</text>
+            <text class="d-s" x="20" y="54">once y is known, the</text>
+            <text class="d-s" x="20" y="70">features carry no</text>
+            <text class="d-s" x="20" y="86">information about each other</text>
+            <text class="d-s" x="470" y="36">Each feature adds its</text>
+            <text class="d-s" x="470" y="52">own factor, one per arrow</text>
+
+            <circle class="node-acc" cx="320" cy="50" r="22"/>
+            <text class="d-t" x="320" y="55" text-anchor="middle">y</text>
+            <text class="d-s" x="350" y="30">output (yes / no)</text>
+
+            <line class="d-ln" x1="299.9" y1="59" x2="140.1" y2="131" marker-end="url(#kml04-ah)"/>
+            <line class="d-ln" x1="304.4" y1="65.6" x2="245.6" y2="124.4" marker-end="url(#kml04-ah)"/>
+            <line class="d-ln" x1="324.8" y1="71.5" x2="335.2" y2="118.5" marker-end="url(#kml04-ah)"/>
+            <line class="d-ln" x1="340.1" y1="59" x2="499.9" y2="131" marker-end="url(#kml04-ah)"/>
+
+            <line class="d-ln-mut d-dash" x1="142" y1="140" x2="208" y2="140"/>
+            <text class="d-al" x="175" y="160" text-anchor="middle">no link</text>
+
+            <circle class="node" cx="120" cy="140" r="20"/><text class="d-t" x="120" y="145" text-anchor="middle">x₁</text>
+            <circle class="node" cx="230" cy="140" r="20"/><text class="d-t" x="230" y="145" text-anchor="middle">x₂</text>
+            <circle class="node" cx="340" cy="140" r="20"/><text class="d-t" x="340" y="145" text-anchor="middle">x₃</text>
+            <text class="d-t" x="430" y="145" text-anchor="middle">…</text>
+            <circle class="node" cx="520" cy="140" r="20"/><text class="d-t" x="520" y="145" text-anchor="middle">xₙ</text>
+
+            <text class="d-s" x="120" y="184" text-anchor="middle">P(x₁ | y)</text>
+            <text class="d-s" x="230" y="184" text-anchor="middle">P(x₂ | y)</text>
+            <text class="d-s" x="340" y="184" text-anchor="middle">P(x₃ | y)</text>
+            <text class="d-s" x="520" y="184" text-anchor="middle">P(xₙ | y)</text>
+            <text class="d-t" x="320" y="208" text-anchor="middle">P(x₁, …, xₙ | y) = P(x₁ | y) · P(x₂ | y) ⋯ P(xₙ | y)</text>
+          </svg>
+        </div>
+        <figcaption><b>What "naive" assumes.</b> Each feature depends only on the class. With no links between features, the joint likelihood is a product of one-feature terms, and each term is a simple count from the training table.</figcaption>
+      </figure>
+      <p class="note">A small correction: strictly, the denominator is the joint \(P(x_1, \dots, x_n)\), and writing it as \(P(x_1) \cdots P(x_n)\) needs the features to be independent without conditioning on \(y\) too. It makes no difference here, because the next step drops the denominator. Not in the video: this conditional-independence assumption is what the word "naive" refers to.</p>
+      <p class="note">For the IIT Madras treatment, see Part 14 (<a href="part-14.html#independence">part-14.html</a>), which derives the same factorization from a generative story.</p>
+    </section>
+
+    <section id="compare-classes">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10909s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:01:49</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11042s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:04:02 drop the denominator</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11076s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:04:36 normalize</a>
+        </div>
+        <h2>Score each class, drop the denominator, normalize</h2>
+      </div>
+      <p>Take a data set with four features and an output that is yes or no. For a record \(\mathbf{x}_i = (x_1, x_2, x_3, x_4)\) the answer could be either class, so we need both probabilities:</p>
+      <div class="eq">\[ P(\text{yes} \mid \mathbf{x}_i) = \frac{P(\text{yes})\,P(x_1 \mid \text{yes})\,P(x_2 \mid \text{yes})\,P(x_3 \mid \text{yes})\,P(x_4 \mid \text{yes})}{P(x_1)\,P(x_2)\,P(x_3)\,P(x_4)} \]
+      \[ P(\text{no} \mid \mathbf{x}_i) = \frac{P(\text{no})\,P(x_1 \mid \text{no})\,P(x_2 \mid \text{no})\,P(x_3 \mid \text{no})\,P(x_4 \mid \text{no})}{P(x_1)\,P(x_2)\,P(x_3)\,P(x_4)} \]</div>
+      <p>The denominator is identical in both lines. It is a constant for this record, so it cannot change which class wins, and he drops it. What is left is a <b>score</b> per class:</p>
+      <div class="result">
+        <span class="lbl">Naive Bayes decision rule</span>
+        \[ P(y \mid \mathbf{x}) \;\propto\; P(y)\prod_{j=1}^{n} P(x_j \mid y), \qquad \hat y = \text{the class with the larger score} \]
+      </div>
+      <p>The scores are not probabilities, because the dropped denominator was what made them add up to 1. Suppose a record scores 0.13 for yes and 0.05 for no. Neither number can be compared with the usual 0.5 cut-off. So he <dfn>normalizes</dfn>: divide each score by the sum of both.</p>
+      <div class="eq">\[ P(\text{yes} \mid \mathbf{x}_i) = \frac{0.13}{0.13 + 0.05} \approx 0.72, \qquad P(\text{no} \mid \mathbf{x}_i) = 1 - 0.72 = 0.28 \]</div>
+      <p>The record is predicted yes, with 72% probability.</p>
+      <ol class="algo">
+        <li class="algo-title">Naive Bayes by hand, as he does it</li>
+        <li>For each class, count its rows: \(P(y) = \) rows in class \(y\) / all rows.</li>
+        <li>For each feature, build a table of counts per value and class, and divide by the class size: \(P(x_j = v \mid y)\).</li>
+        <li>For a new record, multiply the prior by the matching entry of each table, once per class.</li>
+        <li>Normalize the scores so they sum to 1, and predict the class with the larger value.</li>
+      </ol>
+    </section>
+
+    <section id="play-tennis">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11142s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:05:42</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11243s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:07:23 counting outlook</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11407s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:10:07 temperature</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11504s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:11:44 priors</a>
+        </div>
+        <h2>Worked example: the play-tennis table</h2>
+      </div>
+      <p>He pastes in a small data set: 14 days, with four input features (Outlook, Temperature, Humidity, Wind) and the output Play tennis, a binary yes or no. The rows below are the standard version of this table; every count he reads off matches it.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Day</th><th>Outlook</th><th>Temperature</th><th>Humidity</th><th>Wind</th><th>Play tennis</th></tr></thead>
+          <tbody>
+            <tr><td>D1</td><td>Sunny</td><td>Hot</td><td>High</td><td>Weak</td><td>No</td></tr>
+            <tr><td>D2</td><td>Sunny</td><td>Hot</td><td>High</td><td>Strong</td><td>No</td></tr>
+            <tr><td>D3</td><td>Overcast</td><td>Hot</td><td>High</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>D4</td><td>Rain</td><td>Mild</td><td>High</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>D5</td><td>Rain</td><td>Cool</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>D6</td><td>Rain</td><td>Cool</td><td>Normal</td><td>Strong</td><td>No</td></tr>
+            <tr><td>D7</td><td>Overcast</td><td>Cool</td><td>Normal</td><td>Strong</td><td>Yes</td></tr>
+            <tr><td>D8</td><td>Sunny</td><td>Mild</td><td>High</td><td>Weak</td><td>No</td></tr>
+            <tr><td>D9</td><td>Sunny</td><td>Cool</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>D10</td><td>Rain</td><td>Mild</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>D11</td><td>Sunny</td><td>Mild</td><td>Normal</td><td>Strong</td><td>Yes</td></tr>
+            <tr><td>D12</td><td>Overcast</td><td>Mild</td><td>High</td><td>Strong</td><td>Yes</td></tr>
+            <tr><td>D13</td><td>Overcast</td><td>Hot</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>D14</td><td>Rain</td><td>Mild</td><td>High</td><td>Strong</td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>For each feature he builds a smaller table. Outlook has three categories: sunny, overcast and rain. Going down the rows, sunny appears with no three times and with yes twice. Overcast is yes all four times. Rain gives 3 yes and 2 no. Overall there are 9 yes days and 5 no days, 14 in all.</p>
+      <p>Dividing each count by its class total turns the counts into likelihoods. Of the 9 yes days, 2 were sunny, so \(P(\text{sunny} \mid \text{yes}) = 2/9\). Of the 5 no days, 3 were sunny, so \(P(\text{sunny} \mid \text{no}) = 3/5\). He then does the same for temperature (hot, mild and cool).</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Feature value</th><th class="num">Yes days</th><th class="num">No days</th><th class="num">P(value | yes)</th><th class="num">P(value | no)</th></tr></thead>
+          <tbody>
+            <tr><td colspan="5"><b>Outlook</b></td></tr>
+            <tr data-nb="outlook:sunny"><td>Sunny</td><td class="num">2</td><td class="num">3</td><td class="num">2/9</td><td class="num">3/5</td></tr>
+            <tr data-nb="outlook:overcast"><td>Overcast</td><td class="num">4</td><td class="num">0</td><td class="num">4/9</td><td class="num">0/5</td></tr>
+            <tr data-nb="outlook:rain"><td>Rain</td><td class="num">3</td><td class="num">2</td><td class="num">3/9</td><td class="num">2/5</td></tr>
+            <tr><td colspan="5"><b>Temperature</b></td></tr>
+            <tr data-nb="temp:hot"><td>Hot</td><td class="num">2</td><td class="num">2</td><td class="num">2/9</td><td class="num">2/5</td></tr>
+            <tr data-nb="temp:mild"><td>Mild</td><td class="num">4</td><td class="num">2</td><td class="num">4/9</td><td class="num">2/5</td></tr>
+            <tr data-nb="temp:cool"><td>Cool</td><td class="num">3</td><td class="num">1</td><td class="num">3/9</td><td class="num">1/5</td></tr>
+            <tr><td colspan="5"><b>Play tennis (the priors)</b></td></tr>
+            <tr><td>Total</td><td class="num">9</td><td class="num">5</td><td class="num" colspan="2">P(yes) = 9/14, P(no) = 5/14</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Last come the class priors from the Play column, the last row of the table: \(P(\text{yes}) = 9/14\) and \(P(\text{no}) = 5/14\).</p>
+      <p class="callout">While filling in the tables he reads the columns as "probability of yes given sunny". That is backwards. The entry 2/9 is \(P(\text{sunny} \mid \text{yes})\): the share of yes days that were sunny. (\(P(\text{yes} \mid \text{sunny})\) would be 2/5, the share of sunny days that were yes.) He corrects himself when he uses the numbers at 3:13:21, and the calculation below uses them the right way.</p>
+    </section>
+
+    <section id="sunny-hot">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11536s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:12:16</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11601s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:13:21 the no class</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11668s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:14:28 normalize</a>
+        </div>
+        <h2>Predicting for a sunny, hot day</h2>
+      </div>
+      <p>A new test day arrives: the outlook is sunny and the temperature is hot. Will the person play? Write both scores, leaving out the shared denominator \(P(\text{sunny})\,P(\text{hot})\):</p>
+      <div class="eq">\[ P(\text{yes} \mid \text{sunny}, \text{hot}) \propto P(\text{yes})\,P(\text{sunny} \mid \text{yes})\,P(\text{hot} \mid \text{yes}) = \frac{9}{14} \cdot \frac{2}{9} \cdot \frac{2}{9} = \frac{2}{63} \approx 0.031 \]
+      \[ P(\text{no} \mid \text{sunny}, \text{hot}) \propto P(\text{no})\,P(\text{sunny} \mid \text{no})\,P(\text{hot} \mid \text{no}) = \frac{5}{14} \cdot \frac{3}{5} \cdot \frac{2}{5} = \frac{3}{35} \approx 0.086 \]</div>
+      <p>Then normalize, exactly as with 0.13 and 0.05:</p>
+      <div class="eq">\[ P(\text{no} \mid \text{sunny}, \text{hot}) = \frac{0.086}{0.031 + 0.086} \approx 0.73, \qquad P(\text{yes} \mid \text{sunny}, \text{hot}) \approx 1 - 0.73 = 0.27 \]</div>
+      <div class="result">
+        <span class="lbl">Answer</span>
+        <p>On a sunny, hot day the model says the person does <b>not</b> play tennis: 73% no against 27% yes.</p>
+      </div>
+
+      <figure id="nb-calc">
+        <div class="controls">
+          <span style="display:inline-flex; align-items:center; gap:8px;"><label for="nb-outlook">Outlook</label>
+            <select id="nb-outlook" style="font: 500 14px/1.2 var(--font-head); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px;">
+              <option value="">not used</option><option value="sunny" selected>sunny</option><option value="overcast">overcast</option><option value="rain">rain</option>
+            </select></span>
+          <span style="display:inline-flex; align-items:center; gap:8px;"><label for="nb-temp">Temperature</label>
+            <select id="nb-temp" style="font: 500 14px/1.2 var(--font-head); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px;">
+              <option value="">not used</option><option value="hot" selected>hot</option><option value="mild">mild</option><option value="cool">cool</option>
+            </select></span>
+          <span style="display:inline-flex; align-items:center; gap:8px;"><label for="nb-humidity">Humidity</label>
+            <select id="nb-humidity" style="font: 500 14px/1.2 var(--font-head); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px;">
+              <option value="" selected>not used</option><option value="high">high</option><option value="normal">normal</option>
+            </select></span>
+          <span style="display:inline-flex; align-items:center; gap:8px;"><label for="nb-wind">Wind</label>
+            <select id="nb-wind" style="font: 500 14px/1.2 var(--font-head); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px;">
+              <option value="" selected>not used</option><option value="weak">weak</option><option value="strong">strong</option>
+            </select></span>
+          <label class="check" for="nb-smooth"><input type="checkbox" id="nb-smooth"> Add-one smoothing (not in the video)</label>
+          <button class="btn" id="nb-reset" type="button">Back to sunny, hot</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Score for yes</span><span class="v" id="nb-sy">–</span></div>
+          <div><span class="k">Score for no</span><span class="v" id="nb-sn">–</span></div>
+          <div><span class="k">P(yes | x) after normalizing</span><span class="v mine" id="nb-py">–</span></div>
+        </div>
+        <div class="status" id="nb-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="nb-svg" viewBox="0 0 640 212" role="img" aria-label="For each class, the prior times one likelihood per chosen feature, written out as fractions, with a bar for the size of the score. Below, one bar split into the normalized probabilities of yes and no, with a mark at 0.5."></svg></div>
+        <figcaption><b>Naive Bayes calculator on the 14-day table.</b> Pick a value for each feature, or leave it unused. Each row multiplies the class prior by one likelihood per chosen feature, read from the count tables, and its bar length compares the two scores; the bottom bar divides by their sum. He tabulates only Outlook and Temperature and leaves Humidity and Wind as an exercise; their counts come from the same 14 rows. Rows used from the two tables above are highlighted there.</figcaption>
+      </figure>
+    </section>
+
+    <section id="nb-exercise">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11700s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:15:00</a>
+        <h2>His exercise, a zero count, and the variants</h2>
+      </div>
+      <p>He ends the example with homework: find the prediction for an <b>overcast, mild</b> day. He also points out that you can add more features the same way, building a count table for Humidity and Wind and multiplying in one more factor for each.</p>
+      <p>Working the exercise with his two tables:</p>
+      <div class="eq">\[ \text{yes: } \frac{9}{14} \cdot \frac{4}{9} \cdot \frac{4}{9} = \frac{8}{63} \approx 0.127, \qquad \text{no: } \frac{5}{14} \cdot \frac{0}{5} \cdot \frac{2}{5} = 0 \]</div>
+      <p>Normalizing gives 100% yes. No overcast day in the table was a no day, and that single zero count wipes out the whole no score however the other features look. Try it in the calculator above.</p>
+      <p class="callout">Not in the video: this is the <i>zero-frequency problem</i>. The usual fix is <b>Laplace (add-one) smoothing</b>: add 1 to every count and add the number of possible values \(m_j\) to the class total, so no likelihood is ever exactly 0. With it, the overcast, mild day comes out about 87% yes. The calculator's checkbox applies this rule.</p>
+      <div class="eq">\[ P(x_j = v \mid y) = \frac{\text{count}(x_j = v \text{ and } y) + 1}{\text{count}(y) + m_j}, \qquad \text{e.g. } P(\text{overcast} \mid \text{no}) = \frac{0 + 1}{5 + 3} = \frac{1}{8} \]</div>
+      <p class="note">For the IIT Madras treatment of the zero count and smoothing, see Part 14 (<a href="part-14.html#zero-frequency">part-14.html</a>).</p>
+
+      <h3>Not in the video: Naive Bayes variants</h3>
+      <p>The play-tennis example has categorical features, so each \(P(x_j \mid y)\) is a share of counts. Other kinds of features call for other forms of the same factor; scikit-learn has a class for each.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Variant</th><th>Features</th><th>How \(P(x_j \mid y)\) is modelled</th><th>scikit-learn</th></tr></thead>
+          <tbody>
+            <tr><td>Categorical</td><td>Categories, as in play tennis</td><td>Share of class-\(y\) rows with that category</td><td><code>CategoricalNB</code></td></tr>
+            <tr><td>Bernoulli</td><td>Binary: present or absent</td><td>One probability of "present" per feature and class</td><td><code>BernoulliNB</code></td></tr>
+            <tr><td>Multinomial</td><td>Counts, such as word counts in text</td><td>Share of all counts in class \(y\) that fall on feature \(j\)</td><td><code>MultinomialNB</code></td></tr>
+            <tr><td>Gaussian</td><td>Continuous values</td><td>A normal density with a mean and variance per class</td><td><code>GaussianNB</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Part 14 covers the binary (<a href="part-14.html#binary-features">part-14.html</a>) and Gaussian (<a href="part-14.html#gaussian-story">part-14.html</a>) cases in depth.</p>
+    </section>
+
+    <!-- ============ KNN ============ -->
+    <section id="knn-classify">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11762s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:16:02</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11796s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:16:36 K = 5</a>
+        </div>
+        <h2>KNN for classification: a vote among neighbours</h2>
+      </div>
+      <p>The second algorithm of the session is <dfn>KNN</dfn>, short for K-nearest neighbours. It is simple, and it solves both classification and regression.</p>
+      <p>Start with binary classification: two groups of training points, say red and white, and a new point that lands between them. Logistic regression (<a href="krish-ml-02.html">Part 2</a>) would draw a dividing line. KNN draws nothing. It looks at the training points closest to the new one and lets them decide.</p>
+      <p>With \(K = 5\), find the five training points nearest the new point. In his picture three of them are red and two are white. Red has the majority, so the new point is classified red.</p>
+      <ol class="algo">
+        <li class="algo-title">KNN classification</li>
+        <li>Choose \(K\) and a distance (Euclidean or Manhattan).</li>
+        <li>For the new point, compute its distance to every training point.</li>
+        <li>Take the \(K\) training points with the smallest distances.</li>
+        <li>Predict the class that appears most often among those \(K\).</li>
+      </ol>
+
+      <figure id="knn-fig">
+        <div class="controls">
+          <label for="knn-k">Neighbours \(K\)</label>
+          <input type="range" id="knn-k" min="1" max="31" step="2" value="5">
+          <output id="knn-k-out" for="knn-k">K = 5</output>
+          <span style="display:inline-flex; align-items:center; gap:8px;"><label for="knn-metric">Distance</label>
+            <select id="knn-metric" style="font: 500 14px/1.2 var(--font-head); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 8px;">
+              <option value="euclid" selected>Euclidean</option><option value="manhattan">Manhattan</option>
+            </select></span>
+          <label class="check" for="knn-shade"><input type="checkbox" id="knn-shade" checked> Shade predicted regions</label>
+          <button class="btn" id="knn-reset" type="button">Reset</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Votes for A</span><span class="v" id="knn-va">–</span></div>
+          <div><span class="k">Votes for B</span><span class="v" id="knn-vb">–</span></div>
+          <div><span class="k">Prediction</span><span class="v mine" id="knn-pred">–</span></div>
+        </div>
+        <div class="status" id="knn-status" aria-live="polite"></div>
+        <div class="chart-wrap sq"><svg id="knn-svg" viewBox="0 0 400 400" tabindex="0" role="img" aria-label="Forty-four synthetic training points from two overlapping classes, A as blue circles and B as green squares, and a yellow new point. Lines join the new point to its K nearest neighbours, which a dashed outline encloses. The tinted background shows the class KNN predicts at each location. Click, drag or use the arrow keys to move the new point."></svg></div>
+        <figcaption><b>Synthetic data, generated for this page:</b> 22 points per class from two overlapping normal clouds. Click or drag on the plot, or focus it and use the arrow keys, to move the new point. The dashed outline encloses its K nearest neighbours: a circle under Euclidean distance, a diamond under Manhattan. The tint is the class KNN would predict at each location. Only odd K is offered so a two-class vote cannot tie. At the starting point, K = 5 gives his 3-to-2 vote; try K = 1, K = 15 and the Manhattan distance there too.</figcaption>
+      </figure>
+    </section>
+
+    <section id="distances">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11829s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:17:09</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11864s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:17:44 the formulas</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11980s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:19:40 Manhattan with absolute values</a>
+        </div>
+        <h2>Measuring "nearest": Euclidean and Manhattan distance</h2>
+      </div>
+      <p>"Nearest" needs a distance. He names the two used most often. For two points \((x_1, y_1)\) and \((x_2, y_2)\) (here \(x\) and \(y\) are just the two coordinates of a point):</p>
+      <div class="eq">\[ d_\text{Euclidean} = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}, \qquad d_\text{Manhattan} = \lvert x_2 - x_1 \rvert + \lvert y_2 - y_1 \rvert \]</div>
+      <p><dfn>Euclidean distance</dfn> is the straight line between the points, the hypotenuse of the right triangle they form. <dfn>Manhattan distance</dfn> walks along the axes instead: across, then up, like moving along city blocks. It never takes the hypotenuse. He gives the Manhattan formula with absolute values at the very end of the KNN chapter.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 276" role="img" aria-label="Left: points A at (1, 1) and B at (4, 5) on a grid. The straight line between them has length 5, the Euclidean distance. The path along the grid, 3 across and 4 up, has length 7, the Manhattan distance. Right: all points within distance 2 of a centre form a disc under Euclidean distance and a diamond under Manhattan distance.">
+            <text class="d-h" x="40" y="16">From A to B</text>
+            <line class="d-rule" x1="40" y1="28" x2="40" y2="220"/><line class="d-rule" x1="72" y1="28" x2="72" y2="220"/><line class="d-rule" x1="104" y1="28" x2="104" y2="220"/><line class="d-rule" x1="136" y1="28" x2="136" y2="220"/><line class="d-rule" x1="168" y1="28" x2="168" y2="220"/><line class="d-rule" x1="200" y1="28" x2="200" y2="220"/><line class="d-rule" x1="232" y1="28" x2="232" y2="220"/>
+            <line class="d-rule" x1="40" y1="220" x2="232" y2="220"/><line class="d-rule" x1="40" y1="188" x2="232" y2="188"/><line class="d-rule" x1="40" y1="156" x2="232" y2="156"/><line class="d-rule" x1="40" y1="124" x2="232" y2="124"/><line class="d-rule" x1="40" y1="92" x2="232" y2="92"/><line class="d-rule" x1="40" y1="60" x2="232" y2="60"/><line class="d-rule" x1="40" y1="28" x2="232" y2="28"/>
+            <text class="d-al" x="40" y="234" text-anchor="middle">0</text><text class="d-al" x="104" y="234" text-anchor="middle">2</text><text class="d-al" x="168" y="234" text-anchor="middle">4</text><text class="d-al" x="232" y="234" text-anchor="middle">6</text>
+            <text class="d-al" x="32" y="160" text-anchor="end">2</text><text class="d-al" x="32" y="96" text-anchor="end">4</text><text class="d-al" x="32" y="32" text-anchor="end">6</text>
+            <polyline class="d-ln d-dash" points="72,188 168,188 168,60" style="stroke-width:2"/>
+            <line class="d-ln-acc" x1="72" y1="188" x2="168" y2="60" style="stroke-width:2.2"/>
+            <circle class="pt-plain" cx="72" cy="188" r="5"/>
+            <circle class="pt-plain" cx="168" cy="60" r="5"/>
+            <text class="d-s" x="72" y="206" text-anchor="middle">A (1, 1)</text>
+            <text class="d-s" x="176" y="54">B (4, 5)</text>
+            <text class="d-t" x="120" y="204" text-anchor="middle">3</text>
+            <text class="d-t" x="178" y="128">4</text>
+            <text class="d-t" x="114" y="120" text-anchor="end" style="fill: var(--accent)">5</text>
+            <text class="d-s" x="40" y="254" style="fill: var(--accent)">Euclidean: √(3² + 4²) = 5, the straight line</text>
+            <text class="d-s" x="40" y="270">Manhattan: 3 + 4 = 7, along the grid (dashed)</text>
+
+            <line class="d-rule" x1="330" y1="10" x2="330" y2="262"/>
+
+            <text class="d-h" x="374" y="16">Everything within distance 2</text>
+            <line class="d-rule" x1="374" y1="28" x2="374" y2="220"/><line class="d-rule" x1="406" y1="28" x2="406" y2="220"/><line class="d-rule" x1="438" y1="28" x2="438" y2="220"/><line class="d-rule" x1="470" y1="28" x2="470" y2="220"/><line class="d-rule" x1="502" y1="28" x2="502" y2="220"/><line class="d-rule" x1="534" y1="28" x2="534" y2="220"/><line class="d-rule" x1="566" y1="28" x2="566" y2="220"/>
+            <line class="d-rule" x1="374" y1="220" x2="566" y2="220"/><line class="d-rule" x1="374" y1="188" x2="566" y2="188"/><line class="d-rule" x1="374" y1="156" x2="566" y2="156"/><line class="d-rule" x1="374" y1="124" x2="566" y2="124"/><line class="d-rule" x1="374" y1="92" x2="566" y2="92"/><line class="d-rule" x1="374" y1="60" x2="566" y2="60"/><line class="d-rule" x1="374" y1="28" x2="566" y2="28"/>
+            <circle class="d-ln-acc" cx="470" cy="124" r="64" style="fill: var(--accent-soft); fill-opacity: .45; stroke-width: 2"/>
+            <path class="d-ln d-dash" d="M470 60 L534 124 L470 188 L406 124 Z" style="stroke-width:2"/>
+            <line class="d-ln" x1="470" y1="124" x2="534" y2="124" style="stroke-width:1"/>
+            <text class="d-s" x="502" y="118" text-anchor="middle">2</text>
+            <circle class="pt-new" cx="470" cy="124" r="5"/>
+            <text class="d-s" x="374" y="254" style="fill: var(--accent)">Euclidean: the points within 2 fill a disc</text>
+            <text class="d-s" x="374" y="270">Manhattan: they fill a diamond (dashed)</text>
+          </svg>
+        </div>
+        <figcaption><b>Two ways to measure the same gap.</b> Left: A and B differ by 3 across and 4 up, so the Euclidean distance is 5 and the Manhattan distance is 7. Right (not in the video): the neighbourhood each distance draws around a point. This is why the KNN demo above shows a circle or a diamond.</figcaption>
+      </figure>
+      <p class="note">Not in the video: with \(d\) features the same formulas sum over all coordinates, \(\sqrt{\sum_j (a_j - b_j)^2}\) and \(\sum_j \lvert a_j - b_j \rvert\). Both are the Minkowski distance \(\big(\sum_j \lvert a_j - b_j \rvert^p\big)^{1/p}\) with \(p = 2\) and \(p = 1\).</p>
+    </section>
+
+    <section id="knn-regress">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11897s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:18:17</a>
+        <h2>KNN for regression: average the neighbours</h2>
+      </div>
+      <p>Regression works the same way up to the last step. For a new point, find its \(K\) nearest training points (again \(K = 5\) in his example) and predict the <b>average</b> of their output values.</p>
+      <div class="eq">\[ \hat y = \frac{1}{K} \sum_{i \,\in\, N_K(\mathbf{x})} y_i \qquad N_K(\mathbf{x}) = \text{the } K \text{ training points nearest } \mathbf{x} \]</div>
+      <p>That is the only difference between the two uses: a majority vote for classes, a mean for numbers.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 262" role="img" aria-label="Fourteen points with a rising trend. A new input x equals 5.2. The five training points nearest in x, inside a shaded band from 3.8 to 6.6, are highlighted. Their targets average 5.44, which is the prediction, drawn as a horizontal line across the band.">
+            <rect x="262.8" y="20" width="156.8" height="200" style="fill: var(--accent-soft); fill-opacity: .6"/>
+            <line class="d-ln" x1="50" y1="220" x2="610" y2="220"/>
+            <line class="d-ln" x1="50" y1="20" x2="50" y2="220"/>
+            <text class="d-al" x="50" y="236" text-anchor="middle">0</text><text class="d-al" x="162" y="236" text-anchor="middle">2</text><text class="d-al" x="274" y="236" text-anchor="middle">4</text><text class="d-al" x="386" y="236" text-anchor="middle">6</text><text class="d-al" x="498" y="236" text-anchor="middle">8</text><text class="d-al" x="610" y="236" text-anchor="middle">10</text>
+            <text class="d-al" x="42" y="184" text-anchor="end">2</text><text class="d-al" x="42" y="144" text-anchor="end">4</text><text class="d-al" x="42" y="104" text-anchor="end">6</text><text class="d-al" x="42" y="64" text-anchor="end">8</text><text class="d-al" x="42" y="24" text-anchor="end">10</text>
+            <text class="d-s" x="58" y="14">target y</text>
+            <text class="d-s" x="610" y="254" text-anchor="end">feature x</text>
+            <text class="d-s" x="341.2" y="34" text-anchor="middle" style="fill: var(--accent)">5 nearest in x</text>
+
+            <line class="d-ln-acc d-dash" x1="341.2" y1="220" x2="341.2" y2="111.2"/>
+            <line class="d-ln-acc" x1="262.8" y1="111.2" x2="419.6" y2="111.2" style="stroke-width:2"/>
+
+            <circle class="pt-plain" cx="83.6" cy="178" r="4.5"/><circle class="pt-plain" cx="122.8" cy="164" r="4.5"/><circle class="pt-plain" cx="162" cy="172" r="4.5"/><circle class="pt-plain" cx="206.8" cy="142" r="4.5"/><circle class="pt-plain" cx="246" cy="136" r="4.5"/>
+            <circle class="pt-plain" cx="464.4" cy="76" r="4.5"/><circle class="pt-plain" cx="503.6" cy="84" r="4.5"/><circle class="pt-plain" cx="542.8" cy="58" r="4.5"/><circle class="pt-plain" cx="582" cy="52" r="4.5"/>
+            <circle class="pt-tree" cx="290.8" cy="140" r="5"/><circle class="pt-tree" cx="318.8" cy="102" r="5"/><circle class="pt-tree" cx="358" cy="118" r="5"/><circle class="pt-tree" cx="380.4" cy="94" r="5"/><circle class="pt-tree" cx="419.6" cy="102" r="5"/>
+            <circle class="pt-new" cx="341.2" cy="111.2" r="6"/>
+            <text class="d-t" x="434" y="114" style="fill: var(--accent)">ŷ = 5.44</text>
+            <text class="d-s" x="434" y="130">mean of the 5 nearest targets</text>
+            <text class="d-s" x="341.2" y="254" text-anchor="middle" style="fill: var(--accent)">new x = 5.2</text>
+          </svg>
+        </div>
+        <figcaption><b>KNN regression with K = 5</b> (illustrative points). The five training points closest to \(x = 5.2\) have targets 4.0, 5.9, 5.1, 6.3 and 5.9. Their mean, 5.44, is the prediction. Move \(x\) and a different five take over, so the prediction is a step function of \(x\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="choosing-k">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11933s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:18:53</a>
+        <h2>Choosing K</h2>
+      </div>
+      <p>\(K\) is a <dfn>hyperparameter</dfn>: we set it, the algorithm does not learn it. His recipe is to try many values, for example \(K = 1\) to \(50\), measure the error rate for each, and keep the model whose error rate is lowest.</p>
+      <p class="code-cap">Not in the video: one way to run that search in scikit-learn</p>
+      <pre class="codeblock"><code><span class="kw">from</span> sklearn.neighbors <span class="kw">import</span> KNeighborsClassifier
+<span class="kw">from</span> sklearn.model_selection <span class="kw">import</span> cross_val_score
+
+error_rate = []
+<span class="kw">for</span> k <span class="kw">in</span> range(1, 51):                       <span class="cm"># try K = 1 ... 50</span>
+    knn = KNeighborsClassifier(n_neighbors=k, metric="euclidean")   <span class="cm"># or "manhattan"</span>
+    accuracy = cross_val_score(knn, X_train, y_train, cv=5).mean()
+    error_rate.append(1 - accuracy)               <span class="cm"># error rate for this K</span>
+
+best_k = error_rate.index(min(error_rate)) + 1    <span class="cm"># list index 0 holds K = 1</span>
+print("best K:", best_k)
+<span class="cm"># for regression, KNeighborsRegressor(n_neighbors=best_k) averages the targets</span></code></pre>
+      <p class="note">For the IIT Madras treatment of choosing \(k\) by cross-validation, and what small and large \(k\) do to the decision boundary, see Part 13 (<a href="part-13.html#decision-boundary">part-13.html</a>).</p>
+    </section>
+
+    <section id="knn-weak">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11945s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:19:05</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11964s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:19:24 an outlier</a>
+        </div>
+        <h2>Where KNN goes wrong: outliers and imbalanced data</h2>
+      </div>
+      <p>He names two situations in which KNN works badly.</p>
+      <ul>
+        <li><b>Outliers.</b> Suppose one point of class A sits deep inside the group of class B. A new point next to it is surrounded by B points, yet its nearest neighbour is the outlier, so it is put in class A.</li>
+        <li><b>Imbalanced data.</b> He names this one without an example. Not in the video: when one class has many more points than the other, it fills most neighbourhoods, and once \(K\) is more than a few, the majority class wins the vote even next to a small group of the other class.</li>
+      </ul>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 240" role="img" aria-label="Left: a group of class A circles on the left and class B squares on the right, with one A outlier inside the B group. A new point next to the outlier has the outlier as its single nearest neighbour, so K equals 1 predicts A. Right: three A circles among sixteen B squares. A new point inside the A group has 3 A and 4 B among its 7 nearest, so B wins.">
+            <text class="d-h" x="14" y="22">An outlier</text>
+            <rect class="d-plot" x="14" y="34" width="312" height="172"/>
+            <circle class="pt-tree" cx="50" cy="70" r="4.5"/><circle class="pt-tree" cx="84" cy="58" r="4.5"/><circle class="pt-tree" cx="66" cy="104" r="4.5"/><circle class="pt-tree" cx="102" cy="92" r="4.5"/>
+            <circle class="pt-tree" cx="44" cy="140" r="4.5"/><circle class="pt-tree" cx="90" cy="132" r="4.5"/><circle class="pt-tree" cx="120" cy="62" r="4.5"/><circle class="pt-tree" cx="76" cy="170" r="4.5"/>
+            <rect x="196" y="56" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="234" y="76" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="268" y="44" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="206" y="118" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="246" y="136" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="296" y="92" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="224" y="172" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="278" y="166" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="192" y="156" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <circle class="d-ln-acc d-dash" cx="232" cy="106" r="18"/>
+            <line class="d-ln" x1="232" y1="106" x2="246" y2="112" style="stroke-width:1"/>
+            <circle class="pt-tree" cx="246" cy="112" r="4.5"/>
+            <circle class="pt-new" cx="232" cy="106" r="5.5"/>
+            <text class="d-s" x="258" y="121">outlier</text>
+            <text class="d-s" x="14" y="226">K = 1: the nearest point is the outlier, so predict A</text>
+
+            <text class="d-h" x="354" y="22">Imbalanced classes</text>
+            <rect class="d-plot" x="354" y="34" width="312" height="172"/>
+            <rect x="462" y="72" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="484" y="100" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="470" y="136" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="436" y="156" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="388" y="166" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="376" y="76" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="516" y="56" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="536" y="116" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="506" y="166" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="576" y="76" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="596" y="136" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="556" y="180" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="616" y="56" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="636" y="106" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="608" y="176" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <rect x="466" y="186" width="8" height="8" style="fill: var(--ok); stroke: var(--surface); stroke-width: 1.5"/>
+            <circle class="pt-tree" cx="420" cy="90" r="4.5"/><circle class="pt-tree" cx="446" cy="112" r="4.5"/><circle class="pt-tree" cx="410" cy="128" r="4.5"/>
+            <circle class="d-ln-acc d-dash" cx="440" cy="120" r="60"/>
+            <circle class="pt-new" cx="440" cy="120" r="5.5"/>
+            <text class="d-s" x="354" y="226">K = 7: 3 A against 4 B, so B wins</text>
+          </svg>
+        </div>
+        <figcaption><b>Two ways KNN gets misled</b> (illustrative points). Blue circles are class A, green squares class B, and the yellow dot is the new point; the dashed circle holds its K nearest neighbours. Left, his outlier case: a single A point inside the B group decides the label of a new point beside it. Right, an imbalanced set: with 16 B points and 3 A points, the new point sits in the middle of the A group, yet 4 of its 7 nearest neighbours are B.</figcaption>
+      </figure>
+      <p class="note">Not in the video: because everything rests on distances, features on large scales (salary in rupees next to age in years) dominate the vote, so features are usually standardized before KNN. Part 13 also notes that prediction is slow, since every new point needs its distance to every training point (<a href="part-13.html#knn-issues">part-13.html</a>).</p>
+      <p>He closes the session there and points to his separate, longer videos on each topic.</p>
+    </section>
+
+    <section id="trees-preview">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=11995s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:19:55</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12027s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:20:27 nested if-else</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12090s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:21:30 the same logic as a tree</a>
+        </div>
+        <h2>Next session: a decision tree is a nested if-else</h2>
+      </div>
+      <p>The last few minutes of this range open the next session, on <b>decision trees</b>. Like KNN, they solve both regression and classification. He starts from plain code: a chain of conditions on age.</p>
+      <p class="code-cap">Code reconstructed from the video's audio</p>
+      <pre class="codeblock"><code><span class="kw">if</span> age &lt;= 18:
+    print("college")
+<span class="kw">elif</span> age &gt; 18 <span class="kw">and</span> age &lt;= 35:
+    print("work")
+<span class="kw">else</span>:
+    print("retire")</code></pre>
+      <p>Any nested if-else like this can be drawn as a tree. The first condition becomes the <dfn>root node</dfn>, with a yes branch and a no branch. The yes branch ends in a <dfn>leaf node</dfn>, "college". The no branch leads to the next condition, which splits again into the leaves "work" and "retire".</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 600 250" role="img" aria-label="Decision tree for the age rules. Root node: age at most 18? Yes leads to the leaf College. No leads to the node: 18 less than age at most 35? Yes leads to the leaf Work, no to the leaf Retire.">
+            <line class="d-ln" x1="280" y1="68" x2="150" y2="128"/>
+            <line class="d-ln" x1="280" y1="68" x2="410" y2="128"/>
+            <line class="d-ln" x1="410" y1="164" x2="330" y2="208"/>
+            <line class="d-ln" x1="410" y1="164" x2="490" y2="208"/>
+            <text class="d-s" x="206" y="94" text-anchor="end">yes</text>
+            <text class="d-s" x="354" y="94">no</text>
+            <text class="d-s" x="362" y="186" text-anchor="end">yes</text>
+            <text class="d-s" x="458" y="186">no</text>
+
+            <rect class="d-box-acc" x="210" y="30" width="140" height="38" rx="8"/>
+            <text class="d-t" x="280" y="54" text-anchor="middle">age ≤ 18?</text>
+            <text class="d-s" x="360" y="53">root node</text>
+
+            <rect class="b-ok" x="95" y="128" width="110" height="36" rx="8"/>
+            <text class="d-t" x="150" y="151" text-anchor="middle">College</text>
+            <text class="d-s" x="150" y="182" text-anchor="middle">leaf node</text>
+
+            <rect class="d-box-acc" x="330" y="128" width="160" height="36" rx="8"/>
+            <text class="d-t" x="410" y="151" text-anchor="middle">18 &lt; age ≤ 35?</text>
+
+            <rect class="b-ok" x="280" y="208" width="100" height="34" rx="8"/>
+            <text class="d-t" x="330" y="230" text-anchor="middle">Work</text>
+            <rect class="b-ok" x="440" y="208" width="100" height="34" rx="8"/>
+            <text class="d-t" x="490" y="230" text-anchor="middle">Retire</text>
+          </svg>
+        </div>
+        <figcaption><b>The if-else chain as a tree.</b> Blue boxes are conditions, green boxes are leaves that give the answer. Following the branches for a 25-year-old: not 18 or under, so go right; between 18 and 35, so the answer is "work".</figcaption>
+      </figure>
+      <p>So a decision tree is a nested if-else drawn as nodes. What the session still has to explain is the maths that chooses the conditions, which starts in Part 5 (<a href="krish-ml-05.html">krish-ml-05.html</a>). For the IIT Madras treatment of decision trees, see Part 13 (<a href="part-13.html#decision-tree">part-13.html</a>).</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Independent events</dt><dd>One outcome does not change the probability of the other, as with two rolls of a die.</dd></div>
+        <div><dt>Dependent events</dt><dd>The first outcome changes the odds of the second, as when marbles are drawn without putting them back.</dd></div>
+        <div><dt>Conditional probability</dt><dd>\(P(B \mid A)\), the probability of \(B\) once \(A\) has happened; \(P(A \text{ and } B) = P(A)\,P(B \mid A)\).</dd></div>
+        <div><dt>Bayes' theorem</dt><dd>\(P(B \mid A) = P(B)\,P(A \mid B) / P(A)\), from writing \(P(A \text{ and } B)\) in both orders.</dd></div>
+        <div><dt>Naive Bayes</dt><dd>A classifier that scores each class by \(P(y)\prod_j P(x_j \mid y)\), treating features as independent given the class.</dd></div>
+        <div><dt>Prior \(P(y)\)</dt><dd>The share of training rows in class \(y\), such as \(9/14\) for yes.</dd></div>
+        <div><dt>Likelihood \(P(x_j \mid y)\)</dt><dd>The share of class-\(y\) rows with that feature value, such as \(P(\text{sunny} \mid \text{yes}) = 2/9\).</dd></div>
+        <div><dt>Normalization</dt><dd>Dividing each class score by the sum of the scores so the results add up to 1.</dd></div>
+        <div><dt>Zero-frequency problem</dt><dd>A value never seen with a class zeroes that class's product; add-one smoothing (not in the video) avoids it.</dd></div>
+        <div><dt>KNN</dt><dd>Predicts from the K closest training points: majority vote for classification, mean for regression.</dd></div>
+        <div><dt>Euclidean distance</dt><dd>Straight-line distance, \(\sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}\).</dd></div>
+        <div><dt>Manhattan distance</dt><dd>Distance along the axes, \(\lvert x_2 - x_1 \rvert + \lvert y_2 - y_1 \rvert\).</dd></div>
+        <div><dt>Hyperparameter K</dt><dd>The number of neighbours; chosen by trying a range of values and keeping the one with the lowest error.</dd></div>
+        <div><dt>Root and leaf nodes</dt><dd>The first condition of a decision tree, and the end nodes that give the answer.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>From the bag of 3 red and 2 green marbles, you draw two without replacement. What is the probability of green first, then red, and why are these dependent events?</span><span class="tog"></span></summary>
+          <p>\(P(G) = 2/5\). One green is now gone, leaving 3 red out of 4, so \(P(R \mid G) = 3/4\). The product is \(2/5 \times 3/4 = 6/20 = 0.3\). The events are dependent because the first draw changes what is in the bag for the second.</p></details>
+        <details><summary><span class="q">Q2</span><span>Derive Bayes' theorem from the rule for \(P(A \text{ and } B)\).</span><span class="tog"></span></summary>
+          <p>\(P(A \text{ and } B) = P(A)\,P(B \mid A)\), and the same event in the other order is \(P(B)\,P(A \mid B)\). Setting them equal and dividing by \(P(A)\) gives \(P(B \mid A) = P(B)\,P(A \mid B)/P(A)\).</p></details>
+        <details><summary><span class="q">Q3</span><span>Why can Naive Bayes ignore the denominator, and how do you turn scores of 0.02 (yes) and 0.06 (no) into probabilities?</span><span class="tog"></span></summary>
+          <p>The denominator depends only on the record's features, so it is the same for every class and cannot change which class wins. Normalize by the sum: \(P(\text{yes}) = 0.02/0.08 = 0.25\) and \(P(\text{no}) = 0.75\), so predict no.</p></details>
+        <details><summary><span class="q">Q4</span><span>Using the Outlook and Temperature tables, predict for a rainy, cool day.</span><span class="tog"></span></summary>
+          <p>Yes: \(\frac{9}{14} \cdot \frac{3}{9} \cdot \frac{3}{9} = \frac{1}{14} \approx 0.071\). No: \(\frac{5}{14} \cdot \frac{2}{5} \cdot \frac{1}{5} = \frac{1}{35} \approx 0.029\). Normalized, \(P(\text{yes}) = 0.071/0.100 \approx 0.71\), so the person plays (about 71%).</p></details>
+        <details><summary><span class="q">Q5</span><span>His exercise: overcast and mild. What does Naive Bayes predict, and what is odd about the answer?</span><span class="tog"></span></summary>
+          <p>Yes: \(\frac{9}{14} \cdot \frac{4}{9} \cdot \frac{4}{9} = \frac{8}{63} \approx 0.127\). No: \(\frac{5}{14} \cdot \frac{0}{5} \cdot \frac{2}{5} = 0\). So it predicts yes with 100% certainty, because no overcast day in the table was a no day. One zero count wipes out the whole no score. Add-one smoothing (not in the video) gives about 87% yes instead.</p></details>
+        <details><summary><span class="q">Q6</span><span>Find the Euclidean and Manhattan distances between \((1, 2)\) and \((7, 10)\).</span><span class="tog"></span></summary>
+          <p>The differences are 6 and 8. Euclidean: \(\sqrt{6^2 + 8^2} = \sqrt{100} = 10\). Manhattan: \(6 + 8 = 14\). Manhattan is never smaller than Euclidean, since walking along the axes is never shorter than the straight line.</p></details>
+        <details><summary><span class="q">Q7</span><span>In KNN regression with \(K = 5\), the five nearest neighbours have targets 10, 12, 11, 13 and 54. What is the prediction, and which weakness does this show?</span><span class="tog"></span></summary>
+          <p>The mean is \((10 + 12 + 11 + 13 + 54)/5 = 100/5 = 20\), far from the 10 to 13 that four of the neighbours agree on. The single outlier, 54, drags the prediction. This is KNN's sensitivity to outliers.</p></details>
+        <details><summary><span class="q">Q8</span><span>How does he suggest choosing K, and why is \(K = 1\) risky?</span><span class="tog"></span></summary>
+          <p>Treat K as a hyperparameter: try a range such as 1 to 50, compute the error rate for each, and keep the K with the lowest error. With \(K = 1\) the prediction copies the single nearest point, so one outlier or mislabelled point decides the answer for everything around it.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="index.html#extra"><span class="dir">← All notes</span><span class="nm">Complete Machine Learning in 6 Hours</span></a><a class="next" href="index.html#extra"><span class="dir">Part 5 · coming</span><span class="nm">Decision trees</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the YouTube auto-generated captions of Krish Naik's video <i>Complete Machine Learning in 6 Hours</i>. Timestamp links open the video at that moment. Code is reconstructed from the audio. Charts marked synthetic use data generated for these notes. Not affiliated with Krish Naik or IIT Madras.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 380; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const axes = (svg, sx, sy, lo, hi, step) => {
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(v), y2: sy(v) }, g);
+      mk('line', { x1: sx(v), x2: sx(v), y1: sy(lo), y2: sy(hi) }, g);
+      if (v !== 0) {
+        mk('text', { x: sx(v), y: sy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v;
+        mk('text', { x: sx(0) - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+      }
+    }
+    mk('line', { x1: sx(lo), x2: sx(hi), y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(lo), y2: sy(hi), class: 'c-axis' }, svg);
+  };
+
+  /* ---------- Naive Bayes calculator on the play-tennis table ---------- */
+  (() => {
+    const svg = document.getElementById('nb-svg'); if (!svg) return;
+    // counts [yes, no] per value, from the 14-day table
+    const FEATS = [
+      { id: 'nb-outlook', key: 'outlook', vals: { sunny: [2, 3], overcast: [4, 0], rain: [3, 2] } },
+      { id: 'nb-temp', key: 'temp', vals: { hot: [2, 2], mild: [4, 2], cool: [3, 1] } },
+      { id: 'nb-humidity', key: 'humidity', vals: { high: [3, 4], normal: [6, 1] } },
+      { id: 'nb-wind', key: 'wind', vals: { weak: [6, 2], strong: [3, 3] } },
+    ];
+    const NC = [9, 5], TOTAL = 14;
+    const sels = FEATS.map(f => document.getElementById(f.id));
+    const smooth = document.getElementById('nb-smooth');
+    const outY = document.getElementById('nb-sy'), outN = document.getElementById('nb-sn'), outP = document.getElementById('nb-py'), status = document.getElementById('nb-status');
+    const rows = [...document.querySelectorAll('tr[data-nb]')];
+    const X0 = 16, X1 = 624, W = X1 - X0;
+    const cls = [
+      { name: 'yes', y: 30, fill: 'var(--accent)' },
+      { name: 'no', y: 84, fill: 'var(--ink-2)' },
+    ];
+    cls.forEach(c => {
+      mk('text', { x: X0, y: c.y, class: 'c-title' }, svg).textContent = 'Play = ' + c.name;
+      c.chain = mk('text', { x: X0 + 82, y: c.y, class: 'c-note', style: 'font-family: var(--font-mono)' }, svg);
+      c.val = mk('text', { x: X1, y: c.y, 'text-anchor': 'end', class: 'c-lbl' }, svg);
+      mk('rect', { x: X0, y: c.y + 10, width: W, height: 14, rx: 3, style: 'fill: var(--paper)' }, svg);
+      c.bar = mk('rect', { x: X0, y: c.y + 10, width: 0, height: 14, rx: 3, style: 'fill: ' + c.fill }, svg);
+      c.w = 0;
+    });
+    mk('text', { x: X0, y: 146, class: 'c-title' }, svg).textContent = 'After normalizing (dividing by the sum of the two scores)';
+    const nY = mk('rect', { x: X0, y: 156, width: W / 2, height: 26, style: 'fill: var(--accent)' }, svg);
+    const nN = mk('rect', { x: X0 + W / 2, y: 156, width: W / 2, height: 26, style: 'fill: var(--ink-2); opacity: .55' }, svg);
+    mk('line', { x1: X0 + W / 2, x2: X0 + W / 2, y1: 150, y2: 188, style: 'stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 3 3' }, svg);
+    mk('text', { x: X0 + W / 2, y: 202, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = '0.5';
+    const lY = mk('text', { x: X0, y: 202, class: 'c-lbl' }, svg);
+    const lN = mk('text', { x: X1, y: 202, 'text-anchor': 'end', class: 'c-note' }, svg);
+    let split = 0.5;
+
+    const fmt = v => v === 0 ? '0' : v < 0.001 ? v.toExponential(2) : v.toFixed(4);
+    const draw = () => {
+      const lap = smooth.checked;
+      const score = [NC[0] / TOTAL, NC[1] / TOTAL];
+      const parts = [[NC[0] + '/' + TOTAL], [NC[1] + '/' + TOTAL]];
+      const used = [];
+      FEATS.forEach((f, i) => {
+        const v = sels[i].value; if (!v) return;
+        used.push(v);
+        const m = Object.keys(f.vals).length;
+        [0, 1].forEach(c => {
+          const num = f.vals[v][c] + (lap ? 1 : 0), den = NC[c] + (lap ? m : 0);
+          score[c] *= num / den; parts[c].push(num + '/' + den);
+        });
+      });
+      const top = Math.max(score[0], score[1]) || 1, sum = score[0] + score[1];
+      cls.forEach((c, i) => {
+        c.chain.textContent = parts[i].join(' × ');
+        c.val.textContent = '= ' + fmt(score[i]);
+        c.val.setAttribute('style', i === 1 ? 'fill: var(--ink)' : '');
+        const target = W * score[i] / top, from = c.w; c.w = target;
+        tween(from, target, w => c.bar.setAttribute('width', Math.max(0, w)));
+      });
+      const pYes = sum ? score[0] / sum : 0.5;
+      const from = split; split = pYes;
+      tween(from, pYes, s => { nY.setAttribute('width', W * s); nN.setAttribute('x', X0 + W * s); nN.setAttribute('width', W * (1 - s)); });
+      lY.textContent = 'yes ' + (100 * pYes).toFixed(1) + '%';
+      lN.textContent = 'no ' + (100 * (1 - pYes)).toFixed(1) + '%';
+      outY.textContent = fmt(score[0]); outN.textContent = fmt(score[1]); outP.textContent = (100 * pYes).toFixed(1) + '%';
+      const desc = used.length ? used.join(', ') : 'no features (priors only)';
+      const pred = pYes >= 0.5 ? 'yes, he plays' : 'no, he does not play';
+      status.textContent = `For ${desc}: the scores add up to ${fmt(sum)}, so dividing by that gives ${(100 * pYes).toFixed(1)}% yes. Prediction: ${pred}.` + (score[1] === 0 ? ' The no score is exactly 0 because of a zero count.' : '');
+      rows.forEach(r => { const [k, v] = r.dataset.nb.split(':'); const f = FEATS.find(x => x.key === k); const on = f && sels[FEATS.indexOf(f)].value === v; r.style.background = on ? 'var(--mark)' : ''; });
+    };
+    sels.forEach(s => s.addEventListener('change', draw));
+    smooth.addEventListener('change', draw);
+    document.getElementById('nb-reset').addEventListener('click', () => { sels[0].value = 'sunny'; sels[1].value = 'hot'; sels[2].value = ''; sels[3].value = ''; smooth.checked = false; draw(); });
+    draw();
+  })();
+
+  /* ---------- KNN classification on synthetic two-class data ---------- */
+  (() => {
+    const svg = document.getElementById('knn-svg'); if (!svg) return;
+    let seed = 4104;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const clamp = v => Math.min(9.6, Math.max(0.4, v));
+    const pts = [];
+    for (let i = 0; i < 22; i++) pts.push([clamp(3.6 + 1.35 * normal()), clamp(6.1 + 1.35 * normal()), 0]);
+    for (let i = 0; i < 22; i++) pts.push([clamp(6.4 + 1.35 * normal()), clamp(3.9 + 1.35 * normal()), 1]);
+    const START = [5.5, 6.5];
+    const lo = 0, hi = 10, P = 24, S = (400 - 2 * P) / (hi - lo);
+    const sx = x => P + (x - lo) * S, sy = y => 400 - P - (y - lo) * S;
+    const defs = mk('defs', {}, svg); const cp = mk('clipPath', { id: 'kml04-knn-clip' }, defs); mk('rect', { x: P, y: P, width: 400 - 2 * P, height: 400 - 2 * P }, cp);
+    const gReg = mk('g', {}, svg);
+    const gRA = mk('g', { style: 'fill: var(--accent); opacity: .13' }, gReg);
+    const gRB = mk('g', { style: 'fill: var(--ok); opacity: .17' }, gReg);
+    axes(svg, sx, sy, lo, hi, 2);
+    const shape = mk('path', { class: 'c-err', 'clip-path': 'url(#kml04-knn-clip)' }, svg);
+    const gLines = mk('g', { style: 'stroke: var(--ink-2); stroke-width: 1; opacity: .8' }, svg);
+    const gRing = mk('g', { style: 'fill: none; stroke: var(--ink); stroke-width: 1.5' }, svg);
+    const gPts = mk('g', {}, svg);
+    pts.forEach(p => {
+      if (p[2] === 0) mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 4.6, style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.5' }, gPts);
+      else mk('rect', { x: sx(p[0]) - 4.2, y: sy(p[1]) - 4.2, width: 8.4, height: 8.4, style: 'fill: var(--ok); stroke: var(--surface); stroke-width: 1.5' }, gPts);
+    });
+    const qDot = mk('circle', { r: 7, class: 'c-pt-hi' }, svg);
+
+    const slider = document.getElementById('knn-k'), kOut = document.getElementById('knn-k-out');
+    const metric = document.getElementById('knn-metric'), shade = document.getElementById('knn-shade');
+    const vA = document.getElementById('knn-va'), vB = document.getElementById('knn-vb'), vP = document.getElementById('knn-pred'), status = document.getElementById('knn-status');
+    let q = START.slice();
+    const dist = (a, b, man) => man ? Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) : Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const nearest = (x, k, man) => pts.map(p => ({ p, d: dist(p, x, man) })).sort((a, b) => a.d - b.d).slice(0, k);
+    const predict = (x, k, man) => { const nb = nearest(x, k, man); const a = nb.filter(o => o.p[2] === 0).length; return a > k - a ? 0 : 1; };
+
+    const regions = () => {
+      gRA.textContent = ''; gRB.textContent = '';
+      gReg.style.display = shade.checked ? '' : 'none';
+      if (!shade.checked) return;
+      const k = +slider.value, man = metric.value === 'manhattan', n = 50, c = (hi - lo) / n;
+      for (let j = 0; j < n; j++) {
+        let start = 0, cur = predict([lo + 0.5 * c, hi - (j + 0.5) * c], k, man);
+        for (let i = 1; i <= n; i++) {
+          const lab = i < n ? predict([lo + (i + 0.5) * c, hi - (j + 0.5) * c], k, man) : -1;
+          if (lab !== cur) {
+            mk('rect', { x: sx(lo + start * c), y: sy(hi - j * c), width: (i - start) * c * S + 0.4, height: c * S + 0.4 }, cur === 0 ? gRA : gRB);
+            start = i; cur = lab;
+          }
+        }
+      }
+    };
+
+    const draw = () => {
+      const k = +slider.value, man = metric.value === 'manhattan';
+      kOut.textContent = 'K = ' + k;
+      const nb = nearest(q, k, man);
+      const a = nb.filter(o => o.p[2] === 0).length, b = k - a;
+      gLines.textContent = ''; gRing.textContent = '';
+      nb.forEach(o => { mk('line', { x1: sx(q[0]), y1: sy(q[1]), x2: sx(o.p[0]), y2: sy(o.p[1]) }, gLines); mk('circle', { cx: sx(o.p[0]), cy: sy(o.p[1]), r: 8 }, gRing); });
+      const R = nb[nb.length - 1].d * S + 3, cx = sx(q[0]), cy = sy(q[1]);
+      shape.setAttribute('d', man ? `M${cx} ${cy - R} L${cx + R} ${cy} L${cx} ${cy + R} L${cx - R} ${cy} Z` : `M${cx - R} ${cy} a${R} ${R} 0 1 0 ${2 * R} 0 a${R} ${R} 0 1 0 ${-2 * R} 0`);
+      qDot.setAttribute('cx', cx); qDot.setAttribute('cy', cy);
+      vA.textContent = a; vB.textContent = b;
+      const lab = a > b ? 'A' : 'B';
+      vP.textContent = 'class ' + lab;
+      const at = `New point at (${q[0].toFixed(1)}, ${q[1].toFixed(1)}): `, by = man ? 'Manhattan' : 'Euclidean';
+      status.textContent = k === 1 ? `${at}its nearest neighbour by ${by} distance is ${lab}, so it is labelled ${lab}.` : `${at}its ${k} nearest by ${by} distance are ${a} A and ${b} B, so it is labelled ${lab}.`;
+    };
+
+    const toData = e => { const m = svg.getScreenCTM(); if (!m) return null; const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const r = pt.matrixTransform(m.inverse()); return [Math.min(hi, Math.max(lo, (r.x - P) / S + lo)), Math.min(hi, Math.max(lo, (400 - P - r.y) / S + lo))]; };
+    let dragging = false;
+    svg.addEventListener('pointerdown', e => { const d = toData(e); if (!d) return; dragging = true; q = d; draw(); if (svg.setPointerCapture) svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener('pointermove', e => { if (!dragging) return; const d = toData(e); if (d) { q = d; draw(); } });
+    const stop = () => { dragging = false; };
+    svg.addEventListener('pointerup', stop); svg.addEventListener('pointercancel', stop);
+    svg.addEventListener('keydown', e => {
+      const step = 0.2, mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
+      if (!mv) return; e.preventDefault();
+      q = [Math.min(hi, Math.max(lo, q[0] + mv[0])), Math.min(hi, Math.max(lo, q[1] + mv[1]))]; draw();
+    });
+    slider.addEventListener('input', () => { regions(); draw(); });
+    metric.addEventListener('change', () => { regions(); draw(); });
+    shade.addEventListener('change', regions);
+    document.getElementById('knn-reset').addEventListener('click', () => { q = START.slice(); slider.value = 5; metric.value = 'euclid'; shade.checked = true; regions(); draw(); });
+    regions(); draw();
+  })();
+})();
+</script>
+</body>
+</html>
