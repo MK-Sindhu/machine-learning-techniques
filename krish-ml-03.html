@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 3 · Practical: linear, ridge and lasso regression · ML in 6 Hours · MLT Notes</title>
+<meta name="description" content="Notes on Krish Naik's Complete Machine Learning in 6 Hours, Part 3: the Jupyter practical for linear, ridge and lasso regression on the Boston house-price data with cross-validation, GridSearchCV and R², then logistic regression on the breast-cancer data.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script src="theme.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html#extra">All notes</a><span class="sep">/</span><span>ML in 6 hours · Part 3 of 8</span><span class="sep">·</span><a href="krish-ml-04.html">Part 4 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Krish Naik · Complete Machine Learning in 6 Hours</div>
+    <h1>Linear, ridge and lasso regression in a Jupyter notebook</h1>
+    <p class="lede">A hands-on session on the Boston house-price data: build a DataFrame, split features from the target, score plain linear regression by 5-fold cross-validation, then tune ridge and lasso over α with GridSearchCV and check R² on a held-out test set. The same recipe then fits a logistic regression to the breast-cancer data and reads its confusion matrix.</p>
+    <div class="meta">
+      <span><b>Part 3</b> of 8</span>
+      <span>Teacher <b>Krish Naik</b></span>
+      <span>About <b>40 min</b> of video</span>
+      <span><b>2</b> chapters</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8032s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:13:52 · Linear regression practical</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8910s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:28:30 · Ridge and Lasso practical</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Linear regression practical</h4>
+      <ul>
+        <li><a href="#setup">The plan and the imports</a></li>
+        <li><a href="#boston">Load the Boston data</a></li>
+        <li><a href="#dataframe">From Bunch to DataFrame</a></li>
+        <li><a href="#x-y">Split X and y</a></li>
+        <li><a href="#linreg-cv">Linear regression + CV</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Ridge and Lasso practical</h4>
+      <ul>
+        <li><a href="#ridge-grid">Ridge + GridSearchCV</a></li>
+        <li><a href="#lasso-grid">Lasso, same recipe</a></li>
+        <li><a href="#more-alphas">A wider α grid</a></li>
+        <li><a href="#train-test">Train/test split</a></li>
+        <li><a href="#r2-test">R² on the test set</a></li>
+        <li><a href="#logistic">Logistic regression</a></li>
+        <li><a href="#logistic-eval">Confusion matrix</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html#extra">All notes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>The data is scikit-learn's Boston house-price set: 506 houses, 13 features and a price. A DataFrame is built from the <code>Bunch</code> it comes in, and <code>iloc</code> splits it into <b>X</b> (features) and <b>y</b> (price).</li>
+        <li>Plain <code>LinearRegression</code> has nothing to tune, so it is scored with <code>cross_val_score</code> and 5-fold <dfn>cross-validation</dfn>: a mean negative MSE of about −37.13.</li>
+        <li>Ridge and lasso are tuned over α with <code>GridSearchCV</code>. Scores are <b>negative</b> MSE, so closer to zero is better. Ridge reaches about −29.9 at α = 100; lasso stays near −34 to −35 (α = 1 on the first grid).</li>
+        <li>After a 67/33 <code>train_test_split</code>, all three models score an R² of about 0.67 to 0.68 on the test rows. A linear model can only fit a flat surface, so that is roughly its ceiling here.</li>
+        <li>The same recipe tunes <code>LogisticRegression</code> (C and max_iter, F1 scoring) on the breast-cancer data. Its confusion matrix has 181 of 188 test rows right, an accuracy of about 96%.</li>
+      </ul>
+    </div>
+
+    <!-- ============ CHAPTER: LINEAR REGRESSION PRACTICAL ============ -->
+    <section id="setup">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8032s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:13:52</a>
+        <h2>The plan, and the imports</h2>
+      </div>
+      <p>The session moves from the whiteboard to a Jupyter notebook. The aim is to solve one regression problem three ways (linear regression, then ridge, then lasso) and to see how hyperparameter tuning is done. Linear regression exists in several Python libraries, and he mentions statsmodels and SciPy, but the notebook uses scikit-learn's <code>LinearRegression</code>. It has options such as <code>fit_intercept</code>, and its job is the one from the theory sessions: find the coefficients \(\theta_0, \theta_1, \dots\).</p>
+      <p class="note">The screen is not in the captions, so every listing on this page is reconstructed from the video's audio with the standard library calls. Outputs in comments are the values he reads out.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 236" role="img" aria-label="The notebook as a flow. load_boston gives a Bunch, which becomes a DataFrame with 13 named columns and a Price column, which iloc splits into X and y. Pass 1 scores linear regression, ridge and lasso by 5-fold cross-validation on all 506 rows. Pass 2 holds out a 33 percent test set, cross-validates the training rows, predicts the test rows and scores them with R squared.">
+            <defs>
+              <marker id="kml03-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker>
+              <marker id="kml03-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+            </defs>
+            <rect class="d-box" x="10" y="14" width="190" height="58" rx="8"/>
+            <text class="d-t" x="105" y="38" text-anchor="middle">load_boston()</text>
+            <text class="d-s" x="105" y="58" text-anchor="middle">Bunch: data · target · names</text>
+            <line class="d-ln" x1="200" y1="43" x2="243" y2="43" marker-end="url(#kml03-ah)"/>
+            <rect class="d-box" x="245" y="14" width="190" height="58" rx="8"/>
+            <text class="d-t" x="340" y="38" text-anchor="middle">pd.DataFrame</text>
+            <text class="d-s" x="340" y="58" text-anchor="middle">13 named columns + Price</text>
+            <line class="d-ln" x1="435" y1="43" x2="478" y2="43" marker-end="url(#kml03-ah)"/>
+            <rect class="d-box" x="480" y="14" width="190" height="58" rx="8"/>
+            <text class="d-t" x="575" y="38" text-anchor="middle">iloc split</text>
+            <text class="d-s" x="575" y="58" text-anchor="middle">X: 506 × 13 · y: Price</text>
+            <path class="d-ln" d="M575 72 V92 H170 V110" marker-end="url(#kml03-ah)"/>
+            <path class="d-ln" d="M510 92 V110" marker-end="url(#kml03-ah)"/>
+            <rect class="d-box" x="10" y="112" width="320" height="112" rx="8"/>
+            <text class="d-t" x="24" y="136">Pass 1 · 5-fold CV on all 506 rows</text>
+            <text class="d-s" x="24" y="160">LinearRegression + cross_val_score: −37.13</text>
+            <text class="d-s" x="24" y="182">Ridge + GridSearchCV: α = 100, about −29.9</text>
+            <text class="d-s" x="24" y="204">Lasso + GridSearchCV: about −34 to −35</text>
+            <rect class="d-box-acc" x="350" y="112" width="320" height="112" rx="8"/>
+            <text class="d-t" x="364" y="136">Pass 2 · split first (test_size = 0.33)</text>
+            <text class="d-s" x="364" y="160">same CV on X_train (339 rows): about −25.5</text>
+            <text class="d-s" x="364" y="182">fit on train, predict X_test (167 rows)</text>
+            <text class="d-s" x="364" y="204">r2_score on the test rows: 0.67 to 0.68</text>
+          </svg>
+        </div>
+        <figcaption><b>The whole notebook in one picture.</b> The numbers are the ones he reads out: mean negative mean squared error from cross-validation in pass 1 and on the training rows in pass 2, and R² on the held-out test rows at the end.</figcaption>
+      </figure>
+
+      <p>He prepares many empty cells so he can keep typing, then imports the usual libraries:</p>
+      <div class="code-cap">Cell · imports</div>
+<pre class="codeblock"><code><span class="kw">from</span> sklearn.datasets <span class="kw">import</span> load_boston
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> seaborn <span class="kw">as</span> sns
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+%matplotlib inline          <span class="cm"># show plots inside the notebook</span></code></pre>
+      <p>No plots are drawn in this part; seaborn and matplotlib are there out of habit. The theory behind the three models is in Part 1 (<a href="krish-ml-01.html">krish-ml-01.html</a>) for linear regression and R², and Part 2 (<a href="krish-ml-02.html">krish-ml-02.html</a>) for ridge, lasso and logistic regression.</p>
+    </section>
+
+    <section id="boston">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8113s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:15:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8179s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:16:19 the Bunch</a>
+        </div>
+        <h2>Load the Boston house-price data</h2>
+      </div>
+      <p>He wants a small data set that ships with scikit-learn and picks Boston house prices. Pressing <b>Shift+Tab</b> on <code>load_boston</code> shows its docstring: it loads and returns the Boston house-prices data set, a regression problem.</p>
+      <div class="code-cap">Cell · load and inspect</div>
+<pre class="codeblock"><code>df = load_boston()
+type(df)
+<span class="cm"># sklearn.utils.Bunch</span>
+
+df
+<span class="cm"># {'data': array([[6.3200e-03, 1.8000e+01, 2.3100e+00, ...], ...]),</span>
+<span class="cm">#  'target': array([24. , 21.6, 34.7, ...]),</span>
+<span class="cm">#  'feature_names': array(['CRIM', 'ZN', 'INDUS', ..., 'LSTAT'], dtype='&lt;U7'),</span>
+<span class="cm">#  'DESCR': '.. _boston_dataset: ...', ...}</span></code></pre>
+      <p>A <dfn>Bunch</dfn> is a dictionary whose keys can also be read as attributes, so <code>df['data']</code> and <code>df.data</code> are the same array. Printing it shows key–value pairs. Three keys matter: <code>data</code> (the feature values), <code>target</code> (the prices) and <code>feature_names</code>. The next step combines them into one DataFrame.</p>
+      <p class="callout">Not in the video: <code>load_boston</code> was deprecated in scikit-learn 1.0 and removed in 1.2, partly because one column (B) was built from the proportion of Black residents in each town. On a current install the import fails. The removal notice suggested reading the original file instead, as below, or practising the same steps on <code>fetch_california_housing()</code>.</p>
+<pre class="codeblock"><code><span class="cm"># Not in the video: the same data on scikit-learn 1.2 or later</span>
+data_url = "http://lib.stat.cmu.edu/datasets/boston"
+raw_df = pd.read_csv(data_url, sep=r"\s+", skiprows=22, header=None)
+data = np.hstack([raw_df.values[::2, :], raw_df.values[1::2, :2]])   <span class="cm"># 506 × 13</span>
+target = raw_df.values[1::2, 2]                                       <span class="cm"># 506 prices</span></code></pre>
+    </section>
+
+    <section id="dataframe">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8211s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:16:51</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8277s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:17:57 a length error</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8408s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:20:08 the Price column</a>
+        </div>
+        <h2>From Bunch to DataFrame</h2>
+      </div>
+      <p><code>pd.DataFrame(df.data)</code> gives a table of 506 rows and 13 unnamed columns, numbered 0 to 12. (He counts them as 12 features; there are 13, as the error message below confirms.) To name the columns he first assigns the wrong key, and pandas refuses:</p>
+      <div class="code-cap">Cell · build the table</div>
+<pre class="codeblock"><code>dataset = pd.DataFrame(df.data)
+dataset.columns = df.target
+<span class="cm"># ValueError: Length mismatch: Expected axis has 13 elements, new values have 506 elements</span></code></pre>
+      <p><code>df.target</code> holds one price per house, 506 values, while a header needs one name per column. The right key is <code>feature_names</code>:</p>
+<pre class="codeblock"><code>dataset.columns = df.feature_names
+dataset.head()
+
+print(df.DESCR)              <span class="cm"># what each column means</span></code></pre>
+      <p>The description explains each column. He reads several out: the crime rate, the share of land zoned for large lots, the distance to Boston's employment centres, highway access, the property-tax rate and the pupil–teacher ratio. All 13 are the <dfn>independent features</dfn>.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Column</th><th>Meaning (from <code>DESCR</code>)</th></tr></thead>
+          <tbody>
+            <tr><td><code>CRIM</code></td><td>per-capita crime rate by town</td></tr>
+            <tr><td><code>ZN</code></td><td>proportion of residential land zoned for lots over 25,000 sq ft</td></tr>
+            <tr><td><code>INDUS</code></td><td>proportion of non-retail business acres per town</td></tr>
+            <tr><td><code>CHAS</code></td><td>1 if the tract bounds the Charles River, else 0</td></tr>
+            <tr><td><code>NOX</code></td><td>nitric-oxide concentration (parts per 10 million)</td></tr>
+            <tr><td><code>RM</code></td><td>average number of rooms per dwelling</td></tr>
+            <tr><td><code>AGE</code></td><td>proportion of owner-occupied units built before 1940</td></tr>
+            <tr><td><code>DIS</code></td><td>weighted distance to five Boston employment centres</td></tr>
+            <tr><td><code>RAD</code></td><td>index of accessibility to radial highways</td></tr>
+            <tr><td><code>TAX</code></td><td>full-value property-tax rate per $10,000</td></tr>
+            <tr><td><code>PTRATIO</code></td><td>pupil–teacher ratio by town</td></tr>
+            <tr><td><code>B</code></td><td>a transform of the proportion of Black residents (the column behind the removal)</td></tr>
+            <tr><td><code>LSTAT</code></td><td>% lower-status population</td></tr>
+            <tr><td><b>target</b> (MEDV)</td><td>median value of owner-occupied homes, in $1000s</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The price is the <dfn>dependent feature</dfn>. He adds it to the table as a new column taken from <code>df.target</code>:</p>
+<pre class="codeblock"><code>dataset['Price'] = df.target
+dataset.head()               <span class="cm"># 13 feature columns, then Price</span></code></pre>
+      <p class="note">He is unsure of the units and guesses millions. The description gives them: the target is in thousands of dollars, so 24.0 means $24,000 (the data dates from the 1970s).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 236" role="img" aria-label="Left: the Bunch with keys data (506 by 13), target (506), feature_names (13) and DESCR. An arrow labelled pd.DataFrame(df.data) leads to a table whose header comes from feature_names and whose last column, Price, comes from target. A bracket under the first 13 columns marks X equals dataset.iloc[:, :-1]; a bracket under Price marks y equals dataset.iloc[:, -1].">
+            <rect class="d-box" x="10" y="40" width="160" height="118" rx="8"/>
+            <text class="d-t" x="22" y="62">df (a Bunch)</text>
+            <text class="d-al" x="22" y="86">data → 506 × 13</text>
+            <text class="d-al" x="22" y="106">target → 506</text>
+            <text class="d-al" x="22" y="126">feature_names → 13</text>
+            <text class="d-al" x="22" y="146">DESCR → text</text>
+            <line class="d-ln" x1="170" y1="99" x2="264" y2="99" marker-end="url(#kml03-ah)"/>
+            <text class="d-al" x="217" y="90" text-anchor="middle">pd.DataFrame</text>
+            <text class="d-al" x="217" y="116" text-anchor="middle">(df.data)</text>
+            <text class="d-s" x="270" y="28">column names from df.feature_names</text>
+            <text class="d-s" x="662" y="28" text-anchor="end">Price = df.target</text>
+            <rect class="d-box" x="270" y="40" width="336" height="110"/>
+            <rect class="d-box-acc" x="606" y="40" width="56" height="110"/>
+            <line class="d-rule" x1="270" y1="64" x2="662" y2="64"/>
+            <line class="d-rule" x1="270" y1="86" x2="662" y2="86"/>
+            <line class="d-rule" x1="270" y1="108" x2="662" y2="108"/>
+            <line class="d-rule" x1="270" y1="130" x2="662" y2="130"/>
+            <line class="d-rule" x1="326" y1="40" x2="326" y2="150"/>
+            <line class="d-rule" x1="382" y1="40" x2="382" y2="150"/>
+            <line class="d-rule" x1="438" y1="40" x2="438" y2="150"/>
+            <line class="d-rule" x1="494" y1="40" x2="494" y2="150"/>
+            <line class="d-rule" x1="550" y1="40" x2="550" y2="150"/>
+            <text class="d-t" x="298" y="57" text-anchor="middle" style="font-size:11.5px">CRIM</text>
+            <text class="d-t" x="354" y="57" text-anchor="middle" style="font-size:11.5px">ZN</text>
+            <text class="d-t" x="410" y="57" text-anchor="middle" style="font-size:11.5px">INDUS</text>
+            <text class="d-t" x="466" y="57" text-anchor="middle" style="font-size:11.5px">… 8 more</text>
+            <text class="d-t" x="522" y="57" text-anchor="middle" style="font-size:11.5px">B</text>
+            <text class="d-t" x="578" y="57" text-anchor="middle" style="font-size:11.5px">LSTAT</text>
+            <text class="d-t" x="634" y="57" text-anchor="middle" style="font-size:11.5px; fill: var(--accent)">Price</text>
+            <text class="d-al" x="298" y="79" text-anchor="middle">0.00632</text><text class="d-al" x="354" y="79" text-anchor="middle">18.0</text><text class="d-al" x="410" y="79" text-anchor="middle">2.31</text><text class="d-al" x="466" y="79" text-anchor="middle">…</text><text class="d-al" x="522" y="79" text-anchor="middle">396.90</text><text class="d-al" x="578" y="79" text-anchor="middle">4.98</text><text class="d-al" x="634" y="79" text-anchor="middle">24.0</text>
+            <text class="d-al" x="298" y="101" text-anchor="middle">0.02731</text><text class="d-al" x="354" y="101" text-anchor="middle">0.0</text><text class="d-al" x="410" y="101" text-anchor="middle">7.07</text><text class="d-al" x="466" y="101" text-anchor="middle">…</text><text class="d-al" x="522" y="101" text-anchor="middle">396.90</text><text class="d-al" x="578" y="101" text-anchor="middle">9.14</text><text class="d-al" x="634" y="101" text-anchor="middle">21.6</text>
+            <text class="d-al" x="298" y="123" text-anchor="middle">0.02729</text><text class="d-al" x="354" y="123" text-anchor="middle">0.0</text><text class="d-al" x="410" y="123" text-anchor="middle">7.07</text><text class="d-al" x="466" y="123" text-anchor="middle">…</text><text class="d-al" x="522" y="123" text-anchor="middle">392.83</text><text class="d-al" x="578" y="123" text-anchor="middle">4.03</text><text class="d-al" x="634" y="123" text-anchor="middle">34.7</text>
+            <text class="d-al" x="298" y="144" text-anchor="middle">⋮</text><text class="d-al" x="466" y="144" text-anchor="middle">506 rows</text><text class="d-al" x="634" y="144" text-anchor="middle">⋮</text>
+            <path class="d-ln" d="M272 158 V166 H604 V158"/>
+            <text class="d-s" x="438" y="184" text-anchor="middle">X = dataset.iloc[:, :-1]  (506 × 13)</text>
+            <path class="d-ln-acc" d="M608 158 V166 H660 V158"/>
+            <text class="d-s" x="662" y="204" text-anchor="end" style="fill: var(--accent)">y = dataset.iloc[:, -1]  (506)</text>
+            <text class="d-s" x="10" y="226">dataset.columns = df.target fails: 506 values for 13 columns</text>
+          </svg>
+        </div>
+        <figcaption><b>Bunch in, DataFrame out.</b> The feature array becomes the table body, <code>feature_names</code> the header and <code>target</code> a new last column, Price. The three rows shown are the first rows of the real data set, as <code>head()</code> prints them. Because Price is last, one <code>iloc</code> slice gives X and another gives y.</figcaption>
+      </figure>
+    </section>
+
+    <section id="x-y">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8505s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:21:45</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8542s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:22:22 iloc</a>
+        </div>
+        <h2>Split into independent and dependent features</h2>
+      </div>
+      <p>Any model needs the table divided into X, the independent features, and y, the dependent feature. Price is the last column, so X is every column except the last and y is only the last. <code>iloc</code> indexes by position: the part before the comma picks rows, the part after it picks columns, and <code>:</code> alone means "all".</p>
+      <div class="code-cap">Cell · X and y</div>
+<pre class="codeblock"><code>X = dataset.iloc[:, :-1]     <span class="cm"># all rows, every column except the last</span>
+y = dataset.iloc[:, -1]      <span class="cm"># all rows, only the last column (Price)</span>
+X.head()
+y.head()</code></pre>
+      <p class="note">Not in the video: <code>X.shape</code> is (506, 13), and y is a pandas Series of 506 prices.</p>
+    </section>
+
+    <section id="linreg-cv">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8609s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:23:29</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8737s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:25:37 cross-validation</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8841s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:27:21 five scores</a>
+        </div>
+        <h2>Linear regression, scored by 5-fold cross-validation</h2>
+      </div>
+      <p>He says that in his own work he would not stop at plain linear regression. Ridge and lasso have hyperparameters to tune, so they leave more room to improve. Linear regression comes first only to show the workflow. Import paths need not be memorized; he searches the scikit-learn docs for them too.</p>
+      <div class="code-cap">Cell · linear regression with cross-validation</div>
+<pre class="codeblock"><code><span class="kw">from</span> sklearn.linear_model <span class="kw">import</span> LinearRegression
+<span class="kw">from</span> sklearn.model_selection <span class="kw">import</span> cross_val_score
+
+lin_regressor = LinearRegression()
+mse = cross_val_score(lin_regressor, X, y, scoring='neg_mean_squared_error', cv=5)
+print(mse)                   <span class="cm"># five values, one per fold</span>
+mean_mse = np.mean(mse)
+print(mean_mse)              <span class="cm"># -37.13...</span></code></pre>
+
+      <h3>What cross-validation does</h3>
+      <p>With <code>cv=5</code> the rows are cut into five equal blocks. Each block takes one turn as the test set while the other four train the model, so there are five train/test combinations and five scores. With 100 records, each test block holds 20 records and each training set 80. <code>cross_val_score</code> returns the five scores, and their mean is the model's <dfn>cross-validation score</dfn>. He keeps the explanation short and offers a separate session on it later.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 240" role="img" aria-label="Five rows, one per fold. Each row is the same 100 records cut into five blocks of 20. In fold 1 the first block is the test set, in fold 2 the second block, and so on; the other four blocks are training data. Each fold produces one negative MSE, and the five are averaged into one score.">
+            <text class="d-al" x="100" y="20" text-anchor="end">records</text>
+            <text class="d-al" x="150" y="20" text-anchor="middle">1–20</text>
+            <text class="d-al" x="230" y="20" text-anchor="middle">21–40</text>
+            <text class="d-al" x="310" y="20" text-anchor="middle">41–60</text>
+            <text class="d-al" x="390" y="20" text-anchor="middle">61–80</text>
+            <text class="d-al" x="470" y="20" text-anchor="middle">81–100</text>
+            <text class="d-t" x="100" y="50" text-anchor="end">Fold 1</text>
+            <rect class="d-box-acc" x="111" y="32" width="78" height="26" rx="4"/><text class="d-s" x="150" y="50" text-anchor="middle">test</text>
+            <rect class="d-box" x="191" y="32" width="78" height="26" rx="4"/><text class="d-al" x="230" y="50" text-anchor="middle">train</text>
+            <rect class="d-box" x="271" y="32" width="78" height="26" rx="4"/><text class="d-al" x="310" y="50" text-anchor="middle">train</text>
+            <rect class="d-box" x="351" y="32" width="78" height="26" rx="4"/><text class="d-al" x="390" y="50" text-anchor="middle">train</text>
+            <rect class="d-box" x="431" y="32" width="78" height="26" rx="4"/><text class="d-al" x="470" y="50" text-anchor="middle">train</text>
+            <text class="d-s" x="522" y="50">→ −MSE₁</text>
+            <text class="d-t" x="100" y="86" text-anchor="end">Fold 2</text>
+            <rect class="d-box" x="111" y="68" width="78" height="26" rx="4"/><text class="d-al" x="150" y="86" text-anchor="middle">train</text>
+            <rect class="d-box-acc" x="191" y="68" width="78" height="26" rx="4"/><text class="d-s" x="230" y="86" text-anchor="middle">test</text>
+            <rect class="d-box" x="271" y="68" width="78" height="26" rx="4"/><text class="d-al" x="310" y="86" text-anchor="middle">train</text>
+            <rect class="d-box" x="351" y="68" width="78" height="26" rx="4"/><text class="d-al" x="390" y="86" text-anchor="middle">train</text>
+            <rect class="d-box" x="431" y="68" width="78" height="26" rx="4"/><text class="d-al" x="470" y="86" text-anchor="middle">train</text>
+            <text class="d-s" x="522" y="86">→ −MSE₂</text>
+            <text class="d-t" x="100" y="122" text-anchor="end">Fold 3</text>
+            <rect class="d-box" x="111" y="104" width="78" height="26" rx="4"/><text class="d-al" x="150" y="122" text-anchor="middle">train</text>
+            <rect class="d-box" x="191" y="104" width="78" height="26" rx="4"/><text class="d-al" x="230" y="122" text-anchor="middle">train</text>
+            <rect class="d-box-acc" x="271" y="104" width="78" height="26" rx="4"/><text class="d-s" x="310" y="122" text-anchor="middle">test</text>
+            <rect class="d-box" x="351" y="104" width="78" height="26" rx="4"/><text class="d-al" x="390" y="122" text-anchor="middle">train</text>
+            <rect class="d-box" x="431" y="104" width="78" height="26" rx="4"/><text class="d-al" x="470" y="122" text-anchor="middle">train</text>
+            <text class="d-s" x="522" y="122">→ −MSE₃</text>
+            <text class="d-t" x="100" y="158" text-anchor="end">Fold 4</text>
+            <rect class="d-box" x="111" y="140" width="78" height="26" rx="4"/><text class="d-al" x="150" y="158" text-anchor="middle">train</text>
+            <rect class="d-box" x="191" y="140" width="78" height="26" rx="4"/><text class="d-al" x="230" y="158" text-anchor="middle">train</text>
+            <rect class="d-box" x="271" y="140" width="78" height="26" rx="4"/><text class="d-al" x="310" y="158" text-anchor="middle">train</text>
+            <rect class="d-box-acc" x="351" y="140" width="78" height="26" rx="4"/><text class="d-s" x="390" y="158" text-anchor="middle">test</text>
+            <rect class="d-box" x="431" y="140" width="78" height="26" rx="4"/><text class="d-al" x="470" y="158" text-anchor="middle">train</text>
+            <text class="d-s" x="522" y="158">→ −MSE₄</text>
+            <text class="d-t" x="100" y="194" text-anchor="end">Fold 5</text>
+            <rect class="d-box" x="111" y="176" width="78" height="26" rx="4"/><text class="d-al" x="150" y="194" text-anchor="middle">train</text>
+            <rect class="d-box" x="191" y="176" width="78" height="26" rx="4"/><text class="d-al" x="230" y="194" text-anchor="middle">train</text>
+            <rect class="d-box" x="271" y="176" width="78" height="26" rx="4"/><text class="d-al" x="310" y="194" text-anchor="middle">train</text>
+            <rect class="d-box" x="351" y="176" width="78" height="26" rx="4"/><text class="d-al" x="390" y="194" text-anchor="middle">train</text>
+            <rect class="d-box-acc" x="431" y="176" width="78" height="26" rx="4"/><text class="d-s" x="470" y="194" text-anchor="middle">test</text>
+            <text class="d-s" x="522" y="194">→ −MSE₅</text>
+            <path class="d-ln" d="M584 34 Q596 34 596 46 V105 Q596 117 606 117 Q596 117 596 129 V188 Q596 200 584 200"/>
+            <text class="d-al" x="612" y="112">np.mean</text>
+            <text class="d-s" x="612" y="128">one score</text>
+            <text class="d-s" x="111" y="228">Every record is tested exactly once; each fold trains on the other 80 records.</text>
+          </svg>
+        </div>
+        <figcaption><b>5-fold cross-validation on 100 records</b>, as he describes it. <code>cross_val_score</code> returns the five per-fold scores; <code>np.mean</code> turns them into one number. Not in the video: by default the blocks are consecutive rows, with no shuffling.</figcaption>
+      </figure>
+
+      <div class="eq">\[ \text{MSE}_j = \frac{1}{m_j}\sum_{i \in \text{fold } j}\big(y_i - \hat y_i\big)^2, \qquad \text{CV score} = \frac{1}{5}\sum_{j=1}^{5}\big(-\text{MSE}_j\big) \]</div>
+      <p>Here he passes the whole of X and y. He points out the better practice: do the train/test split first and cross-validate only the training data, so the test rows stay unseen. The notebook does this later, in the <a href="#train-test">train/test section</a>.</p>
+      <div class="result">
+        <span class="lbl">Linear regression, 5-fold CV on all 506 rows</span>
+        <p>Mean negative MSE ≈ <b>−37.13</b>, so the mean squared error is about 37. The minus sign comes only from the scoring name; the next chapter explains it. Not in the video: in price units, \(\sqrt{37} \approx 6.1\), a typical error of about $6,100.</p>
+      </div>
+      <p>To predict, call <code>lin_regressor.predict(X_test)</code> on the rows you want. The model has to be fitted first, which causes a small surprise <a href="#r2-test">later</a>. Linear regression offers almost nothing to tune, so the next step is ridge, which fights overfitting, and lasso, which can also drop features. For the IIT Madras treatment of linear regression, see Part 10 (<a href="part-10.html">part-10.html</a>); for K-fold cross-validation, see Part 11 (<a href="part-11.html#k-fold">part-11.html</a>).</p>
+    </section>
+
+    <!-- ============ CHAPTER: RIDGE AND LASSO PRACTICAL ============ -->
+    <section id="ridge-grid">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=8910s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:28:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9010s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:30:10 the Ridge docs</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9204s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:33:24 GridSearchCV</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9332s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:35:32 best α</a>
+        </div>
+        <h2>Ridge regression, tuned with GridSearchCV</h2>
+      </div>
+      <p>Two imports: <code>Ridge</code> from <code>linear_model</code>, and <code>GridSearchCV</code> from <code>model_selection</code>, the tool for <dfn>hyperparameter tuning</dfn>.</p>
+<pre class="codeblock"><code><span class="kw">from</span> sklearn.linear_model <span class="kw">import</span> Ridge
+<span class="kw">from</span> sklearn.model_selection <span class="kw">import</span> GridSearchCV</code></pre>
+      <p>He opens the Ridge documentation to see what can be tuned. <code>alpha</code> is the strength of the penalty: the multiplier on the sum of squared slopes in the theory, and the most useful parameter to tune. <code>max_iter</code> caps how many times an iterative solver may update the coefficients. It could be tuned too, but he concentrates on alpha.</p>
+      <div class="eq">\[ J(\theta) = \frac{1}{m}\sum_{i=1}^{m}\big(h_\theta(x_i) - y_i\big)^2 + \alpha\sum_{j=1}^{n}\theta_j^2 \]</div>
+      <p class="note">Not in the video: scikit-learn's Ridge minimizes \(\lVert y - Xw\rVert^2 + \alpha\lVert w\rVert^2\), the <i>sum</i> of squared errors rather than the mean, and it never penalizes the intercept.</p>
+      <p>The candidate values go in a dictionary that maps the parameter's name to a list. He first types <code>C</code>, then corrects himself: C belongs to logistic regression, and ridge calls it alpha. The list runs from tiny values, where ridge is almost plain linear regression, up to 20. GridSearchCV takes the estimator, the grid and the scoring rule (Shift+Tab shows the signature), plus <code>cv</code> for the number of folds.</p>
+      <div class="code-cap">Cell · ridge grid search</div>
+<pre class="codeblock"><code>ridge = Ridge()
+parameters = {'alpha': [1e-15, 1e-10, 1e-8, 1e-3, 1e-2, 1, 5, 10, 20]}
+ridge_regressor = GridSearchCV(ridge, parameters, scoring='neg_mean_squared_error', cv=5)
+ridge_regressor.fit(X, y)
+
+print(ridge_regressor.best_params_)   <span class="cm"># {'alpha': 20}</span>
+print(ridge_regressor.best_score_)    <span class="cm"># about -32</span></code></pre>
+      <p class="note">The captions give the first value as 1e-5, but the long run of zeros he reads out fits 1e-15. Either way it is effectively α = 0.</p>
+      <p>Grid search tries every value in the grid, or every combination when several parameters are listed. It scores each by cross-validation and keeps the best. His first run fails because he wrote the grid as a list instead of a dictionary; writing it as <code>{'alpha': [...]}</code> fixes it. He says errors are nothing to worry about: read them and fix them.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 300" role="img" aria-label="A grid with one row per alpha value (1e-15 to 20) and one box per fold, five folds, plus a mean column. The row for alpha equals 20 is highlighted; an arrow leads to best_params_ equals alpha 20 and best_score_ about minus 32, and another arrow to the refit on all of X and y.">
+            <text class="d-al" x="84" y="32" text-anchor="end">α</text>
+            <text class="d-al" x="118" y="32" text-anchor="middle">fold 1</text>
+            <text class="d-al" x="168" y="32" text-anchor="middle">fold 2</text>
+            <text class="d-al" x="218" y="32" text-anchor="middle">fold 3</text>
+            <text class="d-al" x="268" y="32" text-anchor="middle">fold 4</text>
+            <text class="d-al" x="318" y="32" text-anchor="middle">fold 5</text>
+            <text class="d-al" x="388" y="32" text-anchor="middle">mean</text>
+            <text class="d-al" x="84" y="53" text-anchor="end">1e-15</text><rect class="d-box" x="96" y="40" width="44" height="18" rx="3"/><rect class="d-box" x="146" y="40" width="44" height="18" rx="3"/><rect class="d-box" x="196" y="40" width="44" height="18" rx="3"/><rect class="d-box" x="246" y="40" width="44" height="18" rx="3"/><rect class="d-box" x="296" y="40" width="44" height="18" rx="3"/><rect class="d-box" x="356" y="40" width="64" height="18" rx="3"/>
+            <text class="d-al" x="84" y="77" text-anchor="end">1e-10</text><rect class="d-box" x="96" y="64" width="44" height="18" rx="3"/><rect class="d-box" x="146" y="64" width="44" height="18" rx="3"/><rect class="d-box" x="196" y="64" width="44" height="18" rx="3"/><rect class="d-box" x="246" y="64" width="44" height="18" rx="3"/><rect class="d-box" x="296" y="64" width="44" height="18" rx="3"/><rect class="d-box" x="356" y="64" width="64" height="18" rx="3"/>
+            <text class="d-al" x="84" y="101" text-anchor="end">1e-8</text><rect class="d-box" x="96" y="88" width="44" height="18" rx="3"/><rect class="d-box" x="146" y="88" width="44" height="18" rx="3"/><rect class="d-box" x="196" y="88" width="44" height="18" rx="3"/><rect class="d-box" x="246" y="88" width="44" height="18" rx="3"/><rect class="d-box" x="296" y="88" width="44" height="18" rx="3"/><rect class="d-box" x="356" y="88" width="64" height="18" rx="3"/>
+            <text class="d-al" x="84" y="125" text-anchor="end">0.001</text><rect class="d-box" x="96" y="112" width="44" height="18" rx="3"/><rect class="d-box" x="146" y="112" width="44" height="18" rx="3"/><rect class="d-box" x="196" y="112" width="44" height="18" rx="3"/><rect class="d-box" x="246" y="112" width="44" height="18" rx="3"/><rect class="d-box" x="296" y="112" width="44" height="18" rx="3"/><rect class="d-box" x="356" y="112" width="64" height="18" rx="3"/>
+            <text class="d-al" x="84" y="149" text-anchor="end">0.01</text><rect class="d-box" x="96" y="136" width="44" height="18" rx="3"/><rect class="d-box" x="146" y="136" width="44" height="18" rx="3"/><rect class="d-box" x="196" y="136" width="44" height="18" rx="3"/><rect class="d-box" x="246" y="136" width="44" height="18" rx="3"/><rect class="d-box" x="296" y="136" width="44" height="18" rx="3"/><rect class="d-box" x="356" y="136" width="64" height="18" rx="3"/>
+            <text class="d-al" x="84" y="173" text-anchor="end">1</text><rect class="d-box" x="96" y="160" width="44" height="18" rx="3"/><rect class="d-box" x="146" y="160" width="44" height="18" rx="3"/><rect class="d-box" x="196" y="160" width="44" height="18" rx="3"/><rect class="d-box" x="246" y="160" width="44" height="18" rx="3"/><rect class="d-box" x="296" y="160" width="44" height="18" rx="3"/><rect class="d-box" x="356" y="160" width="64" height="18" rx="3"/>
+            <text class="d-al" x="84" y="197" text-anchor="end">5</text><rect class="d-box" x="96" y="184" width="44" height="18" rx="3"/><rect class="d-box" x="146" y="184" width="44" height="18" rx="3"/><rect class="d-box" x="196" y="184" width="44" height="18" rx="3"/><rect class="d-box" x="246" y="184" width="44" height="18" rx="3"/><rect class="d-box" x="296" y="184" width="44" height="18" rx="3"/><rect class="d-box" x="356" y="184" width="64" height="18" rx="3"/>
+            <text class="d-al" x="84" y="221" text-anchor="end">10</text><rect class="d-box" x="96" y="208" width="44" height="18" rx="3"/><rect class="d-box" x="146" y="208" width="44" height="18" rx="3"/><rect class="d-box" x="196" y="208" width="44" height="18" rx="3"/><rect class="d-box" x="246" y="208" width="44" height="18" rx="3"/><rect class="d-box" x="296" y="208" width="44" height="18" rx="3"/><rect class="d-box" x="356" y="208" width="64" height="18" rx="3"/>
+            <text class="d-al" x="84" y="245" text-anchor="end">20</text><rect class="d-box-acc" x="96" y="232" width="44" height="18" rx="3"/><rect class="d-box-acc" x="146" y="232" width="44" height="18" rx="3"/><rect class="d-box-acc" x="196" y="232" width="44" height="18" rx="3"/><rect class="d-box-acc" x="246" y="232" width="44" height="18" rx="3"/><rect class="d-box-acc" x="296" y="232" width="44" height="18" rx="3"/><rect class="d-box-acc" x="356" y="232" width="64" height="18" rx="3"/><text class="d-al" x="388" y="245" text-anchor="middle" style="fill: var(--ink)">≈ −32</text>
+            <path class="d-ln-acc" d="M420 241 H450" marker-end="url(#kml03-ah-acc)"/>
+            <rect class="d-box-acc" x="452" y="212" width="220" height="58" rx="8"/>
+            <text class="d-al" x="464" y="236" style="fill: var(--ink)">best_params_ = {'alpha': 20}</text>
+            <text class="d-al" x="464" y="256" style="fill: var(--ink)">best_score_ ≈ −32</text>
+            <path class="d-ln" d="M562 212 V136" marker-end="url(#kml03-ah)"/>
+            <rect class="d-box" x="452" y="62" width="220" height="72" rx="8"/>
+            <text class="d-s" x="464" y="86">refit: train α = 20 again</text>
+            <text class="d-s" x="464" y="104">on all of X and y</text>
+            <text class="d-s" x="464" y="122">→ best_estimator_, used by predict</text>
+            <text class="d-s" x="10" y="290">9 α values × 5 folds = 45 fits, plus 1 refit. Each box is one fit scored on its held-out fold.</text>
+          </svg>
+        </div>
+        <figcaption><b>What GridSearchCV does with his first grid.</b> Every α gets its own 5-fold cross-validation; the mean of the five scores ranks the α values. The best row becomes <code>best_params_</code>, its mean <code>best_score_</code>. With the default <code>refit=True</code> the winner is then trained once more on all the data passed to <code>fit</code>.</figcaption>
+      </figure>
+
+      <p>The result is α = 20 with a best score of about −32, against −37.13 for linear regression. Because the score is a negative error, −32 is the better of the two: ridge helps.</p>
+      <h3>Why the score is negative <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9234s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:33:54</a></h3>
+      <p>He tells viewers not to worry about the sign: −37 and 37 describe the same error. scikit-learn offers <code>neg_mean_squared_error</code> as a scoring option, and root-mean-squared versions exist too (<code>neg_root_mean_squared_error</code>). His guess is that the library keeps its scoring generic so that other algorithms can share it. Not in the video: the documented rule is that every scikit-learn scorer is <i>maximized</i>. Errors are therefore negated, so the largest score is the smallest error.</p>
+      <p class="rule-of-thumb">With neg_mean_squared_error, a score closer to zero is better: −32 beats −37.13.</p>
+    </section>
+
+    <section id="lasso-grid">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9428s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:37:08</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9459s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:37:39 lasso's best α</a>
+        </div>
+        <h2>Lasso with the same recipe</h2>
+      </div>
+      <p>Lasso is the same code with one name changed. He copies the cell, imports <code>Lasso</code> and reuses the same grid:</p>
+      <div class="code-cap">Cell · lasso grid search</div>
+<pre class="codeblock"><code><span class="kw">from</span> sklearn.linear_model <span class="kw">import</span> Lasso
+
+lasso = Lasso()
+lasso_regressor = GridSearchCV(lasso, parameters, scoring='neg_mean_squared_error', cv=5)
+lasso_regressor.fit(X, y)
+
+print(lasso_regressor.best_params_)   <span class="cm"># {'alpha': 1}</span>
+print(lasso_regressor.best_score_)    <span class="cm"># about -35</span></code></pre>
+      <div class="eq">\[ J(\theta) = \frac{1}{m}\sum_{i=1}^{m}\big(h_\theta(x_i) - y_i\big)^2 + \alpha\sum_{j=1}^{n}\lvert\theta_j\rvert \]</div>
+      <p class="note">Not in the video: scikit-learn's Lasso minimizes \(\frac{1}{2m}\lVert y - Xw\rVert^2 + \alpha\lVert w\rVert_1\). It divides the squared error by \(2m\) and Ridge does not, so the same α is a far stronger penalty in Lasso. That is one reason ridge settles on a large α and lasso on α = 1. Very small α values also make Lasso slow to converge, and it prints ConvergenceWarnings for them.</p>
+      <p>Reading the three scores live, he briefly gets the direction muddled and says ridge is not helping. He then lines them up: linear −37, ridge −32, lasso −35. Ridge is closest to zero, so it is the model to choose; lasso beats plain linear regression but not ridge. He also remarks that ridge is there to reduce overfitting and wavers again on whether it helps here; by the rule above, it does.</p>
+      <p>For the theory of both penalties, see Part 2 (<a href="krish-ml-02.html">krish-ml-02.html</a>). For the IIT Madras treatment, see Part 12 (<a href="part-12.html">part-12.html</a>).</p>
+    </section>
+
+    <section id="more-alphas">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9493s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:38:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9529s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:38:49 ridge at α = 100</a>
+        </div>
+        <h2>A wider α grid</h2>
+      </div>
+      <p>To see whether the scores improve, he adds more values above 20 and runs both grid searches again with <code>cv=5</code>:</p>
+      <div class="code-cap">Cell · wider grid</div>
+<pre class="codeblock"><code>parameters = {'alpha': [1e-15, 1e-10, 1e-8, 1e-3, 1e-2, 1, 5, 10, 20, 30, 35, 40, 45, 100]}
+
+ridge_regressor = GridSearchCV(ridge, parameters, scoring='neg_mean_squared_error', cv=5)
+ridge_regressor.fit(X, y)
+print(ridge_regressor.best_params_)   <span class="cm"># {'alpha': 100}</span>
+print(ridge_regressor.best_score_)    <span class="cm"># about -29.9 ("minus 29")</span>
+
+lasso_regressor = GridSearchCV(lasso, parameters, scoring='neg_mean_squared_error', cv=5)
+lasso_regressor.fit(X, y)
+print(lasso_regressor.best_score_)    <span class="cm"># about -34</span></code></pre>
+      <p>Ridge improves to about −29.9, now with α = 100. Lasso barely moves, to about −34. He suggests trying <code>cv=10</code> as well. On a bigger problem you would tune many hyperparameters at once and keep whichever combination scores best.</p>
+      <p class="callout">Not in the video: α = 100 is the largest value on the grid. When the winner sits at the edge of the grid, extend the grid past it, because a still larger α might score better. The grid also jumps from 0.01 straight to 1, so it cannot find an optimum in between. The widget below shows both effects on synthetic data.</p>
+
+      <figure id="gs-fig">
+        <div class="controls">
+          <label for="gs-a">Penalty α (log scale)</label>
+          <input type="range" id="gs-a" min="-3" max="3" step="0.02" value="0">
+          <output id="gs-a-out" for="gs-a">α = 1.00</output>
+          <button class="btn" id="gs-ridge" type="button">Grid-search ridge</button>
+          <button class="btn" id="gs-lasso" type="button">Grid-search lasso</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Lasso weights exactly 0</span><span class="v mine" id="gs-lz">–</span></div>
+          <div><span class="k">Ridge weights exactly 0</span><span class="v" id="gs-rz">–</span></div>
+          <div><span class="k">5-fold CV MSE, ridge</span><span class="v" id="gs-rcv">–</span></div>
+          <div><span class="k">5-fold CV MSE, lasso</span><span class="v" id="gs-lcv">–</span></div>
+        </div>
+        <div class="status" id="gs-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="gs-svg" viewBox="0 0 640 470" role="img" aria-label="Three charts on synthetic data. Top left: the eight ridge coefficients against alpha on a log scale; they shrink smoothly towards zero but never reach it. Top right: the eight lasso coefficients; they hit exactly zero one after another. Bottom: five-fold cross-validation error against alpha for ridge and for lasso, with a dashed line for plain linear regression. Grid-search buttons mark the scores at the video's alpha values and move the slider to the best one."></svg></div>
+        <figcaption><b>Synthetic data</b> (40 rows, 8 features, generated for this page with a seeded random number generator): \(y = 20 + 3x_1 - 2x_2 + 1.5x_3 + \text{noise}\). Features \(x_4\) to \(x_8\) have no effect of their own, and \(x_4, x_5\) are partly copies of \(x_1, x_2\). The models use scikit-learn's objectives exactly (Ridge: \(\lVert y - Xw\rVert^2 + \alpha\lVert w\rVert^2\); Lasso: \(\frac{1}{2m}\lVert y - Xw\rVert^2 + \alpha\lVert w\rVert_1\)), and cross-validation uses five consecutive blocks, as <code>cv=5</code> does. The grid buttons score his wider α grid; 1e-15, 1e-10 and 1e-8 are off the left edge and score the same as the dashed line. Ridge's grid winner is α = 20 and lasso's is α = 1, but a finer search finds a lasso α near 0.6 that beats both.</figcaption>
+      </figure>
+      <p class="note">Not in the video: the Boston features have very different scales (TAX is in the hundreds, NOX below 1), and the penalty treats every coefficient alike. In practice the features are standardized first, for example with <code>StandardScaler</code> inside a <code>Pipeline</code>. The widget's synthetic features already share one scale.</p>
+    </section>
+
+    <section id="train-test">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9598s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:39:58</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9629s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:40:29 train_test_split</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9695s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:41:35 scores on the training rows</a>
+        </div>
+        <h2>Split first, then cross-validate the training rows</h2>
+      </div>
+      <p>Next he follows his own advice and holds out a test set before tuning:</p>
+      <div class="code-cap">Cell · hold out a test set</div>
+<pre class="codeblock"><code><span class="kw">from</span> sklearn.model_selection <span class="kw">import</span> train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)</code></pre>
+      <p><code>test_size=0.33</code> puts 33% of the rows in the test set and the rest in training. (He says the training part is 77%; it is 67%.) Of 506 rows that is 167 for testing and 339 for training. <code>random_state</code> only fixes the shuffle so the split is the same on every run; any number will do.</p>
+      <p>He then reruns the three cross-validation cells on the training rows only:</p>
+<pre class="codeblock"><code>mse = cross_val_score(lin_regressor, X_train, y_train, scoring='neg_mean_squared_error', cv=5)
+np.mean(mse)                          <span class="cm"># about -25.8</span>
+
+ridge_regressor.fit(X_train, y_train)
+ridge_regressor.best_score_           <span class="cm"># about -25.47</span>
+
+lasso_regressor.fit(X_train, y_train)
+lasso_regressor.best_score_           <span class="cm"># a similar value; unclear in the captions</span></code></pre>
+      <p>Values closer to zero mean better performance. Linear regression now scores about −25.8 and ridge about −25.47, so ridge's edge over plain linear regression has almost disappeared.</p>
+      <p class="callout">Not in the video: these numbers cannot be compared with the earlier −37 and −29.9, because they come from different rows (339 instead of 506). Also, <code>cross_val_score</code> and <code>GridSearchCV</code> cut consecutive blocks without shuffling, and the Boston rows are stored in an order that keeps similar neighbourhoods together, while <code>train_test_split</code> shuffles. Unshuffled folds of ordered data tend to give larger errors, which is a likely reason for the jump from −37 to −26.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 300" role="img" aria-label="Horizontal bar chart of mean cross-validation MSE as read out in the video. On all 506 rows: linear regression 37.13, ridge first grid 32, lasso first grid 35, ridge wider grid 29.9, lasso wider grid 34. On the 339 training rows: linear regression 25.8, ridge 25.5. Shorter bars are better.">
+            <line class="d-rule" x1="250" y1="30" x2="250" y2="254"/>
+            <line class="d-rule" x1="347.5" y1="30" x2="347.5" y2="254"/>
+            <line class="d-rule" x1="445" y1="30" x2="445" y2="254"/>
+            <line class="d-rule" x1="542.5" y1="30" x2="542.5" y2="254"/>
+            <line class="d-rule" x1="640" y1="30" x2="640" y2="254"/>
+            <text class="d-t" x="10" y="22">5-fold CV on all 506 rows</text>
+            <text class="d-s" x="240" y="47" text-anchor="end">LinearRegression</text>
+            <rect x="250" y="34" width="362" height="18" style="fill: var(--ink-2)"/><text class="d-al" x="618" y="47">37.13</text>
+            <text class="d-s" x="240" y="75" text-anchor="end">Ridge, first grid (α = 20)</text>
+            <rect x="250" y="62" width="312" height="18" style="fill: var(--accent)"/><text class="d-al" x="568" y="75">≈ 32</text>
+            <text class="d-s" x="240" y="103" text-anchor="end">Lasso, first grid (α = 1)</text>
+            <rect class="d-box-acc" x="250" y="90" width="341.3" height="18"/><text class="d-al" x="597" y="103">≈ 35</text>
+            <text class="d-s" x="240" y="131" text-anchor="end">Ridge, wider grid (α = 100)</text>
+            <rect x="250" y="118" width="291.5" height="18" style="fill: var(--accent)"/><text class="d-al" x="548" y="131">≈ 29.9</text>
+            <text class="d-s" x="240" y="159" text-anchor="end">Lasso, wider grid</text>
+            <rect class="d-box-acc" x="250" y="146" width="331.5" height="18"/><text class="d-al" x="588" y="159">≈ 34</text>
+            <text class="d-t" x="10" y="192">5-fold CV on the 339 training rows</text>
+            <text class="d-s" x="240" y="215" text-anchor="end">LinearRegression</text>
+            <rect x="250" y="202" width="251.6" height="18" style="fill: var(--ink-2)"/><text class="d-al" x="508" y="215">≈ 25.8</text>
+            <text class="d-s" x="240" y="243" text-anchor="end">Ridge (grid search)</text>
+            <rect x="250" y="230" width="248.3" height="18" style="fill: var(--accent)"/><text class="d-al" x="505" y="243">≈ 25.5</text>
+            <line class="d-ln" x1="250" y1="258" x2="640" y2="258"/>
+            <text class="d-al" x="250" y="273" text-anchor="middle">0</text>
+            <text class="d-al" x="347.5" y="273" text-anchor="middle">10</text>
+            <text class="d-al" x="445" y="273" text-anchor="middle">20</text>
+            <text class="d-al" x="542.5" y="273" text-anchor="middle">30</text>
+            <text class="d-al" x="640" y="273" text-anchor="end">40</text>
+            <text class="d-s" x="445" y="294" text-anchor="middle">mean squared error, the printed score without its minus sign · shorter is better</text>
+          </svg>
+        </div>
+        <figcaption><b>Every cross-validation score in the notebook</b>, drawn to scale. These are his results on the real data as he reads them out (rounded), not synthetic numbers. The two groups use different rows and different folds, so compare bars within a group only.</figcaption>
+      </figure>
+    </section>
+
+    <section id="r2-test">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9729s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:42:09</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9828s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:43:48 67% and 68%</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9862s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:44:22 not fitted yet</a>
+        </div>
+        <h2>Predict the test set and score it with R²</h2>
+      </div>
+      <p>A fitted grid search can predict directly. He predicts the 167 test rows with the lasso search and scores them with the <dfn>R² score</dfn> from <code>sklearn.metrics</code>:</p>
+      <div class="code-cap">Cell · test-set R²</div>
+<pre class="codeblock"><code>y_pred = lasso_regressor.predict(X_test)
+
+<span class="kw">from</span> sklearn.metrics <span class="kw">import</span> r2_score
+r2 = r2_score(y_pred, y_test)         <span class="cm"># as typed in the video: about 0.67</span>
+print(r2)</code></pre>
+      <div class="eq">\[ R^2 = 1 - \frac{\sum_i (y_i - \hat y_i)^2}{\sum_i (y_i - \bar y)^2} \]</div>
+      <p>He reminds viewers that R² should be as close to 1 (100%) as possible. Lasso reaches about 67%. Ridge gives about 68%. Linear regression first throws an error:</p>
+<pre class="codeblock"><code>y_pred = ridge_regressor.predict(X_test)
+r2_score(y_pred, y_test)              <span class="cm"># about 0.68</span>
+
+y_pred = lin_regressor.predict(X_test)
+<span class="cm"># NotFittedError: This LinearRegression instance is not fitted yet. Call 'fit' with</span>
+<span class="cm"># appropriate arguments before using this estimator.</span>
+
+lin_regressor.fit(X_train, y_train)
+y_pred = lin_regressor.predict(X_test)
+r2_score(y_pred, y_test)              <span class="cm"># about 0.67 to 0.68</span></code></pre>
+      <p class="callout">Not in the video: <code>cross_val_score</code> trains <i>copies</i> of the estimator, one per fold, and leaves the original untouched, so <code>lin_regressor</code> had never been fitted. GridSearchCV is different: with its default <code>refit=True</code> it retrains the best model on all the data given to <code>fit</code> and keeps it, which is why its <code>predict</code> works.</p>
+
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Model</th><th>How it was fitted</th><th class="num">Test R² (as typed)</th></tr></thead>
+          <tbody>
+            <tr><td>Lasso</td><td>GridSearchCV refit on X_train</td><td class="num">≈ 0.67</td></tr>
+            <tr><td>Ridge</td><td>GridSearchCV refit on X_train</td><td class="num">≈ 0.68</td></tr>
+            <tr><td>LinearRegression</td><td><code>fit(X_train, y_train)</code> after the error</td><td class="num">≈ 0.67–0.68</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>The order of the arguments</h3>
+      <p><code>r2_score</code> expects the true values first: <code>r2_score(y_true, y_pred)</code>. He passes them the other way round and says the order does not matter. It does. R² divides by the spread of its first argument, so swapping the arguments changes the number. For a least-squares fit the predictions vary less than the true prices, so the swapped version usually comes out <i>lower</i> than the true R².</p>
+<pre class="codeblock"><code>r2_score(y_test, y_pred)              <span class="cm"># the documented order: true values, then predictions</span></code></pre>
+
+      <h3>Adjusted R²</h3>
+      <p>He looks for adjusted R² in <code>sklearn.metrics</code> and does not find it. Not in the video: scikit-learn has no function for it, but it is one line from R², the number of test rows \(m\) and the number of features \(p\):</p>
+      <div class="eq">\[ R^2_{\text{adj}} = 1 - (1 - R^2)\,\frac{m - 1}{m - p - 1} \]</div>
+<pre class="codeblock"><code>m, p = X_test.shape                   <span class="cm"># 167 rows, 13 features</span>
+adj_r2 = 1 - (1 - r2) * (m - 1) / (m - p - 1)</code></pre>
+      <p>His conclusion on regression: a linear model fits a straight line (with 13 features, a flat hyperplane), so it cannot follow curved relationships and its score levels off. More flexible algorithms later in the video, such as XGBoost, can go further. R² and adjusted R² are explained in Part 1 (<a href="krish-ml-01.html">krish-ml-01.html</a>).</p>
+    </section>
+
+    <section id="logistic">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=9926s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:45:26</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10019s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:46:59 class balance</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10119s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:48:39 penalty, C, class_weight</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10249s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:50:49 F1 grid search</a>
+        </div>
+        <h2>Logistic regression on the breast-cancer data</h2>
+      </div>
+      <p>Still within this chapter, he runs a quick logistic regression practical. Logistic regression is a classifier, so he needs a classification data set and takes the breast-cancer data, which also ships with scikit-learn. From many measurements of a tumour (30 columns), the model predicts whether the person has cancer.</p>
+      <div class="code-cap">Cell · data and class balance</div>
+<pre class="codeblock"><code><span class="kw">from</span> sklearn.linear_model <span class="kw">import</span> LogisticRegression
+<span class="kw">from</span> sklearn.datasets <span class="kw">import</span> load_breast_cancer
+
+df = load_breast_cancer()
+X = pd.DataFrame(df.data, columns=df.feature_names)    <span class="cm"># independent features</span>
+X.head()
+y = pd.DataFrame(df.target, columns=['Target'])         <span class="cm"># dependent feature: 0 or 1</span>
+y['Target'].value_counts()
+<span class="cm"># 1    357</span>
+<span class="cm"># 0    212</span></code></pre>
+      <p>Before training a classifier, check whether the classes are balanced. If one class were much rarer you would have to deal with it, for example by upsampling. Here there are 357 ones and 212 zeros, which he treats as balanced. (The captions say 22 zeros, but the data set has 569 rows.) Not in the video: in this data set 0 means malignant and 1 benign.</p>
+<pre class="codeblock"><code>X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)</code></pre>
+      <p>He opens the LogisticRegression documentation and picks out the parameters that matter:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Parameter</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>penalty</code></td><td><code>'l2'</code> or <code>'l1'</code>: the kind of regularization added to the cost, as in ridge and lasso</td></tr>
+            <tr><td><code>C</code></td><td>inverse of the regularization strength, roughly \(1/\lambda\): a <i>smaller</i> C means a <i>stronger</i> penalty</td></tr>
+            <tr><td><code>class_weight</code></td><td>weights for the classes when the data is imbalanced; <code>'balanced'</code> sets them automatically</td></tr>
+            <tr><td><code>max_iter</code></td><td>the most iterations the solver may run</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>He admits his theory session skipped the L1 and L2 penalties for logistic regression. Logistic regression can be derived probabilistically or geometrically, and his separate logistic-regression video covers the penalty. It plays the same role as in ridge and lasso. For the IIT Madras treatment of logistic regression, see Part 15 (<a href="part-15.html">part-15.html</a>).</p>
+      <div class="code-cap">Cell · grid search for logistic regression</div>
+<pre class="codeblock"><code><span class="cm"># C values as he lists them; max_iter values other than 150 are illustrative</span>
+params = {'C': [1, 10, 20], 'max_iter': [100, 150]}
+model1 = LogisticRegression()          <span class="cm"># his starting C and max_iter; the grid overrides them</span>
+model = GridSearchCV(model1, param_grid=params, scoring='f1', cv=5)
+model.fit(X_train, y_train)            <span class="cm"># prints many warnings</span>
+
+model.best_params_                     <span class="cm"># max_iter 150 is chosen</span>
+model.best_score_                      <span class="cm"># about 0.95</span></code></pre>
+      <p>He scores with <dfn>F1</dfn> because he is not sure whether false positives or false negatives matter more here, and F1 balances precision and recall. The fit prints many warnings, which he passes over. A best score of about 0.95 is the mean F1 over the five training folds; the test set is still unseen.</p>
+      <p class="callout">Not in the video: the warnings are most likely ConvergenceWarnings (the default lbfgs solver needs more iterations on unscaled features, which also explains why the larger max_iter wins) and a DataConversionWarning (y is a one-column DataFrame where a 1-D array is expected; pass <code>y_train['Target']</code> or <code>y_train.values.ravel()</code>). Standardizing the features usually removes the convergence warnings.</p>
+    </section>
+
+    <section id="logistic-eval">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10318s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:51:58</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10384s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:53:04 the matrix</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=10415s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:53:35 classification report</a>
+        </div>
+        <h2>Confusion matrix, accuracy and the classification report</h2>
+      </div>
+      <p>Now the held-out rows. <code>predict</code> returns a 0 or a 1 for each of the 188 test rows, and three metrics from <code>sklearn.metrics</code> judge them:</p>
+      <div class="code-cap">Cell · evaluate on the test set</div>
+<pre class="codeblock"><code>y_pred = model.predict(X_test)
+
+<span class="kw">from</span> sklearn.metrics <span class="kw">import</span> confusion_matrix, classification_report, accuracy_score
+confusion_matrix(y_test, y_pred)       <span class="cm"># 63 and 118 on the diagonal, 3 and 4 off it</span>
+accuracy_score(y_test, y_pred)         <span class="cm"># about 0.96</span>
+print(classification_report(y_test, y_pred))</code></pre>
+      <p>The <dfn>confusion matrix</dfn> counts each combination of true class and predicted class. He says the order of the two arguments makes no difference except that the entries move. Swapping them transposes the matrix, so false positives and false negatives trade places; the diagonal stays put. Not in the video: scikit-learn's convention is <code>confusion_matrix(y_true, y_pred)</code>, with a row for each true class and a column for each prediction.</p>
+
+      <figure>
+        <div class="fig-split">
+          <svg class="dg" viewBox="0 0 260 230" role="img" aria-label="Two by two confusion matrix. Rows are the true class 0 and 1, columns the predicted class 0 and 1. The diagonal holds 63 true negatives and 118 true positives; the off-diagonal cells hold 3 and 4 errors.">
+            <text class="d-row" x="160" y="18" text-anchor="middle">predicted</text>
+            <text class="d-al" x="120" y="38" text-anchor="middle">0</text>
+            <text class="d-al" x="200" y="38" text-anchor="middle">1</text>
+            <text class="d-row" x="30" y="114" text-anchor="middle" transform="rotate(-90 30 114)">true</text>
+            <text class="d-al" x="66" y="84" text-anchor="end">0</text>
+            <text class="d-al" x="66" y="154" text-anchor="end">1</text>
+            <rect class="d-box-acc" x="80" y="46" width="80" height="70"/>
+            <rect class="d-box" x="160" y="46" width="80" height="70"/>
+            <rect class="d-box" x="80" y="116" width="80" height="70"/>
+            <rect class="d-box-acc" x="160" y="116" width="80" height="70"/>
+            <text class="d-al" x="86" y="60">TN</text><text class="d-h" x="120" y="88" text-anchor="middle" style="font-size:20px">63</text>
+            <text class="d-al" x="166" y="60">FP</text><text class="d-h" x="200" y="88" text-anchor="middle" style="font-size:20px">3</text>
+            <text class="d-al" x="86" y="130">FN</text><text class="d-h" x="120" y="158" text-anchor="middle" style="font-size:20px">4</text>
+            <text class="d-al" x="166" y="130">TP</text><text class="d-h" x="200" y="158" text-anchor="middle" style="font-size:20px">118</text>
+            <text class="d-s" x="160" y="210" text-anchor="middle">rows: y_test · columns: y_pred</text>
+          </svg>
+          <div class="tbl-wrap">
+            <table class="mini">
+              <thead><tr><th>Quantity</th><th class="num">Value</th></tr></thead>
+              <tbody>
+                <tr><td>Test rows</td><td class="num">188</td></tr>
+                <tr><td>Correct (diagonal)</td><td class="num">63 + 118 = 181</td></tr>
+                <tr><td>Wrong (off-diagonal)</td><td class="num">3 + 4 = 7</td></tr>
+                <tr><td>Accuracy</td><td class="num">181 / 188 ≈ 0.96</td></tr>
+                <tr><td>best_score_ (CV F1 on train)</td><td class="num">≈ 0.95</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <figcaption><b>The test-set confusion matrix</b>, with the counts he reads out. Class 1 (benign) is treated as positive. The audio gives the two errors as 3 and 4 without saying which cell holds which, so their placement here is illustrative; the accuracy is the same either way.</figcaption>
+      </figure>
+
+      <div class="eq">\[ \text{accuracy} = \frac{TP + TN}{\text{all}}, \qquad \text{precision} = \frac{TP}{TP + FP}, \qquad \text{recall} = \frac{TP}{TP + FN} \]
+        \[ F_1 = \frac{2 \cdot \text{precision} \cdot \text{recall}}{\text{precision} + \text{recall}} \]</div>
+      <p>The accuracy is about 96%. The <dfn>classification report</dfn> lists precision, recall and F1 for each class (plus the accuracy and averages), and because the classes are fairly balanced they all come out high. He mentions ROC curves, which need the false-positive and true-positive rates, but leaves them until he has covered the theory. These metrics are explained in Part 2 (<a href="krish-ml-02.html">krish-ml-02.html</a>). The video then moves on to Naive Bayes, the subject of Part 4 (<a href="krish-ml-04.html">krish-ml-04.html</a>).</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Bunch</dt><dd>The dictionary-like object scikit-learn's loaders return; keys such as <code>data</code>, <code>target</code> and <code>feature_names</code> can also be read as attributes.</dd></div>
+        <div><dt><code>iloc</code></dt><dd>Position-based indexing in pandas: <code>[rows, columns]</code>. <code>iloc[:, :-1]</code> is all but the last column, <code>iloc[:, -1]</code> only the last.</dd></div>
+        <div><dt>Independent / dependent features</dt><dd>The inputs X (13 house features) and the output y (Price) the model predicts.</dd></div>
+        <div><dt>K-fold cross-validation</dt><dd>Cut the rows into K blocks; each block is the test set once while the others train. The K scores are averaged.</dd></div>
+        <div><dt><code>cross_val_score</code></dt><dd>Runs K-fold cross-validation for one model and returns the K scores. It fits copies, so the model itself stays unfitted.</dd></div>
+        <div><dt><code>neg_mean_squared_error</code></dt><dd>MSE with a minus sign, because scikit-learn scorers are maximized. Closer to zero is better.</dd></div>
+        <div><dt>Hyperparameter α</dt><dd>The penalty strength in Ridge and Lasso, set before training. Larger α shrinks the coefficients more.</dd></div>
+        <div><dt><code>GridSearchCV</code></dt><dd>Tries every value (or combination) in a parameter grid, scores each by cross-validation and refits the best.</dd></div>
+        <div><dt><code>best_params_</code> / <code>best_score_</code></dt><dd>The winning grid entry and its mean cross-validation score.</dd></div>
+        <div><dt><code>train_test_split</code></dt><dd>Shuffles and splits the rows; <code>test_size=0.33</code> keeps 33% aside for the final check.</dd></div>
+        <div><dt>R² score</dt><dd>\(1 - \text{SS}_{\text{res}}/\text{SS}_{\text{tot}}\); 1 is a perfect fit. Call it as <code>r2_score(y_true, y_pred)</code>.</dd></div>
+        <div><dt>Adjusted R²</dt><dd>R² corrected for the number of features \(p\); not built into scikit-learn.</dd></div>
+        <div><dt>C (logistic regression)</dt><dd>Inverse regularization strength, about \(1/\lambda\). Small C means a strong penalty.</dd></div>
+        <div><dt>Confusion matrix</dt><dd>Counts of true class against predicted class; the diagonal holds the correct predictions.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>The DataFrame has 13 feature columns followed by Price. What do <code>dataset.iloc[:, :-1]</code> and <code>dataset.iloc[:, -1]</code> return?</span><span class="tog"></span></summary>
+          <p>The part before the comma selects rows and <code>:</code> means all of them. <code>:-1</code> selects every column except the last, so the first is X, a 506 × 13 table of features. <code>-1</code> selects only the last column, so the second is y, the 506 prices.</p></details>
+        <details><summary><span class="q">Q2</span><span>Why did <code>dataset.columns = df.target</code> raise "Length mismatch: Expected axis has 13 elements, new values have 506 elements"?</span><span class="tog"></span></summary>
+          <p>A header needs one name per column, 13 of them. <code>df.target</code> holds one price per house, 506 values. The names are in <code>df.feature_names</code>; the prices belong in a new column, <code>dataset['Price'] = df.target</code>.</p></details>
+        <details><summary><span class="q">Q3</span><span>You run 5-fold cross-validation on 100 records. How many models are trained, how large is each test block, and what does <code>cross_val_score</code> return?</span><span class="tog"></span></summary>
+          <p>Five models, one per fold. Each test block has 20 records and each training set 80. It returns five scores, one per fold; their mean is the cross-validation score.</p></details>
+        <details><summary><span class="q">Q4</span><span>Linear regression scores −37.13 and ridge −29.9 with <code>scoring='neg_mean_squared_error'</code>. Which is better, and why are the numbers negative?</span><span class="tog"></span></summary>
+          <p>Ridge. The scores are negated MSEs, so −29.9 means an MSE of 29.9, smaller than 37.13. scikit-learn negates error measures because all its scorers are maximized; the highest score, closest to zero, is the smallest error.</p></details>
+        <details><summary><span class="q">Q5</span><span>GridSearchCV runs over his wider grid of 14 α values with <code>cv=5</code>. How many fits does it perform, and what is <code>best_score_</code>?</span><span class="tog"></span></summary>
+          <p>14 × 5 = 70 cross-validation fits, plus one refit of the best α on all the data (with the default <code>refit=True</code>), so 71. <code>best_score_</code> is the mean of the five fold scores for the best α, here a negative MSE.</p></details>
+        <details><summary><span class="q">Q6</span><span>After <code>cross_val_score(lin_regressor, ...)</code>, calling <code>lin_regressor.predict(X_test)</code> raises NotFittedError, yet <code>ridge_regressor.predict(X_test)</code> works. Why?</span><span class="tog"></span></summary>
+          <p><code>cross_val_score</code> trains copies of the estimator and leaves the original untouched, so <code>lin_regressor</code> was never fitted; call <code>lin_regressor.fit(X_train, y_train)</code> first. GridSearchCV refits the best model on the data passed to <code>fit</code> and stores it, so it can predict straight away.</p></details>
+        <details><summary><span class="q">Q7</span><span>Take <code>y_test = [1, 2, 3, 4]</code> and <code>y_pred = [1.5, 2, 3, 3.5]</code>. Compute <code>r2_score(y_test, y_pred)</code> and <code>r2_score(y_pred, y_test)</code>. Does the order matter?</span><span class="tog"></span></summary>
+          <p>The squared errors sum to \(0.25 + 0 + 0 + 0.25 = 0.5\) either way. Around its mean 2.5, y_test has \(\sum(y - \bar y)^2 = 5\), so the correct R² is \(1 - 0.5/5 = 0.9\). y_pred has \(\sum = 1 + 0.25 + 0.25 + 1 = 2.5\), so the swapped call gives \(1 - 0.5/2.5 = 0.8\). The order matters: the true values must come first.</p></details>
+        <details><summary><span class="q">Q8</span><span>The logistic model's test confusion matrix has 63 and 118 on the diagonal and 3 and 4 off it. What is the accuracy? And would raising C from 1 to 20 strengthen or weaken the regularization?</span><span class="tog"></span></summary>
+          <p>Accuracy = (63 + 118) / (63 + 118 + 3 + 4) = 181 / 188 ≈ 0.963, the 96% he reports. C is the inverse of the regularization strength, so a larger C means a weaker penalty.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="index.html#extra"><span class="dir">← All notes</span><span class="nm">Complete Machine Learning in 6 Hours</span></a><a class="next" href="krish-ml-04.html"><span class="dir">Part 4 →</span><span class="nm">Naive Bayes and KNN</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the YouTube auto-generated captions of Krish Naik's video <i>Complete Machine Learning in 6 Hours</i>. Timestamp links open the video at that moment. Code is reconstructed from the audio. Charts marked synthetic use data generated for these notes. Not affiliated with Krish Naik or IIT Madras.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set, ms = 420) => { const t0 = performance.now(), dur = reduce ? 0 : ms; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+
+  /* ---------- Grid search over alpha: ridge vs lasso on seeded synthetic data ---------- */
+  (() => {
+    const svg = document.getElementById('gs-svg'); if (!svg) return;
+    let seed = 2024;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const n = 40, d = 8, K = 5, wTrue = [3, -2, 1.5, 0, 0, 0, 0, 0];
+    const X = [], y = [];
+    for (let i = 0; i < n; i++) { const f = []; for (let j = 0; j < d; j++) f.push(normal()); f[3] = 0.8 * f[0] + 0.6 * f[3]; f[4] = 0.7 * f[1] + 0.7 * f[4]; X.push(f); y.push(20 + f.reduce((s, v, j) => s + v * wTrue[j], 0) + 4 * normal()); }
+
+    /* Centred Gram matrix and cross-products for a set of row indices (intercept is not penalized). */
+    const prep = idx => { const m = idx.length, mx = Array(d).fill(0); let my = 0; idx.forEach(i => { for (let j = 0; j < d; j++) mx[j] += X[i][j] / m; my += y[i] / m; }); const G = [...Array(d)].map(() => Array(d).fill(0)), c = Array(d).fill(0); idx.forEach(i => { const xc = X[i].map((v, j) => v - mx[j]), yc = y[i] - my; for (let a = 0; a < d; a++) { c[a] += xc[a] * yc; for (let b = 0; b < d; b++) G[a][b] += xc[a] * xc[b]; } }); return { G, c, mx, my, m }; };
+    const solve = (M, r) => { const m = M.map((row, i) => [...row, r[i]]); for (let c = 0; c < d; c++) { let p = c; for (let k = c + 1; k < d; k++) if (Math.abs(m[k][c]) > Math.abs(m[p][c])) p = k; [m[c], m[p]] = [m[p], m[c]]; for (let k = c + 1; k < d; k++) { const f = m[k][c] / m[c][c]; for (let j = c; j <= d; j++) m[k][j] -= f * m[c][j]; } } const x = Array(d).fill(0); for (let c = d - 1; c >= 0; c--) { let s = m[c][d]; for (let j = c + 1; j < d; j++) s -= m[c][j] * x[j]; x[c] = s / m[c][c]; } return x; };
+    /* Ridge (scikit-learn): ||y - Xw||^2 + a||w||^2, closed form. */
+    const ridgeFit = (P, a) => solve(P.G.map((row, i) => row.map((v, j) => v + (i === j ? a : 0))), P.c);
+    /* Lasso (scikit-learn): ||y - Xw||^2 / (2m) + a||w||_1, by coordinate descent. */
+    const lassoFit = (P, a, w0) => { const w = w0 ? w0.slice() : Array(d).fill(0); for (let it = 0; it < 10000; it++) { let ch = 0; for (let j = 0; j < d; j++) { let rho = P.c[j]; for (let k = 0; k < d; k++) if (k !== j) rho -= P.G[j][k] * w[k]; rho /= P.m; const g = P.G[j][j] / P.m, nw = rho > a ? (rho - a) / g : rho < -a ? (rho + a) / g : 0; ch = Math.max(ch, Math.abs(nw - w[j])); w[j] = nw; } if (ch < 1e-10) break; } return w; };
+    const all = [...Array(n).keys()];
+    const folds = [...Array(K)].map((_, f) => { const lo = Math.floor(f * n / K), hi = Math.floor((f + 1) * n / K); return { P: prep(all.filter(i => i < lo || i >= hi)), te: all.filter(i => i >= lo && i < hi) }; });
+    const foldMSE = (F, w) => { const b = F.P.my - w.reduce((s, v, j) => s + v * F.P.mx[j], 0); return F.te.reduce((s, i) => s + (y[i] - b - X[i].reduce((t, v, j) => t + v * w[j], 0)) ** 2, 0) / F.te.length; };
+    const cvRidge = a => folds.reduce((s, F) => s + foldMSE(F, ridgeFit(F.P, a)), 0) / K;
+    const cvLasso = a => folds.reduce((s, F) => s + foldMSE(F, lassoFit(F.P, a, null)), 0) / K;
+    const Pall = prep(all);
+
+    /* Precompute paths and CV curves on the slider's grid of log10(alpha). */
+    const STEPS = 300, E = [], wR = [], wL = [], cR = [], cL = [];
+    let warmAll = null; const warmF = folds.map(() => null);
+    for (let k = 0; k <= STEPS; k++) {
+      const e = -3 + 6 * k / STEPS, a = Math.pow(10, e); E.push(e);
+      wR.push(ridgeFit(Pall, a)); warmAll = lassoFit(Pall, a, warmAll); wL.push(warmAll);
+      cR.push(cvRidge(a));
+      let s = 0; folds.forEach((F, f) => { warmF[f] = lassoFit(F.P, a, warmF[f]); s += foldMSE(F, warmF[f]); }); cL.push(s / K);
+    }
+    const ols = cvRidge(0);
+
+    /* Layout */
+    const PA = { x0: 56, x1: 300 }, PB = { x0: 370, x1: 614 }, PC = { x0: 56, x1: 614 };
+    const lx = (p, e) => p.x0 + (e + 3) / 6 * (p.x1 - p.x0);
+    const wTop = 56, wBot = 216, wLo = -2.6, wHi = 3.2, wy = v => wBot - (v - wLo) / (wHi - wLo) * (wBot - wTop);
+    const cTop = 290, cBot = 410, cLo = 18, cHi = 34, cy = v => cBot - (v - cLo) / (cHi - cLo) * (cBot - cTop);
+    const tickLbl = e => ['0.001', '0.01', '0.1', '1', '10', '100', '1000'][e + 3];
+    const sigStyle = 'fill: none; stroke: var(--accent); stroke-width: 2';
+    const noiseStyle = 'fill: none; stroke: var(--muted); stroke-width: 1.3';
+
+    /* Legend */
+    mk('line', { x1: 56, x2: 76, y1: 14, y2: 14, style: sigStyle }, svg);
+    mk('text', { x: 82, y: 18, class: 'c-note' }, svg).textContent = 'x₁, x₂, x₃ (true effects 3, −2, 1.5)';
+    mk('line', { x1: 340, x2: 360, y1: 14, y2: 14, style: noiseStyle }, svg);
+    mk('text', { x: 366, y: 18, class: 'c-note' }, svg).textContent = 'x₄ … x₈ (no effect of their own)';
+
+    const panel = (p, title, W) => {
+      const g = mk('g', { class: 'c-grid' }, svg);
+      for (let v = -2; v <= 3; v++) { mk('line', { x1: p.x0, x2: p.x1, y1: wy(v), y2: wy(v) }, g); mk('text', { x: p.x0 - 6, y: wy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = String(v).replace('-', '−'); }
+      for (let e = -3; e <= 3; e++) { mk('line', { x1: lx(p, e), x2: lx(p, e), y1: wTop, y2: wBot }, g); if (e % 2 !== 0) mk('text', { x: lx(p, e), y: wBot + 15, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = tickLbl(e); }
+      mk('line', { x1: p.x0, x2: p.x1, y1: wy(0), y2: wy(0), class: 'c-axis' }, svg);
+      mk('text', { x: p.x0, y: 44, class: 'c-title' }, svg).textContent = title;
+      for (let j = d - 1; j >= 0; j--) mk('polyline', { points: E.map((e, k) => lx(p, e).toFixed(1) + ',' + wy(W[k][j]).toFixed(1)).join(' '), style: j < 3 ? sigStyle : noiseStyle }, svg);
+      ['x₁', 'x₂', 'x₃'].forEach((t, j) => mk('text', { x: p.x0 + 5, y: wy(W[0][j]) - 6, class: 'c-lbl' }, svg).textContent = t);
+      const cur = mk('line', { y1: wTop, y2: wBot, style: 'stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3' }, svg);
+      const dots = [...Array(d)].map((_, j) => mk('circle', { r: 3.2, style: 'fill: var(--surface); stroke-width: 1.6; stroke: ' + (j < 3 ? 'var(--accent)' : 'var(--muted)') }, svg));
+      return { p, W, cur, dots };
+    };
+    const pA = panel(PA, 'Ridge coefficients vs α', wR), pB = panel(PB, 'Lasso coefficients vs α', wL);
+
+    /* CV panel */
+    const gc = mk('g', { class: 'c-grid' }, svg);
+    for (let v = 20; v <= 30; v += 5) { mk('line', { x1: PC.x0, x2: PC.x1, y1: cy(v), y2: cy(v) }, gc); mk('text', { x: PC.x0 - 6, y: cy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v; }
+    for (let e = -3; e <= 3; e++) { mk('line', { x1: lx(PC, e), x2: lx(PC, e), y1: cTop, y2: cBot }, gc); mk('text', { x: lx(PC, e), y: cBot + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = tickLbl(e); }
+    mk('line', { x1: PC.x0, x2: PC.x1, y1: cBot, y2: cBot, class: 'c-axis' }, svg);
+    mk('text', { x: PC.x0, y: cTop - 10, class: 'c-title' }, svg).textContent = '5-fold CV mean squared error vs α (lower is better)';
+    mk('text', { x: (PC.x0 + PC.x1) / 2, y: 458, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'α (log scale)';
+    mk('line', { x1: PC.x0, x2: PC.x1, y1: cy(ols), y2: cy(ols), style: 'stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 5 4' }, svg);
+    mk('text', { x: lx(PC, 1.6), y: cy(ols) - 6, 'text-anchor': 'middle', class: 'c-note' }, svg).textContent = 'linear regression (α = 0)';
+    const line = (C, style) => mk('polyline', { points: E.map((e, k) => lx(PC, e).toFixed(1) + ',' + cy(C[k]).toFixed(1)).join(' '), style }, svg);
+    line(cR, 'fill: none; stroke: var(--ink-2); stroke-width: 2');
+    line(cL, 'fill: none; stroke: var(--accent); stroke-width: 2');
+    const iRmin = cR.indexOf(Math.min(...cR));
+    mk('text', { x: lx(PC, E[iRmin]), y: cy(cR[iRmin]) + 16, 'text-anchor': 'middle', class: 'c-note' }, svg).textContent = 'ridge';
+    mk('text', { x: PC.x1 - 2, y: cy(cL[STEPS]) - 6, 'text-anchor': 'end', class: 'c-lbl' }, svg).textContent = 'lasso';
+    const gGrid = mk('g', {}, svg);
+    const curC = mk('line', { y1: cTop, y2: cBot, style: 'stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3' }, svg);
+    const mR = mk('circle', { r: 4.5, style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 2' }, svg);
+    const mL = mk('circle', { r: 4.5, style: 'fill: var(--surface); stroke: var(--accent); stroke-width: 2' }, svg);
+
+    /* Controls */
+    const slider = document.getElementById('gs-a'), out = document.getElementById('gs-a-out'), status = document.getElementById('gs-status');
+    const lz = document.getElementById('gs-lz'), rz = document.getElementById('gs-rz'), rcv = document.getElementById('gs-rcv'), lcv = document.getElementById('gs-lcv');
+    const fmtA = a => a < 0.01 ? a.toFixed(4) : a < 1 ? a.toFixed(3) : a < 10 ? a.toFixed(2) : a < 100 ? a.toFixed(1) : a.toFixed(0);
+    let gridMsg = '';
+    const draw = () => {
+      const k = Math.max(0, Math.min(STEPS, Math.round((parseFloat(slider.value) + 3) / 6 * STEPS))), e = E[k];
+      [pA, pB].forEach(P => { const x = lx(P.p, e); P.cur.setAttribute('x1', x); P.cur.setAttribute('x2', x); P.dots.forEach((c, j) => { c.setAttribute('cx', x); c.setAttribute('cy', wy(P.W[k][j])); }); });
+      const xc = lx(PC, e); curC.setAttribute('x1', xc); curC.setAttribute('x2', xc);
+      mR.setAttribute('cx', xc); mR.setAttribute('cy', cy(cR[k])); mL.setAttribute('cx', xc); mL.setAttribute('cy', cy(cL[k]));
+      const zl = wL[k].filter(v => v === 0).length, zr = wR[k].filter(v => v === 0).length;
+      lz.textContent = zl + ' of 8'; rz.textContent = zr + ' of 8';
+      rcv.textContent = cR[k].toFixed(2); lcv.textContent = cL[k].toFixed(2);
+      out.textContent = 'α = ' + fmtA(Math.pow(10, e));
+      const better = cR[k] < cL[k] ? 'ridge' : 'lasso';
+      status.textContent = gridMsg || (zl === 0 ? 'Both fits are close to plain linear regression: every weight is nonzero, and the noise features still get weight. Lower CV error here: ' + better + '.'
+        : zl < 8 ? `Lasso has set ${zl} of the 8 weights to exactly 0; ridge has shrunk all 8 but kept them nonzero. Lower CV error here: ${better}.`
+        : 'Lasso has set every weight to 0, so it predicts the training mean. The ridge weights are small but still nonzero.');
+    };
+
+    /* GridSearchCV on the video's wider grid */
+    const GRID = [1e-15, 1e-10, 1e-8, 1e-3, 1e-2, 1, 5, 10, 20, 30, 35, 40, 45, 100];
+    const run = model => {
+      const sc = GRID.map(a => model === 'ridge' ? cvRidge(a) : cvLasso(a));
+      let bi = 0; sc.forEach((s, i) => { if (s < sc[bi]) bi = i; });
+      while (gGrid.firstChild) gGrid.removeChild(gGrid.firstChild);
+      const stroke = model === 'ridge' ? 'var(--ink-2)' : 'var(--accent)';
+      GRID.forEach((a, i) => { if (a < 1e-3) return; const x = lx(PC, Math.log10(a)), yv = cy(sc[i]); mk('rect', { x: x - 3.5, y: yv - 3.5, width: 7, height: 7, style: 'fill: var(--surface); stroke-width: 1.6; stroke: ' + stroke }, gGrid); });
+      const bx = lx(PC, Math.log10(GRID[bi])), by = cy(sc[bi]);
+      mk('circle', { cx: bx, cy: by, r: 7, class: 'c-pt-hi' }, gGrid);
+      mk('text', { x: bx, y: by + 22, 'text-anchor': 'middle', class: 'c-lbl' }, gGrid).textContent = 'best α = ' + GRID[bi];
+      gridMsg = `GridSearchCV(${model === 'ridge' ? 'Ridge' : 'Lasso'}(), 14 α values, cv=5): best_params_ = {'alpha': ${GRID[bi]}}, best_score_ = −${sc[bi].toFixed(2)}. The squares are the grid's scores.`;
+      draw();
+      tween(parseFloat(slider.value), Math.log10(GRID[bi]), v => { slider.value = v.toFixed(2); draw(); }, 700);
+    };
+    draw();
+    slider.addEventListener('input', () => { gridMsg = ''; draw(); });
+    document.getElementById('gs-ridge').addEventListener('click', () => run('ridge'));
+    document.getElementById('gs-lasso').addEventListener('click', () => run('lasso'));
+  })();
+})();
+</script>
+</body>
+</html>

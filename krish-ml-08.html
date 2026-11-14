@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Part 8 · Bias–variance, XGBoost and SVM · ML in 6 Hours</title>
+<meta name="description" content="Notes on Krish Naik's Complete Machine Learning in 6 Hours, Part 8: bias and variance, the XGBoost classifier and regressor worked by hand (similarity weight, gain, λ, learning rate), and support vector machines.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script src="theme.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html#extra">All notes</a><span class="sep">/</span><span>ML in 6 hours · Part 8 of 8</span><span class="sep">·</span><a href="krish-ml-04.html">← Part 4</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Krish Naik · Complete Machine Learning in 6 Hours</div>
+    <h1>Bias and variance, XGBoost and SVM</h1>
+    <p class="lede">The last stretch of the video defines bias and variance through training and test accuracy, then builds XGBoost trees by hand for a classifier and a regressor with similarity weights and gain. It ends with the support vector machine: hyperplane, marginal planes, the margin to maximize, the soft margin and a first look at kernels.</p>
+    <div class="meta">
+      <span><b>Part 8</b> of 8</span>
+      <span>Teacher <b>Krish Naik</b></span>
+      <span>About <b>62 min</b> of video</span>
+      <span><b>4</b> chapters</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20151s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:35:51 · Bias and variance</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20624s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:43:44 · XGBoost classifier</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=21600s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:00:00 · XGBoost regressor</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22744s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:19:04 · SVM</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Bias and variance</h4>
+      <ul>
+        <li><a href="#bv-definitions">What the two words mean</a></li>
+        <li><a href="#bv-cases">Three models</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>XGBoost classifier</h4>
+      <ul>
+        <li><a href="#xgbc-base">Data and base model</a></li>
+        <li><a href="#xgbc-steps">Three steps per tree</a></li>
+        <li><a href="#xgbc-salary">Split on salary</a></li>
+        <li><a href="#xgbc-credit">Split on credit</a></li>
+        <li><a href="#xgbc-output">Trees to a probability</a></li>
+        <li><a href="#xgbc-overfit">Overfitting, λ and γ</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>XGBoost regressor</h4>
+      <ul>
+        <li><a href="#xgbr-base">Mean as base model</a></li>
+        <li><a href="#xgbr-split">First split</a></li>
+        <li><a href="#xgbr-better">A better split</a></li>
+        <li><a href="#xgbr-output">Predicting a salary</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>SVM</h4>
+      <ul>
+        <li><a href="#svm-margin">Hyperplane and margins</a></li>
+        <li><a href="#svm-line">The line wᵀx + b = 0</a></li>
+        <li><a href="#svm-objective">Maximize the margin</a></li>
+        <li><a href="#svm-soft">Soft margin, C and slack</a></li>
+        <li><a href="#svm-kernel">SVR and kernels</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html#extra">All notes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>In Krish's usage, <b>bias</b> is judged on the training data and <b>variance</b> on the test data. Good training accuracy means low bias, good test accuracy means low variance, and low bias with low variance is the <b>generalized model</b> to aim for.</li>
+        <li><dfn>XGBoost</dfn> (extreme gradient boosting) starts from a dummy <b>base model</b> (probability 0.5 for classification, the mean target for regression) and adds binary decision trees one after another, each built on the <b>residuals</b>.</li>
+        <li>Every node gets a <b>similarity weight</b>, \((\sum r)^2 / (\sum p(1-p) + \lambda)\) for classification and \((\sum r)^2 / (n + \lambda)\) for regression. A split's <b>gain</b> is left + right − parent, and the split with the highest gain is used.</li>
+        <li>A prediction adds learning-rate-scaled tree outputs to the base: \(\sigma(0 + \alpha_1 T_1(\mathbf{x}) + \alpha_2 T_2(\mathbf{x}) + \dots)\) for the classifier, \(51 + \alpha_1 T_1(\mathbf{x}) + \dots\) in his regression example. \(\lambda\) is a hyperparameter against overfitting, chosen by cross-validation.</li>
+        <li>An <b>SVM</b> places a hyperplane \(\mathbf{w}^\top\mathbf{x} + b = 0\) between marginal planes \(\mathbf{w}^\top\mathbf{x} + b = \pm 1\) and maximizes their distance \(2/\lVert\mathbf{w}\rVert\). A soft margin accepts some errors through \(C\) and slack terms; a kernel lifts the data to a higher dimension where a plane can split it.</li>
+      </ul>
+    </div>
+
+    <!-- ============ BIAS AND VARIANCE ============ -->
+    <section id="bv-definitions">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20151s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:35:51</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20194s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:36:34 bias</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20324s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:38:44 variance</a>
+        </div>
+        <h2>What bias and variance mean</h2>
+      </div>
+      <p>Krish opens with a question students often ask him. A model reaches 90% accuracy on the training data and 70% on the test data. Most people call that <dfn>overfitting</dfn> and describe overfitting as <b>low bias and high variance</b>. Why is bias tied to the training data, and variance to the test data? He answers from the definitions.</p>
+      <h3>Bias</h3>
+      <p>He defines bias as a phenomenon that "skews the result of an algorithm in favor or against an idea". Here the idea is the training data set. A model trained on it can come out in its favour, performing well on it, or against it, performing poorly.</p>
+      <ul>
+        <li>Performs well on the training data: <b>low bias</b>.</li>
+        <li>Performs poorly on the training data: <b>high bias</b>.</li>
+      </ul>
+      <p class="note">As captioned, his first statement swaps the two labels: a model that does well on the training data is called high bias. His examples a few minutes later use the convention above, which is also the standard one, so the notes follow it.</p>
+      <h3>Variance</h3>
+      <p>Variance, in his definition, refers to the changes in the model when it is used on a different portion of the data: other training data, or the test data. The data set is split into a training part and a test part. The model learns on the training part, which is where bias is judged, and then predicts on the test part.</p>
+      <ul>
+        <li>Good predictions on the test data: <b>low variance</b>.</li>
+        <li>Poor predictions on the test data: <b>high variance</b>.</li>
+      </ul>
+      <p class="callout">Not in the video: in the textbook sense, variance measures how much the fitted model would change if it were trained on a different sample of data, and bias measures how far its average prediction sits from the truth. A large gap between training and test accuracy is the usual symptom of high variance. For the IIT Madras treatment, see Part 17 (<a href="part-17.html#bias-variance">part-17.html</a>).</p>
+    </section>
+
+    <section id="bv-cases">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20458s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:40:58</a>
+        <h2>Three models, read from train and test accuracy</h2>
+      </div>
+      <p>He then compares three models. Read bias from the training accuracy and variance from the test accuracy.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Model</th><th class="num">Train</th><th class="num">Test</th><th>Bias</th><th>Variance</th><th>Comment</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td class="num">90%</td><td class="num">75%</td><td>low</td><td>high</td><td>overfitting</td></tr>
+            <tr><td>2</td><td class="num">60%</td><td class="num">55%</td><td>high</td><td>high</td><td>poor on both</td></tr>
+            <tr><td>3</td><td class="num">90%</td><td class="num">92%</td><td>low</td><td>low</td><td><b>generalized model</b>, the aim</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Model 3 is the one we want. It learns the training data well and keeps that accuracy on data it has not seen. He calls it a <dfn>generalized model</dfn> and says building one is the aim of a data scientist.</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 318" role="img" aria-label="Left: paired bars of train and test accuracy for his three models: model 1 at 90 and 75 percent, model 2 at 60 and 55, model 3 at 90 and 92, with his bias and variance labels. Right: four dartboards showing the textbook combinations of low or high bias with low or high variance.">
+            <text class="d-h" x="20" y="24">His three models</text>
+            <rect x="188" y="13" width="12" height="12" rx="2" style="fill: var(--accent)"/><text class="d-s" x="205" y="23">train</text>
+            <rect class="d-box" x="246" y="13" width="12" height="12" rx="2"/><text class="d-s" x="263" y="23">test</text>
+            <line class="d-rule" x1="56" y1="150" x2="330" y2="150"/><text class="d-al" x="50" y="154" text-anchor="end">50%</text>
+            <line class="d-rule" x1="56" y1="70" x2="330" y2="70"/><text class="d-al" x="50" y="74" text-anchor="end">100%</text>
+            <line class="d-ln" x1="56" y1="230" x2="330" y2="230"/><text class="d-al" x="50" y="234" text-anchor="end">0</text>
+            <rect x="82" y="86" width="26" height="144" style="fill: var(--accent)"/>
+            <rect class="d-box" x="112" y="110" width="26" height="120"/>
+            <text class="d-al" x="95" y="81" text-anchor="middle">90</text>
+            <text class="d-al" x="125" y="105" text-anchor="middle">75</text>
+            <text class="d-t" x="110" y="250" text-anchor="middle">Model 1</text>
+            <text class="d-s" x="110" y="266" text-anchor="middle">low bias</text>
+            <text class="d-s" x="110" y="281" text-anchor="middle">high variance</text>
+            <text class="d-s" x="110" y="298" text-anchor="middle" style="fill: var(--accent)">overfitting</text>
+            <rect x="174" y="134" width="26" height="96" style="fill: var(--accent)"/>
+            <rect class="d-box" x="204" y="142" width="26" height="88"/>
+            <text class="d-al" x="187" y="129" text-anchor="middle">60</text>
+            <text class="d-al" x="217" y="137" text-anchor="middle">55</text>
+            <text class="d-t" x="202" y="250" text-anchor="middle">Model 2</text>
+            <text class="d-s" x="202" y="266" text-anchor="middle">high bias</text>
+            <text class="d-s" x="202" y="281" text-anchor="middle">high variance</text>
+            <rect x="266" y="86" width="26" height="144" style="fill: var(--accent)"/>
+            <rect class="d-box" x="296" y="82.8" width="26" height="147.2"/>
+            <text class="d-al" x="279" y="81" text-anchor="middle">90</text>
+            <text class="d-al" x="309" y="77.8" text-anchor="middle">92</text>
+            <text class="d-t" x="294" y="250" text-anchor="middle">Model 3</text>
+            <text class="d-s" x="294" y="266" text-anchor="middle">low bias</text>
+            <text class="d-s" x="294" y="281" text-anchor="middle">low variance</text>
+            <text class="d-s" x="294" y="298" text-anchor="middle" style="fill: var(--accent)">the aim</text>
+            <line class="d-rule" x1="352" y1="10" x2="352" y2="308"/>
+            <text class="d-h" x="372" y="24">The textbook four cases</text>
+            <text class="d-s" x="372" y="40">not in the video · illustrative shots</text>
+            <text class="d-row" x="480" y="66" text-anchor="middle">low variance</text>
+            <text class="d-row" x="610" y="66" text-anchor="middle">high variance</text>
+            <text class="d-row" x="392" y="130" text-anchor="middle" transform="rotate(-90 392 130)">low bias</text>
+            <text class="d-row" x="392" y="248" text-anchor="middle" transform="rotate(-90 392 248)">high bias</text>
+            <circle class="d-box" cx="480" cy="130" r="46"/>
+            <circle class="d-ln-mut" cx="480" cy="130" r="30"/>
+            <circle class="pill" cx="480" cy="130" r="13"/>
+            <circle class="pt-plain" cx="476" cy="127" r="3.2"/>
+            <circle class="pt-plain" cx="483" cy="125" r="3.2"/>
+            <circle class="pt-plain" cx="485" cy="132" r="3.2"/>
+            <circle class="pt-plain" cx="478" cy="135" r="3.2"/>
+            <circle class="pt-plain" cx="481" cy="130" r="3.2"/>
+            <circle class="pt-plain" cx="474" cy="131" r="3.2"/>
+            <circle class="d-box" cx="610" cy="130" r="46"/>
+            <circle class="d-ln-mut" cx="610" cy="130" r="30"/>
+            <circle class="pill" cx="610" cy="130" r="13"/>
+            <circle class="pt-plain" cx="588" cy="116" r="3.2"/>
+            <circle class="pt-plain" cx="628" cy="110" r="3.2"/>
+            <circle class="pt-plain" cx="636" cy="140" r="3.2"/>
+            <circle class="pt-plain" cx="596" cy="154" r="3.2"/>
+            <circle class="pt-plain" cx="616" cy="160" r="3.2"/>
+            <circle class="pt-plain" cx="580" cy="136" r="3.2"/>
+            <circle class="d-box" cx="480" cy="248" r="46"/>
+            <circle class="d-ln-mut" cx="480" cy="248" r="30"/>
+            <circle class="pill" cx="480" cy="248" r="13"/>
+            <circle class="pt-plain" cx="502" cy="218" r="3.2"/>
+            <circle class="pt-plain" cx="509" cy="220" r="3.2"/>
+            <circle class="pt-plain" cx="511" cy="227" r="3.2"/>
+            <circle class="pt-plain" cx="504" cy="226" r="3.2"/>
+            <circle class="pt-plain" cx="507" cy="223" r="3.2"/>
+            <circle class="pt-plain" cx="499" cy="223" r="3.2"/>
+            <circle class="d-box" cx="610" cy="248" r="46"/>
+            <circle class="d-ln-mut" cx="610" cy="248" r="30"/>
+            <circle class="pill" cx="610" cy="248" r="13"/>
+            <circle class="pt-plain" cx="606" cy="218" r="3.2"/>
+            <circle class="pt-plain" cx="640" cy="222" r="3.2"/>
+            <circle class="pt-plain" cx="642" cy="250" r="3.2"/>
+            <circle class="pt-plain" cx="610" cy="246" r="3.2"/>
+            <circle class="pt-plain" cx="628" cy="242" r="3.2"/>
+            <circle class="pt-plain" cx="620" cy="212" r="3.2"/>
+          </svg>
+        </div>
+        <figcaption><b>Left: his three models, to scale.</b> Filled bars are training accuracy, outlined bars test accuracy, with his labels underneath. <b>Right: the four textbook cases</b> (not in the video). Each dot is the prediction of a model trained on a different sample; the bullseye is the truth. Bias is how far the cloud's centre is from the bullseye, variance how widely the dots spread.</figcaption>
+      </figure>
+      <p class="callout">Not in the video: his examples cover three of the four combinations. The missing one, high bias with low variance, is the classic underfit model: too simple, and wrong in a consistent way, so training and test accuracy are both low but close together. In that textbook reading his model 2 (60% and 55%, a gap of only 5 points) would count as high bias and low variance; he labels it high variance because its test accuracy is poor. Expect both readings in other material. See also Part 17, overfitting and underfitting (<a href="part-17.html#fitting">part-17.html</a>).</p>
+    </section>
+
+    <!-- ============ XGBOOST CLASSIFIER ============ -->
+    <section id="xgbc-base">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20624s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:43:44</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20710s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:45:10 base model</a>
+        </div>
+        <h2>The loan data and the base model</h2>
+      </div>
+      <p>The example has two features, salary (≤ 50K or &gt; 50K) and credit (bad, good or normal), and a 0/1 target: whether a loan is approved. He adds the seventh record partway through so there is more to split.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">#</th><th>Salary</th><th>Credit</th><th class="num">Approval \(y\)</th><th class="num">Residual \(y - 0.5\)</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td>≤ 50K</td><td>bad</td><td class="num">0</td><td class="num">−0.5</td></tr>
+            <tr><td class="num">2</td><td>≤ 50K</td><td>good</td><td class="num">1</td><td class="num">+0.5</td></tr>
+            <tr><td class="num">3</td><td>≤ 50K</td><td>good</td><td class="num">1</td><td class="num">+0.5</td></tr>
+            <tr><td class="num">4</td><td>&gt; 50K</td><td>bad</td><td class="num">0</td><td class="num">−0.5</td></tr>
+            <tr><td class="num">5</td><td>&gt; 50K</td><td>good</td><td class="num">1</td><td class="num">+0.5</td></tr>
+            <tr><td class="num">6</td><td>&gt; 50K</td><td>normal</td><td class="num">1</td><td class="num">+0.5</td></tr>
+            <tr><td class="num">7</td><td>≤ 50K</td><td>normal</td><td class="num">0</td><td class="num">−0.5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>XGBoost stands for <dfn>extreme gradient boosting</dfn>. It handles both classification and regression. It is a boosting technique, and the learners it combines are decision trees, built one after another.</p>
+      <p>Everything starts from a <dfn>base model</dfn>, a weak learner that ignores its input and always outputs probability 0.5. Asked why 0.5, he says it is only a dummy model, an if-condition that returns 0.5. Its <dfn>residuals</dfn>, approval minus 0.5, are what the first tree works on: −0.5 for each rejected loan and +0.5 for each approved one.</p>
+      <p class="note">Boosting and AdaBoost from the same video are in Part 6 of these notes (<a href="krish-ml-06.html">krish-ml-06.html</a>). For the IIT Madras treatment of boosting, see Part 17 (<a href="part-17.html#boosting">part-17.html</a>).</p>
+    </section>
+
+    <section id="xgbc-steps">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20842s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:47:22</a>
+        <h2>Three steps per tree</h2>
+      </div>
+      <ol class="algo">
+        <li class="algo-title">Building one XGBoost tree (his steps)</li>
+        <li>Create a <b>binary</b> decision tree from the features. Every split has exactly two branches, even for a feature with three categories.</li>
+        <li>Calculate the <b>similarity weight</b> of each node.</li>
+        <li>Calculate the <b>gain</b> of each candidate split and keep the split with the highest gain.</li>
+      </ol>
+      <div class="eq">\[ \text{Similarity weight} = \frac{\big(\sum_i r_i\big)^2}{\sum_i p_i\,(1 - p_i) + \lambda} \]</div>
+      <p>The sums run over the records in the node. \(r_i\) is a record's residual and \(p_i\) the probability the model so far gives it, 0.5 for every record in the first tree. \(\lambda\) is a hyperparameter that keeps the tree from overfitting. He first says it starts at 1, then sets \(\lambda = 0\) for the worked example.</p>
+      <p class="callout">Read the numerator carefully: add the residuals first, then square the total once. He corrects himself on exactly this while working the example. Residuals of opposite sign cancel, so a node whose records disagree gets a low similarity weight, and a node whose residuals all point the same way gets a high one.</p>
+      <div class="eq">\[ \text{Gain} = \text{SW}_{\text{left}} + \text{SW}_{\text{right}} - \text{SW}_{\text{parent}} \]</div>
+      <p>He calls this the information gain, borrowing the decision-tree term (<a href="krish-ml-05.html">krish-ml-05.html</a>); XGBoost's documentation calls it the gain.</p>
+    </section>
+
+    <section id="xgbc-salary">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20912s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:48:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=21069s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:51:09 similarity weights</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=21431s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:57:11 gain</a>
+        </div>
+        <h2>Worked example: split on salary</h2>
+      </div>
+      <p>Split the root on salary. Records 1, 2, 3 and 7 go left (≤ 50K); records 4, 5 and 6 go right (&gt; 50K). Every record has \(p = 0.5\), so each adds \(0.5 \times 0.5 = 0.25\) to a denominator. With \(\lambda = 0\):</p>
+      <div class="eq">\[ \begin{aligned} \text{SW}_{\le 50K} &amp;= \frac{(-0.5 + 0.5 + 0.5 - 0.5)^2}{4 \times 0.25} = \frac{0}{1} = 0 \\ \text{SW}_{> 50K} &amp;= \frac{(-0.5 + 0.5 + 0.5)^2}{3 \times 0.25} = \frac{0.25}{0.75} = 0.33 \\ \text{SW}_{\text{root}} &amp;= \frac{(3 \times (-0.5) + 4 \times 0.5)^2}{7 \times 0.25} = \frac{0.25}{1.75} = 0.14 \end{aligned} \]</div>
+      <p>The left node holds two approvals and two rejections, so its residuals cancel exactly. The root has one more approval than rejection, so its weight is small but above zero.</p>
+      <div class="result">
+        <span class="lbl">Gain of the salary split</span>
+        \[ \text{Gain} = 0 + 0.33 - 0.14 = 0.19 \]
+      </div>
+      <p>The feature whose split gives the highest gain is chosen for the node. He assumes salary wins here and carries on with it.</p>
+      <p class="callout">Not in the video: with these seven records salary does not win. Splitting the root on credit, good against bad or normal, gives a gain of 3.86, and bad against the rest gives 3.66. The calculator further down lists every candidate. The procedure is the same whichever split wins, so the notes follow his tree.</p>
+    </section>
+
+    <section id="xgbc-credit">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=21498s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:58:18</a>
+        <h2>Splitting further on credit</h2>
+      </div>
+      <p>Next he splits the salary ≤ 50K branch on credit. Credit has three categories and an XGBoost tree only makes binary splits, so the categories are grouped two against one. He puts good and normal on one side and bad on the other. Record 1 goes to "bad"; records 2, 3 and 7 go to "good or normal".</p>
+      <div class="eq">\[ \begin{aligned} \text{SW}_{\text{bad}} &amp;= \frac{(-0.5)^2}{0.25} = 1 \\ \text{SW}_{\text{good, normal}} &amp;= \frac{(0.5 + 0.5 - 0.5)^2}{3 \times 0.25} = 0.33 \\ \text{Gain} &amp;= 1 + 0.33 - 0 = 1.33 \end{aligned} \]</div>
+      <p>The parent here is the ≤ 50K node, whose similarity weight is 0, so nothing is subtracted. The other groupings (good against bad and normal, normal against the rest) are scored the same way, and the one with the highest gain is kept. The &gt; 50K branch could be split in the same way; he leaves it.</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 404" role="img" aria-label="The XGBoost tree built in the video. Root with all seven residuals, similarity 0.14. Split on salary: the 50K-or-less branch has four residuals that cancel, similarity 0; the over-50K branch has three residuals, similarity 0.33; gain 0.19. The 50K-or-less branch is split on credit: bad holds one residual, similarity 1, output minus 2; good or normal holds three, similarity 0.33, output 0.67; gain 1.33.">
+            <defs><marker id="kml08-t-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <line class="d-ln" x1="340" y1="96" x2="170" y2="142" marker-end="url(#kml08-t-ah)"/>
+            <line class="d-ln" x1="340" y1="96" x2="530" y2="142" marker-end="url(#kml08-t-ah)"/>
+            <line class="d-ln" x1="170" y1="226" x2="90" y2="300" marker-end="url(#kml08-t-ah)"/>
+            <line class="d-ln" x1="170" y1="226" x2="282" y2="300" marker-end="url(#kml08-t-ah)"/>
+            <rect class="d-box" x="205" y="12" width="270" height="84" rx="8"/>
+            <text class="d-t" x="340" y="32" text-anchor="middle">All 7 records</text>
+            <rect class="b-bad" x="216" y="42" width="32" height="18" rx="4"/><text class="d-al" x="232" y="55" text-anchor="middle">−0.5</text>
+            <rect class="b-ok" x="252" y="42" width="32" height="18" rx="4"/><text class="d-al" x="268" y="55" text-anchor="middle">+0.5</text>
+            <rect class="b-ok" x="288" y="42" width="32" height="18" rx="4"/><text class="d-al" x="304" y="55" text-anchor="middle">+0.5</text>
+            <rect class="b-bad" x="324" y="42" width="32" height="18" rx="4"/><text class="d-al" x="340" y="55" text-anchor="middle">−0.5</text>
+            <rect class="b-ok" x="360" y="42" width="32" height="18" rx="4"/><text class="d-al" x="376" y="55" text-anchor="middle">+0.5</text>
+            <rect class="b-ok" x="396" y="42" width="32" height="18" rx="4"/><text class="d-al" x="412" y="55" text-anchor="middle">+0.5</text>
+            <rect class="b-bad" x="432" y="42" width="32" height="18" rx="4"/><text class="d-al" x="448" y="55" text-anchor="middle">−0.5</text>
+            <text class="d-s" x="340" y="80" text-anchor="middle">similarity 0.25 / 1.75 = 0.14</text>
+            <rect class="d-box" x="55" y="142" width="230" height="84" rx="8"/>
+            <text class="d-t" x="170" y="162" text-anchor="middle">salary ≤ 50K · 4 records</text>
+            <rect class="b-bad" x="100" y="172" width="32" height="18" rx="4"/><text class="d-al" x="116" y="185" text-anchor="middle">−0.5</text>
+            <rect class="b-ok" x="136" y="172" width="32" height="18" rx="4"/><text class="d-al" x="152" y="185" text-anchor="middle">+0.5</text>
+            <rect class="b-ok" x="172" y="172" width="32" height="18" rx="4"/><text class="d-al" x="188" y="185" text-anchor="middle">+0.5</text>
+            <rect class="b-bad" x="208" y="172" width="32" height="18" rx="4"/><text class="d-al" x="224" y="185" text-anchor="middle">−0.5</text>
+            <text class="d-s" x="170" y="210" text-anchor="middle">similarity 0 / 1.00 = 0</text>
+            <rect class="d-box" x="415" y="142" width="230" height="98" rx="8"/>
+            <text class="d-t" x="530" y="162" text-anchor="middle">salary > 50K · 3 records</text>
+            <rect class="b-bad" x="478" y="172" width="32" height="18" rx="4"/><text class="d-al" x="494" y="185" text-anchor="middle">−0.5</text>
+            <rect class="b-ok" x="514" y="172" width="32" height="18" rx="4"/><text class="d-al" x="530" y="185" text-anchor="middle">+0.5</text>
+            <rect class="b-ok" x="550" y="172" width="32" height="18" rx="4"/><text class="d-al" x="566" y="185" text-anchor="middle">+0.5</text>
+            <text class="d-s" x="530" y="210" text-anchor="middle">similarity 0.25 / 0.75 = 0.33</text>
+            <text class="d-s" x="530" y="227" text-anchor="middle" style="fill: var(--accent)">output 0.5 / 0.75 = 0.67</text>
+            <rect class="d-box" x="10" y="300" width="160" height="98" rx="8"/>
+            <text class="d-t" x="90" y="320" text-anchor="middle">credit bad · 1</text>
+            <rect class="b-bad" x="74" y="330" width="32" height="18" rx="4"/><text class="d-al" x="90" y="343" text-anchor="middle">−0.5</text>
+            <text class="d-s" x="90" y="368" text-anchor="middle">similarity 0.25 / 0.25 = 1</text>
+            <text class="d-s" x="90" y="385" text-anchor="middle" style="fill: var(--accent)">output −0.5 / 0.25 = −2</text>
+            <rect class="d-box" x="188" y="300" width="188" height="98" rx="8"/>
+            <text class="d-t" x="282" y="320" text-anchor="middle">credit good or normal · 3</text>
+            <rect class="b-ok" x="230" y="330" width="32" height="18" rx="4"/><text class="d-al" x="246" y="343" text-anchor="middle">+0.5</text>
+            <rect class="b-ok" x="266" y="330" width="32" height="18" rx="4"/><text class="d-al" x="282" y="343" text-anchor="middle">+0.5</text>
+            <rect class="b-bad" x="302" y="330" width="32" height="18" rx="4"/><text class="d-al" x="318" y="343" text-anchor="middle">−0.5</text>
+            <text class="d-s" x="282" y="368" text-anchor="middle">similarity 0.25 / 0.75 = 0.33</text>
+            <text class="d-s" x="282" y="385" text-anchor="middle" style="fill: var(--accent)">output 0.5 / 0.75 = 0.67</text>
+            <rect class="pill" x="488" y="36" width="178" height="26" rx="6"/><text class="d-s" x="577" y="53" text-anchor="middle">gain 0 + 0.33 − 0.14 = 0.19</text>
+            <text class="d-al" x="262" y="114" text-anchor="end">≤ 50K</text><text class="d-al" x="422" y="114">&gt; 50K</text>
+            <rect class="pill" x="330" y="250" width="160" height="26" rx="6"/><text class="d-s" x="410" y="267" text-anchor="middle">gain 1 + 0.33 − 0 = 1.33</text>
+            <text class="d-al" x="124" y="258" text-anchor="end">bad</text><text class="d-al" x="232" y="258">good, normal</text>
+          </svg>
+        </div>
+        <figcaption><b>The tree from the video, with \(\lambda = 0\).</b> Green chips are approvals (+0.5), outlined chips rejections (−0.5). The salary &gt; 50K branch is not split further in the video. The blue output lines are the leaf values XGBoost would use, \(\sum r / (\sum p(1-p) + \lambda)\), added for these notes (see the next section). Among the three credit groupings inside ≤ 50K, good against bad or normal would score higher still (gain 4): it separates the two approvals from the two rejections.</figcaption>
+      </figure>
+    </section>
+
+    <section id="xgbc-output">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=21730s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:02:10</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=21860s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:04:20 adding trees</a>
+        </div>
+        <h2>From trees to a probability</h2>
+      </div>
+      <p>To predict for a record, start at the base model. Its probability 0.5 is first turned into log-odds:</p>
+      <div class="eq">\[ \log\frac{p}{1 - p} = \log\frac{0.5}{0.5} = \log 1 = 0 \]</div>
+      <p>The record then goes down the tree. Record 1 (≤ 50K, bad) ends in the "bad" leaf. The leaf's value is multiplied by a learning rate \(\alpha\), a small number, and added to the base's 0. Because this is classification, a sigmoid turns the total into a probability between 0 and 1.</p>
+      <p class="callout">Correction: in the video the leaf contributes its similarity weight (1 for the "bad" leaf). In XGBoost a leaf contributes its <b>output value</b>, the sum of its residuals over the same denominator, with no square. A similarity weight is never negative, so it could never pull record 1 toward rejection; the output value keeps the residuals' sign.</p>
+      <div class="eq">\[ \text{output} = \frac{\sum_i r_i}{\sum_i p_i(1 - p_i) + \lambda} \]</div>
+      <p>For his tree with \(\lambda = 0\), the "bad" leaf gives \(-0.5/0.25 = -2\) and the "good or normal" leaf \(0.5/0.75 = 0.67\).</p>
+      <p>More trees are then added one after another, each with its own learning-rate term, until the combination becomes a strong learner:</p>
+      <div class="result">
+        <span class="lbl">XGBoost classifier output</span>
+        \[ p(\mathbf{x}) = \sigma\big(0 + \alpha_1 T_1(\mathbf{x}) + \alpha_2 T_2(\mathbf{x}) + \dots + \alpha_n T_n(\mathbf{x})\big) \]
+        <p>\(T_t(\mathbf{x})\) is the output of tree \(t\) for the record and \(\sigma\) the sigmoid. Adding the tree outputs a little at a time is what makes it boosting.</p>
+      </div>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 236" role="img" aria-label="Boosting pipeline: the base model gives probability 0.5, log-odds 0. Tree 1 fits the residuals y minus p0, tree 2 fits the residuals left after tree 1, up to tree n. Each tree output is scaled by the learning rate and added to the log-odds; a sigmoid turns the total into the final probability.">
+            <defs><marker id="kml08-p-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker><marker id="kml08-p-ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <rect class="d-box" x="10" y="40" width="118" height="76" rx="8"/>
+            <text class="d-t" x="69" y="64" text-anchor="middle">Base model</text>
+            <text class="d-s" x="69" y="84" text-anchor="middle">p₀ = 0.5</text>
+            <text class="d-s" x="69" y="100" text-anchor="middle">log-odds 0</text>
+            <rect class="d-box-acc" x="150" y="40" width="104" height="76" rx="8"/>
+            <text class="d-t" x="202" y="64" text-anchor="middle">Tree 1</text>
+            <text class="d-s" x="202" y="84" text-anchor="middle">fits y − p₀</text>
+            <text class="d-s" x="202" y="100" text-anchor="middle">adds α·T₁(x)</text>
+            <rect class="d-box-acc" x="284" y="40" width="104" height="76" rx="8"/>
+            <text class="d-t" x="336" y="64" text-anchor="middle">Tree 2</text>
+            <text class="d-s" x="336" y="84" text-anchor="middle">fits y − p₁</text>
+            <text class="d-s" x="336" y="100" text-anchor="middle">adds α·T₂(x)</text>
+            <rect class="d-box-acc" x="448" y="40" width="104" height="76" rx="8"/>
+            <text class="d-t" x="500" y="64" text-anchor="middle">Tree n</text>
+            <text class="d-s" x="500" y="84" text-anchor="middle">fits y − pₙ₋₁</text>
+            <text class="d-s" x="500" y="100" text-anchor="middle">adds α·Tₙ(x)</text>
+            <rect class="d-box" x="582" y="40" width="88" height="76" rx="8"/>
+            <text class="d-t" x="626" y="64" text-anchor="middle">Sigmoid</text>
+            <text class="d-s" x="626" y="84" text-anchor="middle">p = σ(F)</text>
+            <text class="d-s" x="626" y="100" text-anchor="middle">in (0, 1)</text>
+            <line class="d-ln" x1="128" y1="78" x2="148" y2="78" marker-end="url(#kml08-p-ah)"/>
+            <line class="d-ln" x1="254" y1="78" x2="282" y2="78" marker-end="url(#kml08-p-ah)"/>
+            <line class="d-ln" x1="388" y1="78" x2="404" y2="78" marker-end="url(#kml08-p-ah)"/>
+            <line class="d-ln" x1="436" y1="78" x2="446" y2="78" marker-end="url(#kml08-p-ah)"/>
+            <line class="d-ln" x1="552" y1="78" x2="580" y2="78" marker-end="url(#kml08-p-ah)"/>
+            <text class="d-t" x="420" y="83" text-anchor="middle">…</text>
+            <text class="d-row" x="10" y="26">running total F (log-odds) flows left to right</text>
+            <path class="d-ln-acc d-dash" d="M202 116 V140 Q202 148 210 148 H328 Q336 148 336 140 V118" marker-end="url(#kml08-p-ah2)"/>
+            <text class="d-s" x="269" y="166" text-anchor="middle" style="fill: var(--accent)">p₁ = σ(F₁) → new residuals</text>
+            <text class="d-t" x="340" y="200" text-anchor="middle">F(x) = 0 + α·T₁(x) + α·T₂(x) + … + α·Tₙ(x),   p(x) = σ(F(x))</text>
+            <text class="d-s" x="340" y="222" text-anchor="middle">record 1, illustrative α = 0.3: F₁ = 0 + 0.3 × (−2) = −0.6, p₁ = σ(−0.6) = 0.35, new residual 0 − 0.35 = −0.35</text>
+          </svg>
+        </div>
+        <figcaption><b>How the pieces fit.</b> The running total \(F\) is in log-odds. The dashed loop, the update of probabilities and residuals between trees, is standard XGBoost and is not spelled out in the video. The worked line uses the corrected leaf value −2 and an illustrative \(\alpha = 0.3\).</figcaption>
+      </figure>
+      <p class="note">Not in the video: XGBoost uses one learning rate for every tree (<code>learning_rate</code>, also called eta, 0.3 by default). Before tree \(t+1\) is built, each record's probability becomes \(\sigma\) of its running total and the residuals are recomputed from it. From the second tree on, the \(p_i(1 - p_i)\) terms in the similarity weight differ from record to record.</p>
+    </section>
+
+    <section id="xgbc-overfit">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=21923s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:05:23</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22026s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:07:06 λ by cross-validation</a>
+        </div>
+        <h2>Black box, overfitting and λ</h2>
+      </div>
+      <p>Working these numbers by hand for many trees is impractical, so he calls XGBoost a black-box model. Asked whether it is prone to overfitting, he says it needs hyperparameter tuning, the pre-pruning used for decision trees. \(\lambda\) is one of those hyperparameters, and it is set with cross-validation.</p>
+      <p>\(\lambda\) sits in the denominator of every similarity weight. Raising it shrinks all of them, and it shrinks the weights of nodes with few records the most, because their denominators start small. With \(\lambda = 1\), the one-record "bad" leaf drops from \(0.25/0.25 = 1\) to \(0.25/1.25 = 0.2\), a fifth of its value, while the four-record ≤ 50K node's denominator only doubles. Splits that isolate one or two records lose most of their gain.</p>
+
+      <figure id="sw-fig">
+        <div class="controls">
+          <span style="color: var(--ink-2)">Data</span>
+          <button class="btn solid" type="button" id="sw-mode-cls" aria-pressed="true">Loan approval (classifier)</button>
+          <button class="btn" type="button" id="sw-mode-reg" aria-pressed="false">Salary (regressor)</button>
+        </div>
+        <div class="controls">
+          <label for="sw-split">Split</label>
+          <select id="sw-split" style="font: 500 14px/1.3 var(--font-head); padding: 7px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); color: var(--ink); max-width: 100%;"></select>
+          <button class="btn" type="button" id="sw-reset">His settings</button>
+        </div>
+        <div class="controls">
+          <label for="sw-lam">\(\lambda\)</label>
+          <input type="range" id="sw-lam" min="0" max="3" step="0.05" value="0">
+          <output id="sw-lam-out" for="sw-lam">0.00</output>
+        </div>
+        <div class="controls">
+          <label for="sw-gam">\(\gamma\) (not in the video)</label>
+          <input type="range" id="sw-gam" min="0" max="4" step="0.05" value="0">
+          <output id="sw-gam-out" for="sw-gam">0.00</output>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Similarity, parent</span><span class="v" id="sw-root">–</span></div>
+          <div><span class="k">Similarity, left</span><span class="v" id="sw-left">–</span></div>
+          <div><span class="k">Similarity, right</span><span class="v" id="sw-right">–</span></div>
+          <div><span class="k">Gain</span><span class="v mine" id="sw-gain">–</span></div>
+        </div>
+        <div class="status" id="sw-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="sw-svg" class="dg" viewBox="0 0 680 300" role="img" aria-label="Left: the chosen split drawn as a parent node and two children, each listing its residuals, the sum of residuals, its cover, similarity weight and output value. Right: horizontal bars comparing the gain of every candidate split at the same node, with the chosen split highlighted and a dashed line at gamma."></svg></div>
+        <figcaption><b>Similarity weight and gain calculator.</b> Residuals are from the video, after the base model (0.5 for the loans, 51K for the salaries). Pick a split and move \(\lambda\); the bars compare every candidate split at the same node, and you can click a bar to pick it. It loads with his settings: salary split and \(\lambda = 0\) for the loans (0.14, 0, 0.33, gain 0.19), the 2-year threshold and \(\lambda = 1\) for the salaries. Cover is the denominator without \(\lambda\). The output value and \(\gamma\) are standard XGBoost, not from the video; a bar left of the \(\gamma\) line marks a split that would be pruned.</figcaption>
+      </figure>
+
+      <h3>Not in the video: cover, γ and where the formulas come from</h3>
+      <ul>
+        <li><b>Cover</b> is the denominator without \(\lambda\): \(\sum p(1-p)\) for classification, the number of records for regression. The setting <code>min_child_weight</code> (default 1) forbids a child whose cover is below it. At \(p = 0.5\) each record adds only 0.25, so the default would block his one-record "bad" leaf.</li>
+        <li><b>\(\gamma\)</b> (<code>gamma</code>, also <code>min_split_loss</code>, default 0) is the smallest gain a split must reach. Once a tree is grown, splits whose gain falls below \(\gamma\) are pruned from the bottom up. Larger \(\gamma\) gives smaller trees.</li>
+        <li>Both formulas come from a second-order approximation of the loss. With first derivatives \(g_i\) and second derivatives \(h_i\) of the loss, a node's score is \((\sum g_i)^2/(\sum h_i + \lambda)\) and its best output is \(-\sum g_i/(\sum h_i + \lambda)\). For log loss \(g_i = p_i - y_i = -r_i\) and \(h_i = p_i(1-p_i)\); for squared error \(h_i = 1\), which is why the regressor's denominator counts records. The XGBoost paper also puts a factor ½ in front of the gain, which does not change which split wins. \(\lambda\) acts as an L2 penalty on leaf outputs, the same idea as ridge regression (<a href="part-12.html">Part 12</a>, <a href="krish-ml-02.html">krish-ml-02.html</a>).</li>
+      </ul>
+    </section>
+
+    <!-- ============ XGBOOST REGRESSOR ============ -->
+    <section id="xgbr-base">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22026s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:07:06</a>
+        <h2>Salary data and the mean as base model</h2>
+      </div>
+      <p class="note">The video's chapter marker for the regressor is at 6:00:00, while he is still splitting on credit. The regressor itself starts at about 6:07:06.</p>
+      <p>The regression example predicts salary from years of experience and whether the person had a career gap.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">Experience</th><th>Gap</th><th class="num">Salary</th><th class="num">Residual (salary − 51K)</th></tr></thead>
+          <tbody>
+            <tr><td class="num">2</td><td>yes</td><td class="num">40K</td><td class="num">−11</td></tr>
+            <tr><td class="num">2.5</td><td>yes</td><td class="num">42K</td><td class="num">−9</td></tr>
+            <tr><td class="num">3</td><td>no</td><td class="num">52K</td><td class="num">+1</td></tr>
+            <tr><td class="num">4</td><td>no</td><td class="num">60K</td><td class="num">+9</td></tr>
+            <tr><td class="num">4.5</td><td>yes</td><td class="num">62K</td><td class="num">+11</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>For regression the base model outputs the <b>average</b> of the target, whatever the input. With the salaries he first writes down (40, 41, 52, 60 and 62K) the average is exactly 51K, and each residual is salary minus 51K. He then changes 41K to 42K so the residuals come out rounder and keeps the base at 51K; strictly, the mean becomes 51.2K. The notes use his numbers.</p>
+      <p>Asked whether random forest works this way, he says no: random forest uses bagging (<a href="krish-ml-06.html">krish-ml-06.html</a>).</p>
+    </section>
+
+    <section id="xgbr-split">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22190s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:09:50</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22253s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:10:53 similarity weight</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22414s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:13:34 gain</a>
+        </div>
+        <h2>Similarity weight for regression, and a first split</h2>
+      </div>
+      <p>Experience is continuous, so candidate thresholds are taken between sorted values, as for a decision tree regressor (<a href="krish-ml-05.html">krish-ml-05.html</a>). The first candidate is experience ≤ 2 against &gt; 2: one residual goes left and four go right.</p>
+      <p>For regression the similarity weight changes. The denominator counts residuals instead of summing \(p(1-p)\):</p>
+      <div class="result">
+        <span class="lbl">Similarity weight, regression</span>
+        \[ \text{SW} = \frac{\big(\sum_i r_i\big)^2}{n + \lambda} \]
+        <p>\(n\) is the number of residuals in the node. The larger \(\lambda\), the more the residuals are penalized.</p>
+      </div>
+      <p>With \(\lambda = 0\) the left node would score \(121/1 = 121\). He then sets \(\lambda = 1\) (he calls it alpha at this point) to show the penalty:</p>
+      <div class="eq">\[ \begin{aligned} \text{SW}_{\le 2} &amp;= \frac{(-11)^2}{1 + 1} = \frac{121}{2} = 60.5 \\ \text{SW}_{> 2} &amp;= \frac{(-9 + 1 + 9 + 11)^2}{4 + 1} = \frac{144}{5} = 28.8 \\ \text{SW}_{\text{root}} &amp;= \frac{(-11 - 9 + 1 + 9 + 11)^2}{5 + 1} = \frac{1}{6} = 0.17 \\ \text{Gain} &amp;= 60.5 + 28.8 - 0.17 = 89.13 \end{aligned} \]</div>
+      <p class="note">He first reads \(121/2\) as 65.5 and \(144/5\) as 28.5, and corrects both to 60.5 and 28.8 a moment later. The gain 89.13 is his final figure.</p>
+    </section>
+
+    <section id="xgbr-better">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22484s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:14:44</a>
+        <h2>A better split at 2.5 years</h2>
+      </div>
+      <p>The next threshold, experience ≤ 2.5 against &gt; 2.5, puts the two negative residuals on one side and the three positive ones on the other.</p>
+      <div class="eq">\[ \begin{aligned} \text{SW}_{\le 2.5} &amp;= \frac{(-11 - 9)^2}{2 + 1} = \frac{400}{3} = 133.33 \\ \text{SW}_{> 2.5} &amp;= \frac{(1 + 9 + 11)^2}{3 + 1} = \frac{441}{4} = 110.25 \\ \text{Gain} &amp;= 133.33 + 110.25 - 0.17 = 243.42 \end{aligned} \]</div>
+      <p>He only remarks that this is clearly larger than 89.13; the value 243.42 is worked out for these notes. The split with the higher gain is used, so experience ≤ 2.5 becomes the first split, and further splits are found the same way. Switch the calculator above to <b>Salary (regressor)</b> to compare every threshold and the gap feature.</p>
+    </section>
+
+    <section id="xgbr-output">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22653s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:17:33</a>
+        <h2>Predicting a salary</h2>
+      </div>
+      <p>A new record goes to the base model first and gets 51. It then goes down the tree, and the leaf it reaches contributes the average of its residuals, scaled by the learning rate:</p>
+      <div class="eq">\[ \begin{aligned} \text{experience} \le 2.5: &amp;\quad \hat y = 51 + \alpha_1 \cdot \frac{-11 - 9}{2} = 51 - 10\,\alpha_1 \\ \text{experience} &gt; 2.5: &amp;\quad \hat y = 51 + \alpha_1 \cdot \frac{1 + 9 + 11}{3} = 51 + 7\,\alpha_1 \end{aligned} \]</div>
+      <p>Further trees are built separately and added in the same way:</p>
+      <div class="result">
+        <span class="lbl">XGBoost regressor output</span>
+        \[ \hat y(\mathbf{x}) = 51 + \alpha_1 T_1(\mathbf{x}) + \alpha_2 T_2(\mathbf{x}) + \dots + \alpha_n T_n(\mathbf{x}) \]
+      </div>
+      <p>As with the classifier, he stresses that the result cannot be inspected by eye: in practice it is a black box.</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 354" role="img" aria-label="Salary against years of experience for five people. A dashed line at 51K is the base model; vertical segments show the residuals minus 11, minus 9, plus 1, plus 9, plus 11. A split at 2.5 years gives a step: 41K and 58K with learning rate 1, 46K and 54.5K with learning rate 0.5.">
+            <line class="d-rule" x1="80" y1="242" x2="640" y2="242"/><text class="d-al" x="74" y="246" text-anchor="end">40K</text>
+            <line class="d-rule" x1="80" y1="202" x2="640" y2="202"/><text class="d-al" x="74" y="206" text-anchor="end">45K</text>
+            <line class="d-rule" x1="80" y1="162" x2="640" y2="162"/><text class="d-al" x="74" y="166" text-anchor="end">50K</text>
+            <line class="d-rule" x1="80" y1="122" x2="640" y2="122"/><text class="d-al" x="74" y="126" text-anchor="end">55K</text>
+            <line class="d-rule" x1="80" y1="82" x2="640" y2="82"/><text class="d-al" x="74" y="86" text-anchor="end">60K</text>
+            <line class="d-rule" x1="80" y1="42" x2="640" y2="42"/><text class="d-al" x="74" y="46" text-anchor="end">65K</text>
+            <line class="d-ln" x1="80" y1="290" x2="640" y2="290"/><line class="d-ln" x1="80" y1="34" x2="80" y2="290"/>
+            <line class="d-ln" x1="160" y1="290" x2="160" y2="294"/><text class="d-al" x="160" y="307" text-anchor="middle">2</text>
+            <line class="d-ln" x1="240" y1="290" x2="240" y2="294"/><text class="d-al" x="240" y="307" text-anchor="middle">2.5</text>
+            <line class="d-ln" x1="320" y1="290" x2="320" y2="294"/><text class="d-al" x="320" y="307" text-anchor="middle">3</text>
+            <line class="d-ln" x1="400" y1="290" x2="400" y2="294"/><text class="d-al" x="400" y="307" text-anchor="middle">3.5</text>
+            <line class="d-ln" x1="480" y1="290" x2="480" y2="294"/><text class="d-al" x="480" y="307" text-anchor="middle">4</text>
+            <line class="d-ln" x1="560" y1="290" x2="560" y2="294"/><text class="d-al" x="560" y="307" text-anchor="middle">4.5</text>
+            <line class="d-ln" x1="640" y1="290" x2="640" y2="294"/><text class="d-al" x="640" y="307" text-anchor="middle">5</text>
+            <text class="d-s" x="360" y="324" text-anchor="middle">experience (years)</text>
+            <text class="d-s" x="80" y="20">salary</text>
+            <line class="d-ln-mut" x1="280" y1="34" x2="280" y2="290" style="stroke-dasharray: 3 4; stroke: var(--muted)"/>
+            <text class="d-s" x="286" y="46">split: experience ≤ 2.5 | &gt; 2.5</text>
+            <line class="d-ln d-dash" x1="80" y1="154" x2="640" y2="154"/>
+            <text class="d-s" x="636" y="170" text-anchor="end">base 51K</text>
+            <path class="d-ln-acc d-dash" d="M80 194 H280 V126 H640"/>
+            <path class="d-ln-acc" d="M80 234 H280 V98 H640" style="stroke-width: 2.6"/>
+            <text class="d-s" x="86" y="249" style="fill: var(--accent)">41K</text>
+            <text class="d-s" x="86" y="188" style="fill: var(--accent)">46K</text>
+            <text class="d-s" x="636" y="92" text-anchor="end" style="fill: var(--accent)">58K</text>
+            <text class="d-s" x="636" y="141" text-anchor="end" style="fill: var(--accent)">54.5K</text>
+            <line class="d-ln" x1="160" y1="242" x2="160" y2="154"/>
+            <line class="d-ln" x1="240" y1="226" x2="240" y2="154"/>
+            <line class="d-ln" x1="320" y1="146" x2="320" y2="154"/>
+            <line class="d-ln" x1="480" y1="82" x2="480" y2="154"/>
+            <line class="d-ln" x1="560" y1="66" x2="560" y2="154"/>
+            <circle class="pt-new" cx="160" cy="242" r="5"/>
+            <text class="d-al" x="167" y="216">−11</text>
+            <circle class="pt-new" cx="240" cy="226" r="5"/>
+            <text class="d-al" x="247" y="216">−9</text>
+            <circle class="pt-new" cx="320" cy="146" r="5"/>
+            <text class="d-al" x="327" y="142">+1</text>
+            <circle class="pt-new" cx="480" cy="82" r="5"/>
+            <text class="d-al" x="487" y="146">+9</text>
+            <circle class="pt-new" cx="560" cy="66" r="5"/>
+            <text class="d-al" x="567" y="146">+11</text>
+            <line class="d-ln-acc" x1="80" y1="340" x2="104" y2="340" style="stroke-width: 2.6"/><text class="d-s" x="110" y="344">first tree, α = 1</text>
+            <line class="d-ln-acc d-dash" x1="230" y1="340" x2="254" y2="340"/><text class="d-s" x="260" y="344">first tree, α = 0.5</text>
+            <line class="d-ln d-dash" x1="384" y1="340" x2="408" y2="340"/><text class="d-s" x="414" y="344">base model</text>
+            <circle class="pt-new" cx="508" cy="340" r="4.5"/><text class="d-s" x="518" y="344">data, residual to 51K</text>
+          </svg>
+        </div>
+        <figcaption><b>The salary data from the video</b> (with his 42K). The dashed line is the base model at 51K, and the vertical segments are the residuals the first tree works on. The split at 2.5 years gives the step: with \(\alpha = 1\) the first tree predicts 41K and 58K, with \(\alpha = 0.5\) only half the correction is taken (46K and 54.5K), and later trees fit what is left.</figcaption>
+      </figure>
+      <p class="callout">Not in the video: XGBoost's leaf output for regression is \(\sum r / (n + \lambda)\). The plain average he uses is the \(\lambda = 0\) case. With his \(\lambda = 1\) the two leaves would give \(-20/3 = -6.67\) and \(21/4 = 5.25\), a little closer to zero.</p>
+    </section>
+
+    <!-- ============ SVM ============ -->
+    <section id="svm-margin">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22744s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:19:04</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22842s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:20:42 hard and soft margin</a>
+        </div>
+        <h2>Hyperplane and marginal planes</h2>
+      </div>
+      <p>He introduces the support vector machine as close to logistic regression. Logistic regression fits a best-fit line that divides two classes of points (<a href="krish-ml-02.html">krish-ml-02.html</a>). An SVM draws that line, the <dfn>hyperplane</dfn>, and also two parallel <dfn>marginal planes</dfn>, one on each side, passing through the nearest points of each class. Among all candidate lines, the one whose marginal planes are farthest apart divides the points best.</p>
+      <p>Real data overlap. If the classes can be split with no point inside or across the marginal planes, the result is a <dfn>hard margin</dfn>. When some points land on the wrong side and errors must be allowed, it is a <dfn>soft margin</dfn>. He notes that a hard margin is practically impossible on a normal data set, so in practice the SVM builds a soft margin: the widest margin it can get while tolerating some errors, controlled by hyperparameters.</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 304" role="img" aria-label="Two panels. Left, hard margin: filled and hollow points are split by a solid hyperplane with dashed marginal planes on each side; no point lies between them; ringed points sit on the marginal planes; an arrow shows the margin width 2 over the norm of w. Right, soft margin: a wider margin, with one point inside the margin and two on the wrong side, each joined to its own marginal plane by a dashed slack segment labelled xi.">
+            <defs><clipPath id="kml08-svm-c1"><rect x="55" y="45" width="240" height="240"/></clipPath><clipPath id="kml08-svm-c2"><rect x="385" y="45" width="240" height="240"/></clipPath><marker id="kml08-s-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="55" y="28">Hard margin</text>
+            <rect class="d-plot" x="55" y="45" width="240" height="240"/>
+            <g clip-path="url(#kml08-svm-c1)">
+              <line class="d-ln d-dash" x1="13.8" y1="286.6" x2="296.6" y2="3.8"/>
+              <line class="d-ln" x1="33.6" y1="306.4" x2="316.4" y2="23.6" style="stroke-width: 2"/>
+              <line class="d-ln d-dash" x1="53.4" y1="326.2" x2="336.2" y2="43.4"/>
+            </g>
+            <text class="d-al" x="249.9" y="61.5">+1</text>
+            <text class="d-al" x="269.7" y="81.3">0</text>
+            <text class="d-al" x="289.5" y="101.1">−1</text>
+            <line class="d-ln-acc" x1="135.4" y1="244.2" x2="95.8" y2="204.6" marker-start="url(#kml08-s-ah)" marker-end="url(#kml08-s-ah)"/>
+            <text class="d-s" x="104.5" y="247.5" text-anchor="end" style="fill: var(--accent)">2/‖w‖</text>
+            <circle class="pt-tree" cx="132.6" cy="167.8" r="4.5"/>
+            <circle class="pt-tree" cx="186.3" cy="114.1" r="4.5"/>
+            <circle class="pt-tree" cx="87.3" cy="179.1" r="4.5"/>
+            <circle class="pt-tree" cx="131.2" cy="126.8" r="4.5"/>
+            <circle class="pt-tree" cx="146.7" cy="85.8" r="4.5"/>
+            <circle class="pt-tree" cx="192" cy="80.1" r="4.5"/>
+            <circle class="pt-tree" cx="81.7" cy="133.9" r="4.5"/>
+            <circle class="pt-tree" cx="112.8" cy="85.8" r="4.5"/>
+            <circle class="pt-no" cx="200.5" cy="179.1" r="4.5"/>
+            <circle class="pt-no" cx="169.3" cy="238.5" r="4.5"/>
+            <circle class="pt-no" cx="248.5" cy="165" r="4.5"/>
+            <circle class="pt-no" cx="214.6" cy="227.2" r="4.5"/>
+            <circle class="pt-no" cx="262.7" cy="207.4" r="4.5"/>
+            <circle class="pt-no" cx="259.9" cy="136.7" r="4.5"/>
+            <circle class="pt-no" cx="208.9" cy="266.8" r="4.5"/>
+            <circle class="d-ln-acc" cx="132.6" cy="167.8" r="8.5"/>
+            <circle class="d-ln-acc" cx="186.3" cy="114.1" r="8.5"/>
+            <circle class="d-ln-acc" cx="200.5" cy="179.1" r="8.5"/>
+            <line class="d-rule" x1="340" y1="10" x2="340" y2="296"/>
+            <text class="d-h" x="385" y="28">Soft margin</text>
+            <rect class="d-plot" x="385" y="45" width="240" height="240"/>
+            <g clip-path="url(#kml08-svm-c2)">
+              <line class="d-ln d-dash" x1="335.3" y1="278.1" x2="618.1" y2="-4.7"/>
+              <line class="d-ln" x1="363.6" y1="306.4" x2="646.4" y2="23.6" style="stroke-width: 2"/>
+              <line class="d-ln d-dash" x1="391.9" y1="334.7" x2="674.7" y2="51.9"/>
+            </g>
+            <text class="d-al" x="568.6" y="55.9">+1</text>
+            <text class="d-al" x="596.9" y="84.1">0</text>
+            <text class="d-al" x="625.1" y="112.4">−1</text>
+            <line class="d-ln-acc" x1="471.1" y1="255.5" x2="414.5" y2="198.9" marker-start="url(#kml08-s-ah)" marker-end="url(#kml08-s-ah)"/>
+            <text class="d-s" x="431.7" y="250.3" text-anchor="end" style="fill: var(--accent)">2/‖w‖</text>
+            <line class="d-ln-acc d-dash" x1="485.2" y1="162.2" x2="468.2" y2="145.2"/>
+            <text class="d-s" x="482.7" y="165.7" style="fill: var(--accent)">ξ</text>
+            <line class="d-ln-acc d-dash" x1="565.8" y1="129.6" x2="524.8" y2="88.6"/>
+            <text class="d-s" x="551.3" y="121.1" style="fill: var(--accent)">ξ</text>
+            <line class="d-ln-acc d-dash" x1="462.6" y1="190.5" x2="499.3" y2="227.2"/>
+            <text class="d-s" x="487" y="220.8" style="fill: var(--accent)">ξ</text>
+            <circle class="pt-tree" cx="431.5" cy="182" r="4.5"/>
+            <circle class="pt-tree" cx="493.7" cy="119.7" r="4.5"/>
+            <circle class="pt-tree" cx="434.3" cy="133.9" r="4.5"/>
+            <circle class="pt-tree" cx="493.7" cy="80.1" r="4.5"/>
+            <circle class="pt-tree" cx="442.8" cy="91.5" r="4.5"/>
+            <circle class="pt-tree" cx="394.7" cy="156.5" r="4.5"/>
+            <circle class="pt-no" cx="519.1" cy="207.4" r="4.5"/>
+            <circle class="pt-no" cx="572.9" cy="153.7" r="4.5"/>
+            <circle class="pt-no" cx="510.7" cy="249.9" r="4.5"/>
+            <circle class="pt-no" cx="570.1" cy="201.8" r="4.5"/>
+            <circle class="pt-no" cx="598.3" cy="156.5" r="4.5"/>
+            <circle class="pt-no" cx="564.4" cy="241.4" r="4.5"/>
+            <circle class="pt-tree" cx="485.2" cy="162.2" r="4.5"/>
+            <circle class="pt-tree" cx="565.8" cy="129.6" r="4.5"/>
+            <circle class="pt-no" cx="462.6" cy="190.5" r="4.5"/>
+            <circle class="d-ln-acc" cx="431.5" cy="182" r="8.5"/>
+            <circle class="d-ln-acc" cx="493.7" cy="119.7" r="8.5"/>
+            <circle class="d-ln-acc" cx="519.1" cy="207.4" r="8.5"/>
+            <circle class="d-ln-acc" cx="572.9" cy="153.7" r="8.5"/>
+          </svg>
+        </div>
+        <figcaption><b>Hard and soft margin</b> (illustrative points). Solid line: the hyperplane; dashed lines: the marginal planes, labelled with the value of \(\mathbf{w}^\top\mathbf{x} + b\) (next sections). Ringed points lie on the marginal planes. On the right a wider margin is bought by letting three points violate it; each dashed blue segment is that point's slack \(\xi\), its shortfall from its own marginal plane.</figcaption>
+      </figure>
+      <p class="note">Not in the video: the points the marginal planes rest on, plus any points inside or beyond them in a soft margin, are the <dfn>support vectors</dfn>. They alone fix the hyperplane; moving any other point (without crossing a marginal plane) changes nothing. For the IIT Madras treatment, see Part 16 (<a href="part-16.html#support-vectors">part-16.html</a>).</p>
+    </section>
+
+    <section id="svm-line">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=22875s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:21:15</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=23008s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:23:28 which side</a>
+        </div>
+        <h2>The line as \(\mathbf{w}^\top\mathbf{x} + b = 0\)</h2>
+      </div>
+      <p>He rewrites the familiar line \(y = mx + c\). The general form \(ax + by + c = 0\) describes the same line; solving it for \(y\) gives</p>
+      <div class="eq">\[ y = -\frac{a}{b}\,x - \frac{c}{b} \]</div>
+      <p>So the slope is \(m = -a/b\) and the intercept is \(-c/b\).</p>
+      <p>With features \(x_1, x_2, \dots\) and weights \(w_1, w_2, \dots\) the same form becomes</p>
+      <div class="eq">\[ w_1 x_1 + w_2 x_2 + \dots + b = 0 \;\;\Longleftrightarrow\;\; \mathbf{w}^\top\mathbf{x} + b = 0 \]</div>
+      <p>The sign of \(\mathbf{w}^\top\mathbf{x} + b\) tells which side of the line a point is on. His example takes a line through the origin (\(b = 0\)) with slope −1, the line \(x_2 = -x_1\). In this form it has \(\mathbf{w} = (-1, -1)\):</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Point</th><th>\(\mathbf{w}^\top\mathbf{x} + b\)</th><th>Where it is</th></tr></thead>
+          <tbody>
+            <tr><td>\((-4,\ 0)\)</td><td>\((-1)(-4) + (-1)(0) = 4\)</td><td>below the line: positive</td></tr>
+            <tr><td>\((4,\ 4)\)</td><td>\((-1)(4) + (-1)(4) = -8\)</td><td>above the line: negative</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Every point below this line gives a positive value and every point above it a negative one, so the sign separates the two categories, and a plane can split the points.</p>
+      <p class="note">His spoken arithmetic multiplies only the first coordinate by −1, which gives −4 for the second point. The full \(\mathbf{w}\) for this line gives −8. The sign, which is all that matters here, is the same.</p>
+    </section>
+
+    <section id="svm-objective">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=23195s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:26:35</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=23363s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:29:23 margin width</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=23465s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:31:05 constraints</a>
+        </div>
+        <h2>Maximize the margin</h2>
+      </div>
+      <p>The marginal planes are the places where the same expression equals −1 and +1. The plane on the negative side is \(\mathbf{w}^\top\mathbf{x} + b = -1\) and the one on the positive side \(\mathbf{w}^\top\mathbf{x} + b = +1\). He would rather write \(\pm k\), but most articles and research papers use \(\pm 1\).</p>
+      <p>Take a point \(\mathbf{x}_1\) on the +1 plane and a point \(\mathbf{x}_2\) on the −1 plane and subtract the two equations; \(b\) cancels:</p>
+      <div class="eq">\[ \begin{aligned} \mathbf{w}^\top\mathbf{x}_1 + b = 1,\quad \mathbf{w}^\top\mathbf{x}_2 + b = -1 \;\;&amp;\Rightarrow\;\; \mathbf{w}^\top(\mathbf{x}_1 - \mathbf{x}_2) = 2 \\ &amp;\Rightarrow\;\; \frac{\mathbf{w}^\top}{\lVert\mathbf{w}\rVert}(\mathbf{x}_1 - \mathbf{x}_2) = \frac{2}{\lVert\mathbf{w}\rVert} \end{aligned} \]</div>
+      <p>Dividing by the length \(\lVert\mathbf{w}\rVert\) leaves a unit vector along \(\mathbf{w}\), so the left side is the distance between the two planes. The wider this gap, the better the model, so the SVM's aim is:</p>
+      <div class="result">
+        <span class="lbl">Hard-margin SVM, as he writes it</span>
+        \[ \max_{\mathbf{w},\, b} \; \frac{2}{\lVert\mathbf{w}\rVert} \quad \text{such that} \quad y_i\,(\mathbf{w}^\top\mathbf{x}_i + b) \ge 1 \;\text{ for every point } i \]
+      </div>
+      <p>The constraint packs two conditions into one. A point with label \(y_i = +1\) must have \(\mathbf{w}^\top\mathbf{x}_i + b \ge 1\), and a point with \(y_i = -1\) must have \(\mathbf{w}^\top\mathbf{x}_i + b \le -1\). Multiplying by \(y_i\) turns both into \(\ge 1\) for correctly classified points: for a negative point, −1 times a value ≤ −1 is at least 1.</p>
+      <p>Because optimizers are usually written as minimizations, he flips the fraction <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=23592s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:33:12</a>. Maximizing \(2/\lVert\mathbf{w}\rVert\) is the same as minimizing \(\lVert\mathbf{w}\rVert/2\), by adjusting \(\mathbf{w}\) and \(b\).</p>
+      <p class="note">Not in the video: textbooks minimize \(\tfrac12\lVert\mathbf{w}\rVert^2\), which has the same solution and is smoother to optimize. For the width derivation and the full hard-margin problem, see Part 16 (<a href="part-16.html#width">part-16.html</a>).</p>
+    </section>
+
+    <section id="svm-soft">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=23659s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:34:19</a>
+        <h2>Soft margin: C and the slack terms</h2>
+      </div>
+      <p>For data that overlap, he adds two things to the objective:</p>
+      <div class="eq">\[ \min_{\mathbf{w},\, b} \; \frac{\lVert\mathbf{w}\rVert}{2} + C \sum_{i=1}^{n} \xi_i \]</div>
+      <ul>
+        <li>\(C\) (he writes it with an index, \(C_i\)) says how many errors are acceptable even with the marginal planes in place, for example six or seven.</li>
+        <li>\(\xi_i\) (he calls it eta) is the distance of a wrongly placed point from its marginal plane. Summing over the wrong points of both classes gives the total error.</li>
+      </ul>
+      <p>If the data cannot be fitted cleanly, these two hyperparameters let the SVM accept some errors and still draw the best line with the widest marginal planes it can. The dashed segments in the soft-margin figure above are the \(\xi_i\).</p>
+      <p class="callout">Correction and context: in the standard formulation \(C\) is one constant, the same for every point, and it does not count errors directly. It is the price of each unit of slack. A large \(C\) punishes violations heavily and gives a narrower margin with fewer errors; a small \(C\) accepts more violations in exchange for a wider margin. The constraints change too, to \(y_i(\mathbf{w}^\top\mathbf{x}_i + b) \ge 1 - \xi_i\) with \(\xi_i \ge 0\): a point on or beyond its marginal plane has \(\xi_i = 0\), a point inside the margin has \(0 &lt; \xi_i &lt; 1\), and a misclassified point has \(\xi_i &gt; 1\). See Part 16 (<a href="part-16.html#bribes">slack variables</a>, <a href="part-16.html#choosing-c">what C does</a>).</p>
+    </section>
+
+    <section id="svm-kernel">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=23792s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:36:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=23824s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>6:37:04 kernels</a>
+        </div>
+        <h2>SVR and kernels</h2>
+      </div>
+      <p>For support vector regression (SVR) he says only one part of this formulation changes, and leaves finding out which as an assignment.</p>
+      <p class="callout">Not in the video: SVR keeps \(\tfrac12\lVert\mathbf{w}\rVert^2 + C\sum(\text{slack})\) and changes the constraints. Instead of each point sitting on the correct side of a margin, each target must lie inside a tube of half-width \(\varepsilon\) around the prediction, \(|y_i - (\mathbf{w}^\top\mathbf{x}_i + b)| \le \varepsilon\), with one slack for points above the tube and one for points below. Points inside the tube cost nothing.</p>
+      <p>Some data cannot be divided by any straight line, for example one class forming a ring around the other. An <dfn>SVM kernel</dfn> converts the two-dimensional data into three dimensions, pushing one class up and the other down, and a plane can then split them. For the details he points to his separate video on SVM kernels, which includes a practical demonstration.</p>
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 304" role="img" aria-label="Left: in two dimensions one class forms a small ring around the origin and the other a larger ring around it; no straight line separates them. Right: after adding a third coordinate z equal to x1 squared plus x2 squared, the inner points sit low and the outer points high, and a flat plane between them separates the classes.">
+            <defs><marker id="kml08-k-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="40" y="26">2-D: no straight line works</text>
+            <line class="d-rule" x1="45" y1="166" x2="295" y2="166"/><line class="d-rule" x1="170" y1="41" x2="170" y2="291"/>
+            <text class="d-al" x="292" y="160" text-anchor="end">x₁</text><text class="d-al" x="176" y="52">x₂</text>
+            <circle class="pt-no" cx="258.6" cy="150.4" r="4.5"/>
+            <circle class="pt-no" cx="244.5" cy="103.5" r="4.5"/>
+            <circle class="pt-no" cx="199.6" cy="84.8" r="4.5"/>
+            <circle class="pt-no" cx="152.5" cy="66.7" r="4.5"/>
+            <circle class="pt-no" cx="111" cy="95.7" r="4.5"/>
+            <circle class="pt-no" cx="80.4" cy="133.4" r="4.5"/>
+            <circle class="pt-no" cx="83.1" cy="181.3" r="4.5"/>
+            <circle class="pt-no" cx="94.2" cy="229.6" r="4.5"/>
+            <circle class="pt-no" cx="138" cy="254" r="4.5"/>
+            <circle class="pt-no" cx="185.6" cy="254.6" r="4.5"/>
+            <circle class="pt-no" cx="232.5" cy="240.5" r="4.5"/>
+            <circle class="pt-no" cx="251.2" cy="195.6" r="4.5"/>
+            <circle class="pt-tree" cx="203.8" cy="153.7" r="4.5"/>
+            <circle class="pt-tree" cx="182.9" cy="138.3" r="4.5"/>
+            <circle class="pt-tree" cx="155.8" cy="127.1" r="4.5"/>
+            <circle class="pt-tree" cx="140.6" cy="152.3" r="4.5"/>
+            <circle class="pt-tree" cx="132.8" cy="179.5" r="4.5"/>
+            <circle class="pt-tree" cx="155.5" cy="197" r="4.5"/>
+            <circle class="pt-tree" cx="184.8" cy="206.6" r="4.5"/>
+            <circle class="pt-tree" cx="196.1" cy="178.2" r="4.5"/>
+            <line class="d-ln" x1="306" y1="166" x2="384" y2="166" marker-end="url(#kml08-k-ah)"/>
+            <text class="d-s" x="345" y="156" text-anchor="middle">z = x₁² + x₂²</text>
+            <text class="d-s" x="345" y="186" text-anchor="middle">add a 3rd axis</text>
+            <text class="d-h" x="400" y="26">Lifted, seen from the side</text>
+            <line class="d-ln" x1="405" y1="282" x2="655" y2="282"/><line class="d-ln" x1="530" y1="282" x2="530" y2="42"/>
+            <text class="d-al" x="652" y="276" text-anchor="end">x₁</text><text class="d-al" x="536" y="52">z</text>
+            <line class="d-ln-acc" x1="405" y1="181.2" x2="655" y2="181.2" style="stroke-width: 2.2"/>
+            <text class="d-s" x="408" y="173.2" style="fill: var(--accent)">plane z = 3.6</text>
+            <circle class="pt-no" cx="618.6" cy="107" r="4.5"/>
+            <circle class="pt-no" cx="604.5" cy="77.9" r="4.5"/>
+            <circle class="pt-no" cx="559.6" cy="120.7" r="4.5"/>
+            <circle class="pt-no" cx="512.5" cy="62.5" r="4.5"/>
+            <circle class="pt-no" cx="471" cy="99.9" r="4.5"/>
+            <circle class="pt-no" cx="440.4" cy="85.4" r="4.5"/>
+            <circle class="pt-no" cx="443.1" cy="113.9" r="4.5"/>
+            <circle class="pt-no" cx="454.2" cy="70.2" r="4.5"/>
+            <circle class="pt-no" cx="498" cy="92.7" r="4.5"/>
+            <circle class="pt-no" cx="545.6" cy="107" r="4.5"/>
+            <circle class="pt-no" cx="592.5" cy="77.9" r="4.5"/>
+            <circle class="pt-no" cx="611.2" cy="120.7" r="4.5"/>
+            <circle class="pt-tree" cx="563.8" cy="254" r="4.5"/>
+            <circle class="pt-tree" cx="542.9" cy="261.8" r="4.5"/>
+            <circle class="pt-tree" cx="515.8" cy="245" r="4.5"/>
+            <circle class="pt-tree" cx="500.6" cy="259.3" r="4.5"/>
+            <circle class="pt-tree" cx="492.8" cy="248.1" r="4.5"/>
+            <circle class="pt-tree" cx="515.5" cy="256.7" r="4.5"/>
+            <circle class="pt-tree" cx="544.8" cy="241.7" r="4.5"/>
+            <circle class="pt-tree" cx="556.1" cy="264.1" r="4.5"/>
+          </svg>
+        </div>
+        <figcaption><b>Lifting to a third dimension</b> (illustrative points). Left: the filled class sits inside a ring of the hollow class, so no line separates them. Right: with the extra coordinate \(z = x_1^2 + x_2^2\), seen from the side, the inner points stay low and the outer points rise, and the flat plane \(z = 3.6\) separates them. This particular lift is a standard choice and not given in the video.</figcaption>
+      </figure>
+      <p class="note">The session ends here. PCA, which he lists at the start of this stretch as a possible third topic, is not covered; for PCA see Part 3 (<a href="part-03.html">part-03.html</a>). For kernels in the course, see Part 5 (<a href="part-05.html">part-05.html</a>) and Part 16 (<a href="part-16.html#kernel-prediction">part-16.html</a>).</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Bias (his usage)</dt><dd>How well a model does on the data it was trained on. Good training accuracy means low bias.</dd></div>
+        <div><dt>Variance (his usage)</dt><dd>How well the model holds up on other data, such as the test set. Good test accuracy means low variance.</dd></div>
+        <div><dt>Overfitting</dt><dd>Good on the training data, poor on the test data: low bias, high variance.</dd></div>
+        <div><dt>Generalized model</dt><dd>Low bias and low variance: accurate on training and test data alike. The aim.</dd></div>
+        <div><dt>XGBoost</dt><dd>Extreme gradient boosting: binary decision trees added one after another to a base model, each built on the current residuals.</dd></div>
+        <div><dt>Base model</dt><dd>The starting prediction: probability 0.5 (log-odds 0) for classification, the mean target for regression.</dd></div>
+        <div><dt>Residual</dt><dd>Target minus current prediction; what the next tree tries to explain.</dd></div>
+        <div><dt>Similarity weight</dt><dd>\((\sum r)^2/(\sum p(1-p) + \lambda)\) for classification, \((\sum r)^2/(n + \lambda)\) for regression. High when a node's residuals agree.</dd></div>
+        <div><dt>Gain</dt><dd>\(\text{SW}_{\text{left}} + \text{SW}_{\text{right}} - \text{SW}_{\text{parent}}\); the split with the highest gain is used.</dd></div>
+        <div><dt>\(\lambda\) (lambda)</dt><dd>Hyperparameter added to every denominator. Larger \(\lambda\) shrinks similarity weights and outputs, which fights overfitting. Chosen by cross-validation.</dd></div>
+        <div><dt>Learning rate \(\alpha\)</dt><dd>Factor that scales each tree's output before it is added, so the model improves in small steps.</dd></div>
+        <div><dt>Hyperplane and marginal planes</dt><dd>\(\mathbf{w}^\top\mathbf{x} + b = 0\) separates the classes; \(\mathbf{w}^\top\mathbf{x} + b = \pm1\) pass through the nearest points. Their distance is \(2/\lVert\mathbf{w}\rVert\).</dd></div>
+        <div><dt>Soft margin</dt><dd>A margin that allows errors. The slack \(\xi_i\) measures each violation and \(C\) sets its price.</dd></div>
+        <div><dt>SVM kernel</dt><dd>A mapping to a higher dimension where a plane can separate classes that no straight line separates.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>A model scores 95% on the training data and 60% on the test data. Describe it in Krish's terms.</span><span class="tog"></span></summary>
+          <p>Training accuracy is good, so low bias. Test accuracy is poor, so high variance. Low bias with high variance is overfitting.</p></details>
+        <details><summary><span class="q">Q2</span><span>A classifier node holds residuals −0.5, −0.5 and +0.5, all from \(p = 0.5\). Find its similarity weight with \(\lambda = 0\) and with \(\lambda = 1\).</span><span class="tog"></span></summary>
+          <p>\(\sum r = -0.5\), squared 0.25. Cover \(= 3 \times 0.25 = 0.75\). With \(\lambda = 0\): \(0.25/0.75 = 0.33\). With \(\lambda = 1\): \(0.25/1.75 = 0.14\).</p></details>
+        <details><summary><span class="q">Q3</span><span>Why is the similarity weight of the salary ≤ 50K node exactly 0, and what does that say about the node?</span><span class="tog"></span></summary>
+          <p>It holds two approvals (+0.5 each) and two rejections (−0.5 each), so the residuals sum to 0 before squaring. The node does not lean either way; its output value would also be 0.</p></details>
+        <details><summary><span class="q">Q4</span><span>For the salary data with \(\lambda = 1\), compute the gain of the split experience ≤ 3 against &gt; 3. Does it beat ≤ 2.5?</span><span class="tog"></span></summary>
+          <p>Left: \((-11 - 9 + 1)^2/(3+1) = 361/4 = 90.25\). Right: \((9 + 11)^2/(2+1) = 400/3 = 133.33\). Root: \(1/6 = 0.17\). Gain \(= 90.25 + 133.33 - 0.17 = 223.42\), below the 243.42 of the ≤ 2.5 split, so ≤ 2.5 still wins.</p></details>
+        <details><summary><span class="q">Q5</span><span>What happens to similarity weights and gains as \(\lambda\) grows, and which splits suffer most?</span><span class="tog"></span></summary>
+          <p>Every weight shrinks, because \(\lambda\) is added to every denominator. Nodes with a small cover (few records) shrink proportionally the most, so splits that isolate one or two records lose most of their gain. That makes the tree less eager to chase individual points, which is how \(\lambda\) fights overfitting.</p></details>
+        <details><summary><span class="q">Q6</span><span>Using his first regression tree (split at 2.5 years, leaf averages) with \(\alpha = 0.5\), what salary is predicted for someone with 2.2 years of experience?</span><span class="tog"></span></summary>
+          <p>2.2 ≤ 2.5, so the record lands in the leaf with residuals −11 and −9, average −10. Prediction \(= 51 + 0.5 \times (-10) = 46\)K.</p></details>
+        <details><summary><span class="q">Q7</span><span>Record 1 lands in the classifier's "bad" leaf (one residual −0.5, \(p = 0.5\), \(\lambda = 0\)). With \(\alpha = 0.3\), what is its probability after the first tree, using XGBoost's leaf output?</span><span class="tog"></span></summary>
+          <p>Leaf output \(= -0.5/0.25 = -2\). Log-odds \(= 0 + 0.3 \times (-2) = -0.6\). Probability \(= \sigma(-0.6) = 1/(1 + e^{0.6}) \approx 0.35\), down from 0.5, toward the true label 0. Using the similarity weight 1 instead would have pushed it the wrong way.</p></details>
+        <details><summary><span class="q">Q8</span><span>An SVM has \(\mathbf{w} = (3, 4)\). How wide is its margin, and what would raising \(C\) do in a soft-margin SVM?</span><span class="tog"></span></summary>
+          <p>\(\lVert\mathbf{w}\rVert = 5\), so the distance between the marginal planes is \(2/5 = 0.4\). A larger \(C\) makes each unit of slack more expensive, so the optimizer accepts fewer violations and usually a narrower margin.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="krish-ml-04.html"><span class="dir">← Part 4</span><span class="nm">Naive Bayes and KNN</span></a><a class="next" href="index.html#extra"><span class="dir">Finished →</span><span class="nm">Back to all notes</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the YouTube auto-generated captions of Krish Naik's video <i>Complete Machine Learning in 6 Hours</i>. Timestamp links open the video at that moment. Code is reconstructed from the audio. Charts marked synthetic use data generated for these notes. Not affiliated with Krish Naik or IIT Madras.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const txt = (attrs, s, parent) => { const t = mk('text', attrs, parent); t.textContent = s; return t; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = now => { const k = dur ? Math.min(1, (now - t0) / dur) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+
+  /* ---------- XGBoost similarity weight and gain calculator ---------- */
+  (() => {
+    const svg = document.getElementById('sw-svg'); if (!svg) return;
+    const all = n => Array.from({ length: n }, (_, i) => i);
+    const SETS = {
+      cls: {
+        r: [-0.5, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5], h: [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25],
+        lam: 0, lamMax: 3, lamStep: 0.05, gamMax: 4, gamStep: 0.05, dp: 2, chipW: 34,
+        groups: [
+          { title: 'At the root (all 7 records)', pname: 'All 7 records', parent: all(7), splits: [
+            { name: 'salary ≤ 50K | > 50K', l: 'salary ≤ 50K', r: 'salary > 50K', L: [0, 1, 2, 6], R: [3, 4, 5] },
+            { name: 'credit bad | good, normal', l: 'credit bad', r: 'good, normal', L: [0, 3], R: [1, 2, 4, 5, 6] },
+            { name: 'credit good | bad, normal', l: 'credit good', r: 'bad, normal', L: [1, 2, 4], R: [0, 3, 5, 6] },
+            { name: 'credit normal | bad, good', l: 'credit normal', r: 'bad, good', L: [5, 6], R: [0, 1, 2, 3, 4] }
+          ] },
+          { title: 'Inside salary ≤ 50K (4 records)', pname: 'salary ≤ 50K · 4 records', parent: [0, 1, 2, 6], splits: [
+            { name: 'credit bad | good, normal', l: 'credit bad', r: 'good, normal', L: [0], R: [1, 2, 6] },
+            { name: 'credit good | bad, normal', l: 'credit good', r: 'bad, normal', L: [1, 2], R: [0, 6] },
+            { name: 'credit normal | bad, good', l: 'credit normal', r: 'bad, good', L: [6], R: [0, 1, 2] }
+          ] }
+        ]
+      },
+      reg: {
+        r: [-11, -9, 1, 9, 11], h: [1, 1, 1, 1, 1],
+        lam: 1, lamMax: 10, lamStep: 0.1, gamMax: 300, gamStep: 5, dp: 2, chipW: 32,
+        groups: [
+          { title: 'At the root (all 5 records)', pname: 'All 5 records', parent: all(5), splits: [
+            { name: 'experience ≤ 2 | > 2', l: 'experience ≤ 2', r: 'experience > 2', L: [0], R: [1, 2, 3, 4] },
+            { name: 'experience ≤ 2.5 | > 2.5', l: 'experience ≤ 2.5', r: 'experience > 2.5', L: [0, 1], R: [2, 3, 4] },
+            { name: 'experience ≤ 3 | > 3', l: 'experience ≤ 3', r: 'experience > 3', L: [0, 1, 2], R: [3, 4] },
+            { name: 'experience ≤ 4 | > 4', l: 'experience ≤ 4', r: 'experience > 4', L: [0, 1, 2, 3], R: [4] },
+            { name: 'gap yes | no', l: 'gap yes', r: 'gap no', L: [0, 1, 4], R: [2, 3] }
+          ] }
+        ]
+      }
+    };
+    const sel = document.getElementById('sw-split');
+    const lamIn = document.getElementById('sw-lam'), lamOut = document.getElementById('sw-lam-out');
+    const gamIn = document.getElementById('sw-gam'), gamOut = document.getElementById('sw-gam-out');
+    const bCls = document.getElementById('sw-mode-cls'), bReg = document.getElementById('sw-mode-reg');
+    const oRoot = document.getElementById('sw-root'), oLeft = document.getElementById('sw-left'), oRight = document.getElementById('sw-right'), oGain = document.getElementById('sw-gain');
+    const status = document.getElementById('sw-status');
+    let mode = 'cls', gi = 0, si = 0, lam = 0, gam = 0;
+
+    const sum = (idx, arr) => idx.reduce((s, i) => s + arr[i], 0);
+    const node = (idx, D) => { const G = sum(idx, D.r), H = sum(idx, D.h); return { idx, G, H, sw: G * G / (H + lam), out: G / (H + lam) }; };
+    const gainOf = (D, g, s) => { const p = node(g.parent, D), L = node(s.L, D), R = node(s.R, D); return L.sw + R.sw - p.sw; };
+    const fx = (v, dp) => { const s = Math.abs(v) < 0.005 && dp === 2 ? '0.00' : v.toFixed(dp); return s.replace('-', '−'); };
+    const sgn = v => (v > 0 ? '+' : '−') + Math.abs(v);
+
+    const buildSelect = () => {
+      const D = SETS[mode];
+      sel.textContent = '';
+      D.groups.forEach((g, a) => {
+        const og = document.createElement('optgroup'); og.label = g.title;
+        g.splits.forEach((s, b) => { const o = document.createElement('option'); o.value = a + '-' + b; o.textContent = s.name; og.appendChild(o); });
+        sel.appendChild(og);
+      });
+      sel.value = gi + '-' + si;
+    };
+
+    const setMode = m => {
+      mode = m; const D = SETS[m];
+      gi = 0; si = 0; lam = D.lam; gam = 0;
+      lamIn.max = D.lamMax; lamIn.step = D.lamStep; lamIn.value = lam;
+      gamIn.max = D.gamMax; gamIn.step = D.gamStep; gamIn.value = 0;
+      [[bCls, 'cls'], [bReg, 'reg']].forEach(([b, k]) => { const on = k === m; b.classList.toggle('solid', on); b.setAttribute('aria-pressed', String(on)); });
+      buildSelect(); draw();
+    };
+
+    const box = (g, cx, y, w, h, title, n, D, isLeaf) => {
+      mk('rect', { class: 'd-box', x: cx - w / 2, y, width: w, height: h, rx: 8 }, g);
+      txt({ class: 'd-t', x: cx, y: y + 19, 'text-anchor': 'middle' }, title, g);
+      const cw = D.chipW, gap = 3, tot = n.idx.length * cw + (n.idx.length - 1) * gap;
+      n.idx.forEach((i, k) => {
+        const x = cx - tot / 2 + k * (cw + gap), v = D.r[i];
+        mk('rect', { class: v > 0 ? 'b-ok' : 'b-bad', x, y: y + 28, width: cw, height: 18, rx: 4 }, g);
+        txt({ class: 'd-al', x: x + cw / 2, y: y + 41, 'text-anchor': 'middle' }, sgn(v), g);
+      });
+      const dpG = mode === 'cls' ? 2 : 0;
+      txt({ class: 'd-s', x: cx, y: y + 64, 'text-anchor': 'middle' }, `Σr = ${fx(n.G, dpG)} · cover = ${fx(n.H, dpG)}`, g);
+      txt({ class: 'd-s', x: cx, y: y + 80, 'text-anchor': 'middle' }, `similarity = ${fx(n.sw, D.dp)}`, g);
+      if (isLeaf) txt({ class: 'd-s', x: cx, y: y + 96, 'text-anchor': 'middle', style: 'fill: var(--accent)' }, `output Σr/(cover+λ) = ${fx(n.out, D.dp)}`, g);
+    };
+
+    const draw = () => {
+      const D = SETS[mode], g = D.groups[gi], s = g.splits[si];
+      const P = node(g.parent, D), L = node(s.L, D), R = node(s.R, D), gain = L.sw + R.sw - P.sw;
+      lamOut.textContent = lam.toFixed(mode === 'cls' ? 2 : 1);
+      gamOut.textContent = gam.toFixed(mode === 'cls' ? 2 : 0);
+      oRoot.textContent = fx(P.sw, D.dp); oLeft.textContent = fx(L.sw, D.dp); oRight.textContent = fx(R.sw, D.dp); oGain.textContent = fx(gain, D.dp);
+      svg.textContent = '';
+      const defs = mk('defs', {}, svg);
+      const mkr = mk('marker', { id: 'kml08-sw-ah', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }, defs);
+      mk('path', { d: 'M0,0 L10,5 L0,10 z', class: 'd-ah' }, mkr);
+      const tree = mk('g', {}, svg);
+      mk('line', { class: 'd-ln', x1: 200, y1: 96, x2: 104, y2: 166, 'marker-end': 'url(#kml08-sw-ah)' }, tree);
+      mk('line', { class: 'd-ln', x1: 200, y1: 96, x2: 296, y2: 166, 'marker-end': 'url(#kml08-sw-ah)' }, tree);
+      box(tree, 200, 8, 330, 88, g.pname, P, D, false);
+      box(tree, 104, 168, 196, 106, s.l + ' · n = ' + s.L.length, L, D, true);
+      box(tree, 296, 168, 196, 106, s.r + ' · n = ' + s.R.length, R, D, true);
+      txt({ class: 'd-s', x: 200, y: 294, 'text-anchor': 'middle' }, `gain = ${fx(L.sw, D.dp)} + ${fx(R.sw, D.dp)} − ${fx(P.sw, D.dp)} = ${fx(gain, D.dp)}`, tree);
+
+      /* gain bars for every candidate split at this node */
+      const gains = g.splits.map(sp => gainOf(D, g, sp));
+      const lo = Math.min(0, ...gains), hi = Math.max(...gains, gam, 1e-9);
+      const X0 = 420, W = 176, sx = v => X0 + (v - lo) * W / (hi - lo);
+      const bars = mk('g', {}, svg);
+      txt({ class: 'd-t', x: X0, y: 20 }, 'Gain of each split here', bars);
+      const top = 34, rowH = Math.min(52, 254 / g.splits.length);
+      mk('line', { class: 'd-ln', x1: sx(0), y1: top, x2: sx(0), y2: top + rowH * g.splits.length }, bars);
+      let best = 0; gains.forEach((v, i) => { if (v > gains[best]) best = i; });
+      g.splits.forEach((sp, i) => {
+        const y = top + i * rowH, v = gains[i], on = i === si, pruned = gam > 0 && v < gam;
+        const row = mk('g', { style: 'cursor: pointer' }, bars);
+        mk('rect', { x: X0 - 4, y, width: 260, height: rowH, style: 'fill: transparent' }, row);
+        txt({ class: 'd-s', x: X0, y: y + 14, style: on ? 'fill: var(--accent); font-weight: 600' : '' }, sp.name, row);
+        const xa = sx(Math.min(0, v)), xb = sx(Math.max(0, v));
+        const r = mk('rect', { x: xa, y: y + 20, width: Math.max(1.5, xb - xa), height: 14, rx: 2 }, row);
+        if (on) r.setAttribute('style', 'fill: var(--accent)'); else r.setAttribute('class', pruned ? 'b-unk' : 'pill');
+        txt({ class: 'd-al', x: v >= 0 ? xb + 5 : xa - 5, y: y + 31, 'text-anchor': v >= 0 ? 'start' : 'end' }, fx(v, D.dp), row);
+        row.addEventListener('click', () => { si = i; sel.value = gi + '-' + si; draw(); });
+      });
+      if (gam > 0) {
+        const xg = sx(gam);
+        mk('line', { class: 'd-ln-acc d-dash', x1: xg, y1: top - 4, x2: xg, y2: top + rowH * g.splits.length }, bars);
+        txt({ class: 'd-al', x: xg + 4, y: top + 2, style: 'fill: var(--accent)' }, 'γ', bars);
+      }
+      let msg = si === best
+        ? `This split has the highest gain of the candidates at this node (λ = ${lamOut.textContent}).`
+        : `Highest gain at this node with λ = ${lamOut.textContent}: ${g.splits[best].name} (${fx(gains[best], D.dp)}).`;
+      if (gam > 0 && gain < gam) msg += ` With γ = ${gamOut.textContent} the chosen split would be pruned.`;
+      status.textContent = msg;
+    };
+
+    sel.addEventListener('change', () => { const [a, b] = sel.value.split('-').map(Number); gi = a; si = b; draw(); });
+    lamIn.addEventListener('input', () => { lam = parseFloat(lamIn.value); draw(); });
+    gamIn.addEventListener('input', () => { gam = parseFloat(gamIn.value); draw(); });
+    bCls.addEventListener('click', () => { if (mode !== 'cls') setMode('cls'); });
+    bReg.addEventListener('click', () => { if (mode !== 'reg') setMode('reg'); });
+    document.getElementById('sw-reset').addEventListener('click', () => {
+      const D = SETS[mode]; gi = 0; si = 0; gam = 0; gamIn.value = 0; sel.value = '0-0';
+      tween(lam, D.lam, v => { lam = v; lamIn.value = v; draw(); });
+    });
+    setMode('cls');
+  })();
+})();
+</script>
+</body>
+</html>
