@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ML in 6 hours · Part 6 · Ensembles, random forest and AdaBoost · MLT Notes</title>
+<meta name="description" content="Notes on Krish Naik's Complete Machine Learning in 6 Hours, Part 6: ensemble techniques, bagging versus boosting, the random forest classifier and regressor, and one full round of AdaBoost by hand.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script src="theme.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html#extra">All notes</a><span class="sep">/</span><span>ML in 6 hours · Part 6 of 8</span><span class="sep">·</span><a href="krish-ml-05.html">← Part 5</a><span class="sep">·</span><a href="krish-ml-07.html">Part 7 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Krish Naik · Complete Machine Learning in 6 Hours</div>
+    <h1>Ensembles: bagging, random forests and AdaBoost</h1>
+    <p class="lede">Ensemble techniques combine many models on one problem. Bagging trains them in parallel on samples of the rows and takes a vote, as the random forest does with decision trees; boosting chains weak learners so that each one focuses on the last one's mistakes, shown here through a full round of AdaBoost.</p>
+    <div class="meta">
+      <span><b>Part 6</b> of 8</span>
+      <span>Teacher <b>Krish Naik</b></span>
+      <span>About <b>38 min</b> of video</span>
+      <span><b>3</b> chapters</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14954s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:09:14 · Bagging and boosting</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15689s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:21:29 · Random forest</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16198s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:29:58 · AdaBoost</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Bagging and boosting</h4>
+      <ul>
+        <li><a href="#ensembles">What an ensemble is</a></li>
+        <li><a href="#bagging">Bagging</a></li>
+        <li><a href="#boosting">Boosting</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Random forest</h4>
+      <ul>
+        <li><a href="#tree-variance">One tree overfits</a></li>
+        <li><a href="#random-forest">Random forest</a></li>
+        <li><a href="#rf-questions">Interview questions</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>AdaBoost</h4>
+      <ul>
+        <li><a href="#adaboost-setup">Weights and the first stump</a></li>
+        <li><a href="#performance">Total error and α</a></li>
+        <li><a href="#weight-update">Updating the weights</a></li>
+        <li><a href="#normalize">Normalizing</a></li>
+        <li><a href="#buckets">Buckets and the next stump</a></li>
+        <li><a href="#round">One round, by hand</a></li>
+        <li><a href="#final">Final prediction</a></li>
+        <li><a href="#white-box">White box, black box</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html#extra">All notes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>An <dfn>ensemble</dfn> uses several models on one problem. <b>Bagging</b> trains them in parallel, each on its own sample of rows, and combines them by majority vote for classification or by the mean for regression.</li>
+        <li><b>Boosting</b> chains <b>weak learners</b> one after another. Each concentrates on the records the previous one got wrong, and together they make a <b>strong learner</b>.</li>
+        <li>A fully grown decision tree has low bias and high variance. A <b>random forest</b> bags many such trees, each on sampled rows and features, and the vote turns the high variance into low variance.</li>
+        <li>A random forest needs no feature scaling and is not much affected by outliers. KNN needs scaling and is affected by outliers, because it works with distances.</li>
+        <li>One AdaBoost round: equal weights \(1/n\), a one-split <b>stump</b>, total error \(\mathit{TE}\) = weight of the wrong records, performance \(\alpha = \tfrac12\ln\frac{1-\mathit{TE}}{\mathit{TE}}\), wrong weights times \(e^{\alpha}\) and correct ones times \(e^{-\alpha}\), normalize, then resample through <b>buckets</b> for the next stump.</li>
+      </ul>
+    </div>
+
+    <!-- ============ CHAPTER 1: ENSEMBLES ============ -->
+    <section id="ensembles">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14954s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:09:14</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14988s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:09:48 many models, one problem</a>
+        </div>
+        <h2>What an ensemble is</h2>
+      </div>
+      <p>Every algorithm so far in the video (linear and logistic regression, Naive Bayes, KNN, decision trees) solved a classification or regression problem on its own, one model at a time. This part opens with a new question: can several algorithms work on one problem together? They can, and the methods that do this are called <dfn>ensemble techniques</dfn>.</p>
+      <p>There are two ways to combine models, <dfn>bagging</dfn> and <dfn>boosting</dfn>. The session explains both, then the random forest (a bagging method) and AdaBoost (a boosting method). XGBoost was also on the agenda; it comes later in the video, in <a href="krish-ml-08.html">Part 8</a>.</p>
+      <p class="note">For the IIT Madras treatment of ensembles, see <a href="part-17.html">Part 17</a> (part-17.html).</p>
+    </section>
+
+    <section id="bagging">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15085s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:11:25</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15248s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:14:08 majority vote</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15418s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:16:58 regression</a>
+        </div>
+        <h2>Bagging: parallel models and a vote</h2>
+      </div>
+      <p>Start with a data set \(D\): features \(f_1, f_2, f_3, \dots\), an output column, and say 10,000 rows. Bagging sets up several models \(M_1, M_2, M_3, M_4, \dots\). In general they can be of any type. Krish's example mixes logistic regression, a decision tree, KNN and a second decision tree.</p>
+      <p>Each model trains on a <dfn>row sample</dfn> of \(D\): some of the rows (data points), with all the features. If \(M_1\) gets 1,000 of the 10,000 rows, call that sample \(D'\). \(M_2\) gets another sample \(D''\), \(M_3\) gets \(D'''\), and so on. Each sample is smaller than \(D\), and a row can turn up in more than one sample. So every model learns from slightly different data.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 300" role="img" aria-label="Bagging pipeline. A data set D of 10,000 rows feeds four row samples of 1,000 rows each. Each sample trains one model: logistic regression, a decision tree, KNN and another decision tree. For a new test point they output 0, 1, 1 and 1. The aggregate box shows the majority vote, 1, for classification, and for regression the mean of 120, 140, 122 and 148, which is 132.5.">
+            <defs><marker id="kml06-ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-row" x="10" y="18">data set</text>
+            <text class="d-row" x="165" y="18">1 · row sampling</text>
+            <text class="d-row" x="290" y="18">2 · train</text>
+            <text class="d-row" x="452" y="18" text-anchor="middle">3 · predict</text>
+            <text class="d-row" x="515" y="18">4 · aggregate</text>
+
+            <rect class="d-box" x="10" y="105" width="110" height="90" rx="8"/>
+            <text class="d-t" x="22" y="128">D</text>
+            <text class="d-s" x="22" y="146">10,000 rows</text>
+            <text class="d-al" x="22" y="164">f₁ f₂ f₃ … y</text>
+            <text class="d-s" x="22" y="182">all features</text>
+
+            <line class="d-ln" x1="122" y1="150" x2="161" y2="58" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="122" y1="150" x2="161" y2="118" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="122" y1="150" x2="161" y2="176" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="122" y1="150" x2="161" y2="236" marker-end="url(#kml06-ah1)"/>
+
+            <rect class="pill" x="165" y="40" width="100" height="34" rx="6"/><text class="d-s" x="215" y="61" text-anchor="middle" style="fill: var(--ink)">D′ · 1,000 rows</text>
+            <rect class="pill" x="165" y="100" width="100" height="34" rx="6"/><text class="d-s" x="215" y="121" text-anchor="middle" style="fill: var(--ink)">D″ · 1,000 rows</text>
+            <rect class="pill" x="165" y="160" width="100" height="34" rx="6"/><text class="d-s" x="215" y="181" text-anchor="middle" style="fill: var(--ink)">D‴ · 1,000 rows</text>
+            <rect class="pill" x="165" y="220" width="100" height="34" rx="6"/><text class="d-s" x="215" y="241" text-anchor="middle" style="fill: var(--ink)">D⁗ · 1,000 rows</text>
+
+            <line class="d-ln" x1="267" y1="57" x2="286" y2="57" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="267" y1="117" x2="286" y2="117" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="267" y1="177" x2="286" y2="177" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="267" y1="237" x2="286" y2="237" marker-end="url(#kml06-ah1)"/>
+
+            <rect class="d-box" x="290" y="40" width="120" height="34" rx="6"/><text class="d-s" x="350" y="61" text-anchor="middle" style="fill: var(--ink)">M₁ · logistic</text>
+            <rect class="d-box" x="290" y="100" width="120" height="34" rx="6"/><text class="d-s" x="350" y="121" text-anchor="middle" style="fill: var(--ink)">M₂ · decision tree</text>
+            <rect class="d-box" x="290" y="160" width="120" height="34" rx="6"/><text class="d-s" x="350" y="181" text-anchor="middle" style="fill: var(--ink)">M₃ · KNN</text>
+            <rect class="d-box" x="290" y="220" width="120" height="34" rx="6"/><text class="d-s" x="350" y="241" text-anchor="middle" style="fill: var(--ink)">M₄ · decision tree</text>
+
+            <line class="d-ln" x1="412" y1="57" x2="435" y2="57" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="412" y1="117" x2="435" y2="117" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="412" y1="177" x2="435" y2="177" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="412" y1="237" x2="435" y2="237" marker-end="url(#kml06-ah1)"/>
+
+            <circle class="node" cx="452" cy="57" r="13"/><text class="d-t" x="452" y="62" text-anchor="middle">0</text>
+            <circle class="node" cx="452" cy="117" r="13"/><text class="d-t" x="452" y="122" text-anchor="middle">1</text>
+            <circle class="node" cx="452" cy="177" r="13"/><text class="d-t" x="452" y="182" text-anchor="middle">1</text>
+            <circle class="node" cx="452" cy="237" r="13"/><text class="d-t" x="452" y="242" text-anchor="middle">1</text>
+
+            <line class="d-ln" x1="467" y1="60" x2="501" y2="102" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="467" y1="119" x2="501" y2="136" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="467" y1="175" x2="501" y2="166" marker-end="url(#kml06-ah1)"/>
+            <line class="d-ln" x1="467" y1="234" x2="501" y2="200" marker-end="url(#kml06-ah1)"/>
+
+            <rect class="d-box-acc" x="505" y="70" width="165" height="150" rx="8"/>
+            <text class="d-t" x="517" y="92">Classification</text>
+            <text class="d-s" x="517" y="110">majority vote of</text>
+            <text class="d-s" x="517" y="126">0, 1, 1, 1 <tspan style="fill: var(--accent); font-weight: 600">→ 1</tspan></text>
+            <line class="d-rule" x1="517" y1="142" x2="658" y2="142"/>
+            <text class="d-t" x="517" y="162">Regression</text>
+            <text class="d-s" x="517" y="180">mean of 120, 140,</text>
+            <text class="d-s" x="517" y="196">122, 148 <tspan style="fill: var(--accent); font-weight: 600">→ 132.5</tspan></text>
+
+            <text class="d-s" x="10" y="278">Each model trains on its own row sample, with all the features; rows can repeat across samples.</text>
+            <text class="d-s" x="10" y="294">A new test point goes to every model, and their outputs are combined into one answer.</text>
+          </svg>
+        </div>
+        <figcaption><b>Bagging, start to finish.</b> Four row samples of \(D\) train four models of different types. The new test point's four answers are combined by majority vote (classification) or by the mean (regression). The numbers are the ones Krish uses.</figcaption>
+      </figure>
+
+      <h3>Combining the outputs</h3>
+      <p>A new test point goes to every model. Take a binary classification where \(M_1\) says 0 and \(M_2\), \(M_3\) and \(M_4\) say 1. The outputs are aggregated by <dfn>majority voting</dfn>: three models say 1, so the answer is 1. Training on row samples and then aggregating gives bagging its other name, <dfn>bootstrap aggregation</dfn> (Krish calls the combining step the bootstrap aggregator).</p>
+      <p>What if half the models say 0 and half say 1? In practice a bagging model has 100 to 200 or more models, so an exact tie is very unlikely.</p>
+      <p>For regression the aggregate is the mean. If the four models predict 120, 140, 122 and 148, the bagged prediction is \((120 + 140 + 122 + 148)/4 = 132.5\).</p>
+      <p>The random forest, coming next, uses only decision trees. Bagging as an idea allows any mix of models.</p>
+      <p class="note">Not in the video: the textbook bootstrap draws \(n\) rows with replacement, as many as \(D\) has, so a row can repeat even inside one sample. Each sample then holds about 63% of the distinct rows. This is what scikit-learn's bagging and random forest do by default.</p>
+    </section>
+
+    <section id="boosting">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15451s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:17:31</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15551s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:19:11 the teachers analogy</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15647s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:20:47 which algorithms</a>
+        </div>
+        <h2>Boosting: weak learners in sequence</h2>
+      </div>
+      <p>In bagging the models sit side by side, and none depends on another. <dfn>Boosting</dfn> puts them in a sequence. The training data goes to \(M_1\), then on to \(M_2\), \(M_3\) and \(M_4\), and the output comes out at the end.</p>
+      <p>Each model in the chain is a <dfn>weak learner</dfn>, a simple model whose predictions on their own are poor. Combined in sequence they become a <dfn>strong learner</dfn>. Krish's analogy: think of \(M_1\) to \(M_4\) as teachers of physics, chemistry, maths and geography. If the physics teacher cannot solve a problem, one of the others may manage it, and together they cover far more than any one of them.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 270" role="img" aria-label="Left, bagging: the data feeds four models M1 to M4 at the same time, and their outputs meet in a vote or mean. Right, boosting: the data enters M1, and arrows lead from M1 to M2 to M3 to M4. Each is labelled weak. A bracket joins all four into one strong learner.">
+            <defs><marker id="kml06-ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="10" y="22">Bagging: parallel</text>
+            <text class="d-s" x="10" y="40">every model gets its own sample, independently</text>
+            <rect class="d-box" x="10" y="110" width="60" height="50" rx="6"/><text class="d-t" x="40" y="140" text-anchor="middle">data</text>
+            <line class="d-ln" x1="72" y1="135" x2="106" y2="76" marker-end="url(#kml06-ah2)"/>
+            <line class="d-ln" x1="72" y1="135" x2="106" y2="116" marker-end="url(#kml06-ah2)"/>
+            <line class="d-ln" x1="72" y1="135" x2="106" y2="154" marker-end="url(#kml06-ah2)"/>
+            <line class="d-ln" x1="72" y1="135" x2="106" y2="194" marker-end="url(#kml06-ah2)"/>
+            <rect class="d-box" x="110" y="60" width="90" height="30" rx="6"/><text class="d-t" x="155" y="80" text-anchor="middle">M₁</text>
+            <rect class="d-box" x="110" y="100" width="90" height="30" rx="6"/><text class="d-t" x="155" y="120" text-anchor="middle">M₂</text>
+            <rect class="d-box" x="110" y="140" width="90" height="30" rx="6"/><text class="d-t" x="155" y="160" text-anchor="middle">M₃</text>
+            <rect class="d-box" x="110" y="180" width="90" height="30" rx="6"/><text class="d-t" x="155" y="200" text-anchor="middle">M₄</text>
+            <line class="d-ln" x1="202" y1="75" x2="236" y2="117" marker-end="url(#kml06-ah2)"/>
+            <line class="d-ln" x1="202" y1="115" x2="236" y2="130" marker-end="url(#kml06-ah2)"/>
+            <line class="d-ln" x1="202" y1="155" x2="236" y2="141" marker-end="url(#kml06-ah2)"/>
+            <line class="d-ln" x1="202" y1="195" x2="236" y2="154" marker-end="url(#kml06-ah2)"/>
+            <rect class="d-box-acc" x="240" y="105" width="84" height="60" rx="8"/>
+            <text class="d-s" x="282" y="131" text-anchor="middle" style="fill: var(--ink)">vote</text>
+            <text class="d-s" x="282" y="147" text-anchor="middle" style="fill: var(--ink)">or mean</text>
+            <text class="d-s" x="10" y="244">No model waits for another, so all of</text>
+            <text class="d-s" x="10" y="260">them can be trained at the same time.</text>
+
+            <line class="d-rule" x1="340" y1="10" x2="340" y2="262"/>
+
+            <text class="d-h" x="352" y="22">Boosting: sequential</text>
+            <text class="d-s" x="352" y="40">each model works on what the last one got wrong</text>
+            <text class="d-s" x="390" y="66" text-anchor="middle" style="fill: var(--ink)">data</text>
+            <line class="d-ln" x1="390" y1="71" x2="390" y2="90" marker-end="url(#kml06-ah2)"/>
+            <rect class="d-box" x="360" y="94" width="60" height="34" rx="6"/><text class="d-t" x="390" y="116" text-anchor="middle">M₁</text>
+            <rect class="d-box" x="440" y="94" width="60" height="34" rx="6"/><text class="d-t" x="470" y="116" text-anchor="middle">M₂</text>
+            <rect class="d-box" x="520" y="94" width="60" height="34" rx="6"/><text class="d-t" x="550" y="116" text-anchor="middle">M₃</text>
+            <rect class="d-box" x="600" y="94" width="60" height="34" rx="6"/><text class="d-t" x="630" y="116" text-anchor="middle">M₄</text>
+            <line class="d-ln" x1="421" y1="111" x2="437" y2="111" marker-end="url(#kml06-ah2)"/>
+            <line class="d-ln" x1="501" y1="111" x2="517" y2="111" marker-end="url(#kml06-ah2)"/>
+            <line class="d-ln" x1="581" y1="111" x2="597" y2="111" marker-end="url(#kml06-ah2)"/>
+            <text class="d-al" x="390" y="143" text-anchor="middle">weak</text>
+            <text class="d-al" x="470" y="143" text-anchor="middle">weak</text>
+            <text class="d-al" x="550" y="143" text-anchor="middle">weak</text>
+            <text class="d-al" x="630" y="143" text-anchor="middle">weak</text>
+            <path class="d-ln" d="M360 152 V160 H660 V152"/>
+            <line class="d-ln" x1="510" y1="160" x2="510" y2="180" marker-end="url(#kml06-ah2)"/>
+            <rect class="d-box-acc" x="430" y="184" width="160" height="34" rx="8"/><text class="d-t" x="510" y="206" text-anchor="middle">strong learner</text>
+            <text class="d-s" x="352" y="244">Each arrow passes on the records the previous</text>
+            <text class="d-s" x="352" y="260">model misclassified, now with more weight.</text>
+          </svg>
+        </div>
+        <figcaption><b>Parallel against sequential.</b> Bagging's models are independent and meet only in the final vote. Boosting's weak learners form a chain in which each one is trained after, and because of, the one before it. How the mistakes are passed on is AdaBoost's job, below.</figcaption>
+      </figure>
+
+      <p class="rule-of-thumb">Interview answer: boosting combines a sequence of models, usually weak learners, into one strong learner.</p>
+      <p>Bagging and boosting methods are behind many Kaggle competition solutions. Someone in the chat asks whether every model sees all the features; Krish answers that in the random forest section, under feature sampling.</p>
+
+      <h3>Which algorithms belong where</h3>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Family</th><th>Algorithms named in the video</th></tr></thead>
+          <tbody>
+            <tr><td>Bagging</td><td>Random forest classifier and random forest regressor (this part); custom bagging of any models you choose</td></tr>
+            <tr><td>Boosting</td><td>AdaBoost (this part), gradient boosting, and extreme gradient boosting or XGBoost (<a href="krish-ml-08.html">Part 8</a>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ CHAPTER 2: RANDOM FOREST ============ -->
+    <section id="tree-variance">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15689s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:21:29</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15743s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:22:23 why not just prune</a>
+        </div>
+        <h2>Why one decision tree is not enough</h2>
+      </div>
+      <p>Recall the main problem with a decision tree (<a href="krish-ml-05.html">Part 5</a>). Grown without any hyperparameters, it keeps splitting on the features until it reaches full depth, and it <b>overfits</b>: accuracy is high on the training data and low on the test data.</p>
+      <p>In Krish's terms, high training accuracy means <b>low bias</b> and low test accuracy means <b>high variance</b>. (He first says "high bias" and corrects himself.) A model that generalizes should have low bias and low variance.</p>
+      <p>Pruning can fix an overfit tree, but it is a lot of work on a big problem, say 100 features and a million data points. Pre-pruning, which limits the tree before it grows, is possible too, with no guarantee that it works well. The random forest attacks the variance in a different way.</p>
+      <p class="rule-of-thumb">Goal: keep the low bias of deep trees and convert their high variance into low variance.</p>
+      <p class="note">Bias and variance get their own chapter in <a href="krish-ml-08.html">Part 8</a>. For the IIT Madras view of the trade-off, see <a href="part-17.html#bias-variance">Part 17</a> (part-17.html).</p>
+    </section>
+
+    <section id="random-forest">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15774s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:22:54</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15870s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:24:30 row and feature sampling</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=15998s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:26:38 how many features</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16029s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:27:09 regressor</a>
+        </div>
+        <h2>Random forest: bagged decision trees</h2>
+      </div>
+      <p>A <dfn>random forest</dfn> is a bagging technique in which every model is a decision tree. There are many trees \(M_1, M_2, M_3, M_4, \dots\) and no other kind of model.</p>
+      <p>Each tree gets its data through two kinds of sampling:</p>
+      <ul>
+        <li><b>Row sampling</b>: a sample of the records, as in bagging.</li>
+        <li><b><dfn>Feature sampling</dfn></b>: a subset of the columns. With four features, one tree might get two of them, another three, another all four, and another just one. The random forest chooses these internally.</li>
+      </ul>
+      <p>Rows and features can repeat from one tree to the next. Trained on its own slice of the data, each tree becomes an expert on that slice, like the subject teachers in the boosting analogy.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 340" role="img" aria-label="On the left, a data set of 8 rows with features f1 to f4 and an output y. On the right, four trees, each drawn as the same grid with only its sampled rows and features filled in. Tree 1 uses f1 and f3, tree 2 uses f2, f3 and f4, tree 3 uses all four features, tree 4 uses only f4. Each tree has six distinct rows and two rows drawn twice. Below, the trees predict 0, 1, 0 and 0, and the majority vote is 0.">
+            <defs><marker id="kml06-ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-row" x="10" y="18">data set D</text>
+            <text class="d-row" x="150" y="18">each tree: its own rows (drawn with replacement) and its own features</text>
+            <text class="d-t" x="70" y="40" text-anchor="middle">D</text>
+<!-- data set D -->
+<text class="d-al" x="38" y="60" text-anchor="middle">f₁</text><text class="d-al" x="54" y="60" text-anchor="middle">f₂</text><text class="d-al" x="70" y="60" text-anchor="middle">f₃</text><text class="d-al" x="86" y="60" text-anchor="middle">f₄</text><text class="d-al" x="102" y="60" text-anchor="middle">y</text>
+<rect x="31" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="47" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="63" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="79" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="95" y="67" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="31" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="47" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="63" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="79" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="95" y="83" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="31" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="47" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="63" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="79" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="95" y="99" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="31" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="47" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="63" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="79" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="95" y="115" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="31" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="47" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="63" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="79" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="95" y="131" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="31" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="47" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="63" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="79" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="95" y="147" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="31" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="47" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="63" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="79" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="95" y="163" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="31" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="47" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="63" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="79" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="95" y="179" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<text class="d-al" x="24" y="78" text-anchor="end">1</text><text class="d-al" x="24" y="94" text-anchor="end">2</text><text class="d-al" x="24" y="110" text-anchor="end">3</text><text class="d-al" x="24" y="126" text-anchor="end">4</text><text class="d-al" x="24" y="142" text-anchor="end">5</text><text class="d-al" x="24" y="158" text-anchor="end">6</text><text class="d-al" x="24" y="174" text-anchor="end">7</text><text class="d-al" x="24" y="190" text-anchor="end">8</text>
+<!-- tree 1 -->
+<text class="d-t" x="190" y="40" text-anchor="middle">Tree 1</text>
+<text class="d-al" x="158" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₁</text><text class="d-al" x="174" y="60" text-anchor="middle">f₂</text><text class="d-al" x="190" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₃</text><text class="d-al" x="206" y="60" text-anchor="middle">f₄</text><text class="d-al" x="222" y="60" text-anchor="middle">y</text>
+<rect x="151" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="167" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="183" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="199" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="215" y="67" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="151" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="167" y="83" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="183" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="199" y="83" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="215" y="83" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="151" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="167" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="183" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="199" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="215" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/>
+<rect x="151" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="167" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="183" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="199" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="215" y="115" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="151" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="167" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="183" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="199" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="215" y="131" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="151" y="147" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="167" y="147" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="183" y="147" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="199" y="147" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="215" y="147" width="14" height="14" rx="2" style="fill: var(--rule)"/>
+<rect x="151" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="167" y="163" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="183" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="199" y="163" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="215" y="163" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="151" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="167" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="183" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="199" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="215" y="179" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<text class="d-al" x="234" y="94">×2</text>
+<text class="d-al" x="234" y="190">×2</text>
+<text class="d-s" x="190" y="212" text-anchor="middle">f₁, f₃</text>
+<line class="d-ln" x1="190" y1="218" x2="190" y2="230" marker-end="url(#kml06-ah3)"/>
+<line class="d-ln" x1="190" y1="238" x2="176" y2="256"/><line class="d-ln" x1="190" y1="238" x2="204" y2="256"/>
+<circle class="node" cx="190" cy="238" r="6"/><circle class="node" cx="176" cy="258" r="5"/><circle class="node" cx="204" cy="258" r="5"/>
+<line class="d-ln" x1="190" y1="266" x2="190" y2="276" marker-end="url(#kml06-ah3)"/>
+<circle class="node-acc" cx="190" cy="292" r="12"/><text class="d-t" x="190" y="297" text-anchor="middle">0</text>
+<!-- tree 2 -->
+<text class="d-t" x="320" y="40" text-anchor="middle">Tree 2</text>
+<text class="d-al" x="288" y="60" text-anchor="middle">f₁</text><text class="d-al" x="304" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₂</text><text class="d-al" x="320" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₃</text><text class="d-al" x="336" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₄</text><text class="d-al" x="352" y="60" text-anchor="middle">y</text>
+<rect x="281" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="297" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="313" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="329" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="345" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/>
+<rect x="281" y="83" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="297" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="313" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="329" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="345" y="83" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="281" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="297" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="313" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="329" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="345" y="99" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="281" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="297" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="313" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="329" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="345" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/>
+<rect x="281" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="297" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="313" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="329" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="345" y="131" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="281" y="147" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="297" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="313" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="329" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="345" y="147" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="281" y="163" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="297" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="313" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="329" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="345" y="163" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="281" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="297" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="313" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="329" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="345" y="179" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<text class="d-al" x="364" y="110">×2</text>
+<text class="d-al" x="364" y="158">×2</text>
+<text class="d-s" x="320" y="212" text-anchor="middle">f₂, f₃, f₄</text>
+<line class="d-ln" x1="320" y1="218" x2="320" y2="230" marker-end="url(#kml06-ah3)"/>
+<line class="d-ln" x1="320" y1="238" x2="306" y2="256"/><line class="d-ln" x1="320" y1="238" x2="334" y2="256"/>
+<circle class="node" cx="320" cy="238" r="6"/><circle class="node" cx="306" cy="258" r="5"/><circle class="node" cx="334" cy="258" r="5"/>
+<line class="d-ln" x1="320" y1="266" x2="320" y2="276" marker-end="url(#kml06-ah3)"/>
+<circle class="node-acc" cx="320" cy="292" r="12"/><text class="d-t" x="320" y="297" text-anchor="middle">1</text>
+<!-- tree 3 -->
+<text class="d-t" x="450" y="40" text-anchor="middle">Tree 3</text>
+<text class="d-al" x="418" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₁</text><text class="d-al" x="434" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₂</text><text class="d-al" x="450" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₃</text><text class="d-al" x="466" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₄</text><text class="d-al" x="482" y="60" text-anchor="middle">y</text>
+<rect x="411" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="427" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="443" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="459" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="475" y="67" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="411" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="427" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="443" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="459" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="475" y="83" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="411" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="427" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="443" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="459" y="99" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="475" y="99" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="411" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="427" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="443" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="459" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="475" y="115" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="411" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="427" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="443" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="459" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="475" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/>
+<rect x="411" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="427" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="443" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="459" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="475" y="147" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="411" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="427" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="443" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="459" y="163" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="475" y="163" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="411" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="427" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="443" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="459" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="475" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/>
+<text class="d-al" x="494" y="78">×2</text>
+<text class="d-al" x="494" y="174">×2</text>
+<text class="d-s" x="450" y="212" text-anchor="middle">all four</text>
+<line class="d-ln" x1="450" y1="218" x2="450" y2="230" marker-end="url(#kml06-ah3)"/>
+<line class="d-ln" x1="450" y1="238" x2="436" y2="256"/><line class="d-ln" x1="450" y1="238" x2="464" y2="256"/>
+<circle class="node" cx="450" cy="238" r="6"/><circle class="node" cx="436" cy="258" r="5"/><circle class="node" cx="464" cy="258" r="5"/>
+<line class="d-ln" x1="450" y1="266" x2="450" y2="276" marker-end="url(#kml06-ah3)"/>
+<circle class="node-acc" cx="450" cy="292" r="12"/><text class="d-t" x="450" y="297" text-anchor="middle">0</text>
+<!-- tree 4 -->
+<text class="d-t" x="580" y="40" text-anchor="middle">Tree 4</text>
+<text class="d-al" x="548" y="60" text-anchor="middle">f₁</text><text class="d-al" x="564" y="60" text-anchor="middle">f₂</text><text class="d-al" x="580" y="60" text-anchor="middle">f₃</text><text class="d-al" x="596" y="60" text-anchor="middle" style="fill: var(--accent); font-weight: 600">f₄</text><text class="d-al" x="612" y="60" text-anchor="middle">y</text>
+<rect x="541" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="557" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="573" y="67" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="589" y="67" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="605" y="67" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="541" y="83" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="557" y="83" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="573" y="83" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="589" y="83" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="605" y="83" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="541" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="557" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="573" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="589" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="605" y="99" width="14" height="14" rx="2" style="fill: var(--rule)"/>
+<rect x="541" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="557" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="573" y="115" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="589" y="115" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="605" y="115" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="541" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="557" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="573" y="131" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="589" y="131" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="605" y="131" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="541" y="147" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="557" y="147" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="573" y="147" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="589" y="147" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="605" y="147" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<rect x="541" y="163" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="557" y="163" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="573" y="163" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="589" y="163" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="605" y="163" width="14" height="14" rx="2" style="fill: var(--rule)"/>
+<rect x="541" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="557" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="573" y="179" width="14" height="14" rx="2" style="fill: var(--rule)"/><rect x="589" y="179" width="14" height="14" rx="2" style="fill: var(--accent)"/><rect x="605" y="179" width="14" height="14" rx="2" style="fill: var(--ink-2)"/>
+<text class="d-al" x="624" y="126">×2</text>
+<text class="d-al" x="624" y="190">×2</text>
+<text class="d-s" x="580" y="212" text-anchor="middle">f₄ only</text>
+<line class="d-ln" x1="580" y1="218" x2="580" y2="230" marker-end="url(#kml06-ah3)"/>
+<line class="d-ln" x1="580" y1="238" x2="566" y2="256"/><line class="d-ln" x1="580" y1="238" x2="594" y2="256"/>
+<circle class="node" cx="580" cy="238" r="6"/><circle class="node" cx="566" cy="258" r="5"/><circle class="node" cx="594" cy="258" r="5"/>
+<line class="d-ln" x1="580" y1="266" x2="580" y2="276" marker-end="url(#kml06-ah3)"/>
+<circle class="node-acc" cx="580" cy="292" r="12"/><text class="d-t" x="580" y="297" text-anchor="middle">0</text>
+            <text class="d-s" x="70" y="212" text-anchor="middle">all rows, all features</text>
+            <line class="d-ln" x1="114" y1="130" x2="142" y2="130" marker-end="url(#kml06-ah3)"/>
+            <text class="d-s" x="10" y="288">new test point:</text>
+            <text class="d-s" x="10" y="304">every tree votes</text>
+            <path class="d-ln" d="M190 310 V316 H580 V310"/>
+            <text class="d-t" x="385" y="332" text-anchor="middle">majority vote of 0, 1, 0, 0 → 0</text>
+          </svg>
+        </div>
+        <figcaption><b>Row sampling plus feature sampling.</b> Filled cells are what each tree trains on; grey cells are left out; ×2 marks a row drawn twice. The feature counts (2, 3, 4 and 1) and the votes follow Krish's example; the rows are illustrative. Because every tree sees different data, each overfits in its own way.</figcaption>
+      </figure>
+
+      <p>To predict, pass the test point to every tree. With outputs 0, 1, 0 and 0, the majority vote gives 0. The <b>random forest regressor</b> differs only in the last step: it averages the trees' outputs.</p>
+
+      <h3>Why the vote reduces variance</h3>
+      <p>Each fully grown tree has low bias and high variance: it fits the quirks of its own sample. The trees see different rows and features, so their quirks differ, and in a vote over many trees they largely cancel. What survives is the pattern most trees agree on. The forest keeps the low bias of its trees and has much lower variance, which is the generalized model the previous section asked for.</p>
+
+      <figure id="forest-fig">
+        <div class="controls">
+          <label for="forest-m">Number of trees averaged</label>
+          <input type="range" id="forest-m" min="1" max="100" step="1" value="1">
+          <output id="forest-m-out" for="forest-m">1</output>
+          <label class="check"><input type="checkbox" id="forest-show" checked> show trees 1–5</label>
+          <button class="btn" id="forest-play" type="button">Grow to 100 trees</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">squared error, one tree on its own (mean)</span><span class="v" id="forest-e1">–</span></div>
+          <div><span class="k">squared error, average of the trees</span><span class="v mine" id="forest-em">–</span></div>
+        </div>
+        <div class="status" id="forest-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="forest-svg" viewBox="0 0 640 350" role="img" aria-label="Forty synthetic noisy points around a wavy true curve. Thin grey step lines are individual fully grown regression trees, each trained on a bootstrap sample; they jump from point to point. The blue line is the average of the chosen number of trees and becomes smoother and closer to the true curve as more trees are averaged."></svg></div>
+        <figcaption><b>Synthetic data (40 points), generated for these notes.</b> Each tree is a fully grown regression tree on a bootstrap sample, so it passes through every point it saw: low bias, high variance. Its squared error is measured against the dashed true curve. Averaging removes most of the jumpiness: with 100 trees the error falls from about 0.25 for one tree on its own to about 0.10. With one feature there is nothing to sample on the columns, so this shows the row-sampling half of the forest.</figcaption>
+      </figure>
+
+      <p class="note">Not in the video: if \(M\) trees each have variance \(\sigma^2\) and every pair has correlation \(\rho\), their average has variance \(\rho\sigma^2 + (1-\rho)\,\sigma^2/M\). Adding trees shrinks only the second term. Feature sampling makes the trees less alike, which lowers \(\rho\) and with it the first term.</p>
+      <p class="note">Not in the video: in Breiman's random forest, and in scikit-learn, the feature subset is drawn afresh at every split, not once per tree. For classification the usual size is about \(\sqrt{d}\) of the \(d\) features; scikit-learn's regressor uses all features unless you set <code>max_features</code>.</p>
+
+      <p class="code-cap">Not in the video · the same ideas in scikit-learn</p>
+      <pre class="codeblock"><code><span class="kw">from</span> sklearn.ensemble <span class="kw">import</span> RandomForestClassifier, RandomForestRegressor
+
+rf = RandomForestClassifier(
+    n_estimators=100,      <span class="cm"># number of decision trees</span>
+    bootstrap=True,        <span class="cm"># row sampling: each tree gets n rows drawn with replacement</span>
+    max_features="sqrt",   <span class="cm"># feature sampling: about sqrt(d) features tried at each split</span>
+    random_state=0,
+)
+rf.fit(X_train, y_train)
+rf.predict(X_test)         <span class="cm"># averages the trees' class probabilities (a soft majority vote)</span>
+
+rfr = RandomForestRegressor(n_estimators=100, random_state=0)
+rfr.fit(X_train, y_train)
+rfr.predict(X_test)        <span class="cm"># mean of the trees' predictions</span></code></pre>
+      <p class="note">Krish does not code in this part; the listing only maps his terms onto the library's parameters. For the IIT Madras treatment of random forests, see <a href="part-17.html#random-forest">Part 17</a> (part-17.html).</p>
+    </section>
+
+    <section id="rf-questions">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16063s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:27:43</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16094s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:28:14 KNN needs scaling</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16126s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:28:46 outliers</a>
+        </div>
+        <h2>Interview questions on random forests</h2>
+      </div>
+      <p>Krish lists four questions that come up in interviews, two about the random forest and the same two about KNN for contrast.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Question</th><th>Random forest or decision tree</th><th>KNN</th></tr></thead>
+          <tbody>
+            <tr><td>Is normalization or standardization required?</td><td><b>No</b></td><td><b>Yes</b></td></tr>
+            <tr><td>Is it impacted by outliers?</td><td><b>No</b></td><td><b>Yes</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>Scaling.</b> A tree only asks whether a feature is above or below a threshold. Shrinking or stretching a feature moves the threshold along with the data, so the same rows land on each side and the splits stay the same. KNN uses Euclidean or Manhattan distance, and a feature with a large range dominates that distance, so the features have to be standardized first (KNN is in <a href="krish-ml-04.html">Part 4</a>).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 286" role="img" aria-label="Left: eight ages on a number line in years, split at age 42 into four left and four right. Below, the same ages standardized; the split moves to z of minus 0.03 and the same four points fall on each side. Right: in standardized units a query point Q, a point A to its far right and a point B just above it. A dashed circle around Q through B shows B is nearest after scaling, at distance 1.02 against 2.51 for A. In raw units A was nearest.">
+            <text class="d-h" x="10" y="22">Decision tree: scaling changes nothing</text>
+            <text class="d-s" x="10" y="52">age in years</text>
+            <line class="d-ln" x1="20" y1="90" x2="320" y2="90"/>
+            <text class="d-al" x="20" y="108" text-anchor="middle">20</text><text class="d-al" x="85.2" y="108" text-anchor="middle">30</text><text class="d-al" x="150.4" y="108" text-anchor="middle">40</text><text class="d-al" x="215.7" y="108" text-anchor="middle">50</text><text class="d-al" x="280.9" y="108" text-anchor="middle">60</text>
+            <line class="d-ln-acc d-dash" x1="163.5" y1="64" x2="163.5" y2="98"/>
+            <text class="d-s" x="168" y="72" style="fill: var(--accent)">age &lt; 42?</text>
+            <circle class="pt-no" cx="33" cy="90" r="5"/><circle class="pt-no" cx="65.7" cy="90" r="5"/><circle class="pt-no" cx="104.8" cy="90" r="5"/><circle class="pt-no" cx="137.4" cy="90" r="5"/>
+            <circle class="pt-tree" cx="189.6" cy="90" r="5"/><circle class="pt-tree" cx="222.2" cy="90" r="5"/><circle class="pt-tree" cx="267.8" cy="90" r="5"/><circle class="pt-tree" cx="307" cy="90" r="5"/>
+
+            <text class="d-s" x="10" y="142">standardized: z = (age − 42.4) / 14.0</text>
+            <line class="d-ln" x1="20" y1="180" x2="320" y2="180"/>
+            <text class="d-al" x="74.5" y="198" text-anchor="middle">−1</text><text class="d-al" x="165.5" y="198" text-anchor="middle">0</text><text class="d-al" x="256.4" y="198" text-anchor="middle">1</text>
+            <line class="d-ln-acc d-dash" x1="163" y1="154" x2="163" y2="188"/>
+            <text class="d-s" x="168" y="162" style="fill: var(--accent)">z &lt; −0.03?</text>
+            <circle class="pt-no" cx="32.7" cy="180" r="5"/><circle class="pt-no" cx="65.3" cy="180" r="5"/><circle class="pt-no" cx="104.4" cy="180" r="5"/><circle class="pt-no" cx="137" cy="180" r="5"/>
+            <circle class="pt-tree" cx="189.1" cy="180" r="5"/><circle class="pt-tree" cx="221.6" cy="180" r="5"/><circle class="pt-tree" cx="267.2" cy="180" r="5"/><circle class="pt-tree" cx="306.3" cy="180" r="5"/>
+
+            <text class="d-s" x="10" y="228">The threshold moves with the points, so the same</text>
+            <text class="d-s" x="10" y="244">four rows fall on each side: the same tree.</text>
+            <circle class="pt-no" cx="16" cy="266" r="5"/><text class="d-s" x="26" y="270">left branch</text>
+            <circle class="pt-tree" cx="112" cy="266" r="5"/><text class="d-s" x="122" y="270">right branch</text>
+
+            <line class="d-rule" x1="340" y1="10" x2="340" y2="278"/>
+
+            <text class="d-h" x="352" y="22">KNN: scaling changes the neighbours</text>
+            <rect class="d-plot" x="380" y="52" width="270" height="180"/>
+            <line class="d-rule" x1="530" y1="52" x2="530" y2="232"/>
+            <line class="d-rule" x1="380" y1="124" x2="650" y2="124"/>
+            <text class="d-al" x="386" y="66">salary (standardized)</text>
+            <text class="d-al" x="646" y="246" text-anchor="end">age (standardized)</text>
+            <circle class="d-ln-acc d-dash" cx="470" cy="154" r="61.2"/>
+            <line class="d-ln d-dash" x1="470" y1="154" x2="482" y2="94"/>
+            <line class="d-ln d-dash" x1="470" y1="154" x2="620" y2="142"/>
+            <text class="d-s" x="470" y="124" text-anchor="end">1.02</text>
+            <text class="d-s" x="560" y="138" text-anchor="middle">2.51</text>
+            <circle class="pt-plain" cx="482" cy="94" r="5"/><text class="d-t" x="470" y="86" text-anchor="end">B</text>
+            <circle class="pt-plain" cx="620" cy="142" r="5"/><text class="d-t" x="620" y="130" text-anchor="middle">A</text>
+            <circle class="pt-new" cx="470" cy="154" r="5.5"/><text class="d-s" x="478" y="172">query Q</text>
+            <text class="d-s" x="352" y="262">Scaled: B is nearest (1.02 against 2.51).</text>
+            <text class="d-s" x="352" y="278">Raw units: A is nearest (about 2,000 against 10,000).</text>
+          </svg>
+        </div>
+        <figcaption><b>Why only KNN needs scaling</b> (illustrative numbers). Left: eight ages before and after standardizing; the best split moves with the data and keeps the same rows on each side. Right: Q = (30 years, 50,000), A = (55 years, 52,000), B = (32 years, 60,000). In raw units the salary gaps of 2,000 and 10,000 swamp the age gaps of 25 and 2 years, so A looks nearest. Standardized with means 40 years and 55,000 and standard deviations 10 years and 10,000, B is nearest.</figcaption>
+      </figure>
+
+      <p><b>Outliers.</b> Krish gives the answers, no for the random forest and yes for KNN, and suggests looking up the reasons. Not in the video: a split depends only on the order of the values, so an extreme feature value just lands in the outermost branch and moves at most one threshold; it also appears in only some of the trees' samples, and the vote dilutes it further. KNN predicts straight from the nearest training points, so with a small \(k\) one unusual neighbour can swing the answer. (An extreme target value in a regression forest still pulls the mean of the leaf it falls into.)</p>
+      <p>In bagging the random forest is the usual choice. You can also build a <b>custom bagging</b> model by hand from any combination of algorithms you like.</p>
+    </section>
+
+    <!-- ============ CHAPTER 3: ADABOOST ============ -->
+    <section id="adaboost-setup">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16198s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:29:58</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16259s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:30:59 equal weights</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16292s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:31:32 the stump</a>
+        </div>
+        <h2>AdaBoost: sample weights and the first stump</h2>
+      </div>
+      <p><dfn>AdaBoost</dfn> is the first boosting algorithm of the session. Krish solves a classification problem with it, on a data set with four features \(f_1, \dots, f_4\), a yes/no output and 7 records.</p>
+      <p><b>Step 0: sample weights.</b> Every record gets a <dfn>sample weight</dfn> between 0 and 1. At the start they are all equal and add up to 1, so with 7 records each weight is \(1/7 \approx 0.143\).</p>
+      <p><b>Step 1: a stump.</b> Choose the feature to split on the way a decision tree does, by information gain with entropy or Gini impurity (<a href="krish-ml-05.html">Part 5</a>). Say \(f_1\) wins. Build a tree on it with depth one, a single split. A one-level tree is called a <dfn>stump</dfn>, and stumps are AdaBoost's weak learners.</p>
+      <p>Train the stump on all the records, then pass the records through it to see which ones it gets right. In the example it gets one record wrong, record 4, and the other six right.</p>
+    </section>
+
+    <section id="performance">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16460s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:34:20</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16493s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:34:53 performance of stump</a>
+        </div>
+        <h2>Total error and the performance of the stump</h2>
+      </div>
+      <p><b>Step 2: total error.</b> Add up the sample weights of the records the stump misclassified. Only record 4 is wrong, so</p>
+      <div class="eq">\[ \mathit{TE} = \sum_{i \,\in\, \text{wrong}} w_i = \frac17 \approx 0.143 \]</div>
+      <p><b>Step 3: performance of the stump.</b> Krish calls this quantity the performance of stump (PS). It is usually written \(\alpha\).</p>
+      <div class="result">
+        <span class="lbl">Performance of a stump</span>
+        \[ \alpha = \frac12 \ln\frac{1 - \mathit{TE}}{\mathit{TE}}, \qquad \text{here} \quad \alpha = \frac12 \ln\frac{6/7}{1/7} = \frac12\ln 6 \approx 0.896 \]
+        <p>Krish reads the value out as 0.895. The captions render the factor in front as "1 by log e"; it is one half times the natural logarithm.</p>
+      </div>
+      <p>The fewer mistakes a stump makes, the larger its \(\alpha\), which is why it measures the stump's performance.</p>
+      <p class="note">Not in the video: a stump with \(\mathit{TE} = 0.5\) is a coin flip and gets \(\alpha = 0\). Above 0.5, \(\alpha\) turns negative.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 290" role="img" aria-label="Plot of alpha against total error from 0 to 1. The curve falls from about 2.3 at TE 0.01 through 0 at TE 0.5 to about minus 2.3 at TE 0.99. Krish's stump is marked at TE one seventh, alpha 0.896. TE 0.5, alpha 0, is marked as the coin flip.">
+            <rect class="d-plot" x="60" y="30" width="580" height="220"/>
+            <line class="d-rule" x1="60" y1="52" x2="640" y2="52"/><line class="d-rule" x1="60" y1="96" x2="640" y2="96"/><line class="d-rule" x1="60" y1="184" x2="640" y2="184"/><line class="d-rule" x1="60" y1="228" x2="640" y2="228"/>
+            <line class="d-rule" x1="205" y1="30" x2="205" y2="250"/><line class="d-rule" x1="350" y1="30" x2="350" y2="250"/><line class="d-rule" x1="495" y1="30" x2="495" y2="250"/>
+            <line class="d-ln" x1="60" y1="140" x2="640" y2="140"/>
+            <text class="d-al" x="52" y="56" text-anchor="end">2</text><text class="d-al" x="52" y="100" text-anchor="end">1</text><text class="d-al" x="52" y="144" text-anchor="end">0</text><text class="d-al" x="52" y="188" text-anchor="end">−1</text><text class="d-al" x="52" y="232" text-anchor="end">−2</text>
+            <text class="d-al" x="60" y="266" text-anchor="middle">0</text><text class="d-al" x="205" y="266" text-anchor="middle">0.25</text><text class="d-al" x="350" y="266" text-anchor="middle">0.5</text><text class="d-al" x="495" y="266" text-anchor="middle">0.75</text><text class="d-al" x="640" y="266" text-anchor="middle">1</text>
+            <text class="d-s" x="350" y="284" text-anchor="middle">total error TE</text>
+            <text class="d-t" x="22" y="144" text-anchor="middle">α</text>
+            <path class="d-ln-acc" style="stroke-width: 2.2" d="M65.8 38.9 L68.7 47.9 L71.6 54.4 L74.5 59.4 L77.4 63.5 L80.3 67.0 L83.2 70.1 L86.1 72.8 L89.0 75.2 L91.9 77.4 L94.8 79.5 L97.7 81.3 L100.6 83.1 L103.5 84.7 L106.4 86.3 L109.3 87.7 L112.2 89.1 L115.1 90.4 L118.0 91.7 L123.8 94.0 L135.4 98.2 L147.0 101.8 L158.6 105.1 L170.2 108.1 L181.8 110.9 L193.4 113.4 L205.0 115.8 L216.6 118.1 L228.2 120.3 L239.8 122.4 L251.4 124.4 L263.0 126.4 L274.6 128.3 L286.2 130.2 L297.8 132.0 L309.4 133.8 L321.0 135.6 L332.6 137.4 L344.2 139.1 L355.8 140.9 L367.4 142.6 L379.0 144.4 L390.6 146.2 L402.2 148.0 L413.8 149.8 L425.4 151.7 L437.0 153.6 L448.6 155.6 L460.2 157.6 L471.8 159.7 L483.4 161.9 L495.0 164.2 L506.6 166.6 L518.2 169.1 L529.8 171.9 L541.4 174.9 L553.0 178.2 L564.6 181.8 L576.2 186.0 L582.0 188.3 L584.9 189.6 L587.8 190.9 L590.7 192.3 L593.6 193.7 L596.5 195.3 L599.4 196.9 L602.3 198.7 L605.2 200.5 L608.1 202.6 L611.0 204.8 L613.9 207.2 L616.8 209.9 L619.7 213.0 L622.6 216.5 L625.5 220.6 L628.4 225.6 L631.3 232.1 L634.2 241.1"/>
+            <text class="d-s" x="176" y="45" style="fill: var(--accent)">α = ½ ln((1 − TE) / TE)</text>
+            <circle class="pt-new" cx="142.9" cy="100.6" r="5"/>
+            <text class="d-s" x="154" y="88">Krish's stump: TE = 1/7, α ≈ 0.896</text>
+            <circle class="pt-plain" cx="350" cy="140" r="4"/>
+            <text class="d-s" x="358" y="130">TE = 0.5: coin flip, α = 0</text>
+            <text class="d-s" x="196" y="67">better than random: α &gt; 0</text>
+            <text class="d-s" x="400" y="238">worse than random: α &lt; 0</text>
+          </svg>
+        </div>
+        <figcaption><b>Performance of a stump against its total error</b>, drawn to scale (not drawn in the video). A stump with few mistakes gets a large \(\alpha\), which means a big change to the weights in the next step. \(\alpha\) grows without limit as \(\mathit{TE}\) approaches 0.</figcaption>
+      </figure>
+    </section>
+
+    <section id="weight-update">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16561s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:36:01</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16622s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:37:02 the two formulas</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16655s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:37:35 the numbers</a>
+        </div>
+        <h2>Updating the sample weights</h2>
+      </div>
+      <p><b>Step 4: new sample weights.</b> Total error and \(\alpha\) exist to change the weights so that the next weak learner pays attention to the mistakes. The weights of correctly classified records go down and the weights of misclassified records go up. A record with a bigger weight is more likely to be passed on to the next stump.</p>
+      <div class="eq">\[ \text{correct record: } \; w \leftarrow w \cdot e^{-\alpha}, \qquad \text{wrong record: } \; w \leftarrow w \cdot e^{+\alpha} \]</div>
+      <p>In the example, with \(\alpha \approx 0.895\):</p>
+      <ul>
+        <li>each correct record: \(\tfrac17 \cdot e^{-0.895} \approx 0.058\), which Krish writes as 0.05;</li>
+        <li>the wrong record 4: \(\tfrac17 \cdot e^{0.895} \approx 0.349\).</li>
+      </ul>
+      <p>So the six correct records fall from 0.143 to about 0.05, and record 4 rises from 0.143 to 0.349.</p>
+    </section>
+
+    <section id="normalize">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16754s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:39:14</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16818s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:40:18 normalized weights</a>
+        </div>
+        <h2>Normalizing the weights</h2>
+      </div>
+      <p>The updated weights no longer add up to 1. With Krish's rounded numbers the sum is \(6 \times 0.05 + 0.349 = 0.649\). <b>Step 5: normalize</b> by dividing every weight by that sum, so the weights add up to 1 again:</p>
+      <div class="eq">\[ w_i \leftarrow \frac{w_i}{\sum_j w_j}: \qquad \frac{0.05}{0.649} \approx 0.077, \qquad \frac{0.349}{0.649} \approx 0.537 \]</div>
+      <div class="tbl-wrap">
+        <table class="mini" style="min-width: 560px">
+          <thead><tr><th>Record</th><th>Stump</th><th class="num">Start weight</th><th class="num">Updated</th><th class="num">Normalized</th><th class="num">Bucket</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>correct</td><td class="num">0.143</td><td class="num">0.05</td><td class="num">0.077</td><td class="num">0 – 0.077</td></tr>
+            <tr><td>2</td><td>correct</td><td class="num">0.143</td><td class="num">0.05</td><td class="num">0.077</td><td class="num">0.077 – 0.154</td></tr>
+            <tr><td>3</td><td>correct</td><td class="num">0.143</td><td class="num">0.05</td><td class="num">0.077</td><td class="num">0.154 – 0.231</td></tr>
+            <tr><td><b>4</b></td><td><b>wrong</b></td><td class="num">0.143</td><td class="num"><b>0.349</b></td><td class="num"><b>0.537</b></td><td class="num"><b>0.231 – 0.768</b></td></tr>
+            <tr><td>5</td><td>correct</td><td class="num">0.143</td><td class="num">0.05</td><td class="num">0.077</td><td class="num">0.768 – 0.845</td></tr>
+            <tr><td>6</td><td>correct</td><td class="num">0.143</td><td class="num">0.05</td><td class="num">0.077</td><td class="num">0.845 – 0.922</td></tr>
+            <tr><td>7</td><td>correct</td><td class="num">0.143</td><td class="num">0.05</td><td class="num">0.077</td><td class="num">0.922 – 1</td></tr>
+            <tr><td>Sum</td><td></td><td class="num">1</td><td class="num">0.649</td><td class="num">≈ 1</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout">Rounding changes these numbers. Krish rounds 0.058 down to 0.05, which makes the sum 0.649. At full precision the updated weights are 0.0583 and 0.3499, their sum is 0.700, and the normalized weights are 0.083 for each correct record and exactly 0.500 for record 4. The calculator further down uses full precision. Krish also reads the cumulative bucket edges off in rounded form (0.07, 0.14, 0.21, 0.747); the table uses the three-decimal values.</p>
+
+      <div class="result">
+        <span class="lbl">Not in the video: the mistakes always end up with half the weight</span>
+        <p>With \(e^{\alpha} = \sqrt{(1-\mathit{TE})/\mathit{TE}}\), the wrong records' total after the update is \(\mathit{TE} \cdot e^{\alpha} = \sqrt{\mathit{TE}(1-\mathit{TE})}\), and the correct records' total is \((1-\mathit{TE})\,e^{-\alpha} = \sqrt{\mathit{TE}(1-\mathit{TE})}\). The two are equal, so</p>
+        \[ \sum_j w_j = 2\sqrt{\mathit{TE}\,(1-\mathit{TE})}, \qquad \text{share of the wrong records after normalizing} = \tfrac12 \]
+        <p>Here \(2\sqrt{(1/7)(6/7)} = 2\sqrt6/7 \approx 0.700\). On the new weights the stump just trained has a total error of exactly 0.5, a coin flip, so the next stump has to find something new.</p>
+      </div>
+    </section>
+
+    <section id="buckets">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16853s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:40:53</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16950s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:42:30 bucket ranges</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=16984s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:43:04 random draws</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17015s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:43:35 more stumps</a>
+        </div>
+        <h2>Buckets: choosing the next stump's records</h2>
+      </div>
+      <p>The second stump in the sequence needs its own training data, and that data should contain mostly the records the first stump got wrong, along with some of the others. AdaBoost builds it from the normalized weights by making <dfn>buckets</dfn>: consecutive ranges on the interval from 0 to 1, one per record, each as wide as that record's weight. Record 1's bucket runs from 0 to 0.077, record 2's from 0.077 to 0.154, and so on; record 4's runs from 0.231 to 0.768 (the last column of the table above).</p>
+      <p>Then generate random numbers between 0 and 1. Each number falls into one bucket, and that bucket's record goes into the new data set. Record 4 owns more than half of the interval, so it is picked most often; the correct records still turn up now and then. If four or five records had been wrong, all their buckets would be wide and together they would fill most of the new sample.</p>
+      <p class="note">Krish does not say how many records to draw. The usual choice is as many as the original data set has, here 7.</p>
+      <p>Train stump 2 on the new data set. It makes its own mistakes, their weights are raised in the same way, and the next resample goes to stump 3. A full model chains many stumps, 100 or more, so it takes longer to train than a single tree.</p>
+
+      <ol class="algo">
+        <li class="algo-title">AdaBoost, as Krish runs it</li>
+        <li>Give each of the \(n\) records the weight \(w_i = 1/n\).</li>
+        <li>Pick a feature by information gain (entropy or Gini), build a stump on it, train it, and find which records it misclassifies.</li>
+        <li>Total error: \(\mathit{TE} = \sum_{\text{wrong}} w_i\).</li>
+        <li>Performance of the stump: \(\alpha = \tfrac12\ln\frac{1-\mathit{TE}}{\mathit{TE}}\).</li>
+        <li>Update: \(w_i \leftarrow w_i\,e^{-\alpha}\) for correct records and \(w_i \leftarrow w_i\,e^{\alpha}\) for wrong ones.</li>
+        <li>Normalize: divide every weight by the sum of the weights.</li>
+        <li>Make buckets from the normalized weights and draw random numbers between 0 and 1 to build the next stump's data set.</li>
+        <li>Repeat from step 2 on the new data set. To predict, combine the outputs of all the stumps.</li>
+      </ol>
+    </section>
+
+    <section id="round">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17112s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:45:12</a>
+        <h2>One round, by hand</h2>
+      </div>
+      <p>Krish sums AdaBoost up as three calculations, total error, performance of stump and new sample weights, followed by normalization so the weights sum to 1. Run them on the 7-record example below. Tick the records the stump gets wrong, draw the next stump's data set from the buckets, and move on to the next round with the new weights.</p>
+
+      <figure id="ada-fig">
+        <div class="controls">
+          <button class="btn" id="ada-draw" type="button">Draw 7 records for the next stump</button>
+          <button class="btn" id="ada-next" type="button">Next round with these weights</button>
+          <button class="btn" id="ada-reset" type="button">Back to Krish's example</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">round</span><span class="v" id="ada-round">1</span></div>
+          <div><span class="k">total error TE</span><span class="v mine" id="ada-te">–</span></div>
+          <div><span class="k">α = ½ ln((1 − TE)/TE)</span><span class="v mine" id="ada-alpha">–</span></div>
+          <div><span class="k">× wrong / × correct</span><span class="v" id="ada-mult">–</span></div>
+          <div><span class="k">sum before normalizing</span><span class="v" id="ada-sum">–</span></div>
+        </div>
+        <div class="status" id="ada-status" aria-live="polite"></div>
+        <div class="tbl-wrap">
+          <table class="mini" style="min-width: 600px">
+            <thead><tr><th>Record</th><th>Stump wrong?</th><th class="num">Weight w</th><th class="num">w · e^(±α)</th><th class="num">Normalized</th><th class="num">Bucket</th></tr></thead>
+            <tbody id="ada-body"></tbody>
+          </table>
+        </div>
+        <div class="chart-wrap"><svg class="dg" id="ada-svg" viewBox="0 0 640 140" role="img" aria-label="The interval from 0 to 1 cut into seven buckets, one per record, each as wide as the record's normalized weight. Buckets of misclassified records are shaded. Random draws appear as markers above the strip, and the records they pick are listed below it."></svg></div>
+        <figcaption><b>An AdaBoost round calculator.</b> It starts at Krish's example: equal weights \(1/7\) and only record 4 wrong. It does not round, so it shows 0.083 and 0.500 where Krish's rounded working gave 0.077 and 0.537. Shaded buckets belong to misclassified records. Try round 2 with record 4 wrong again: its \(\mathit{TE}\) is exactly 0.5.</figcaption>
+      </figure>
+    </section>
+
+    <section id="final">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17049s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:44:09</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17145s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:45:45 every stump counts</a>
+        </div>
+        <h2>The final prediction</h2>
+      </div>
+      <p>For a new test point, every stump gives an output. In a binary problem they might say 0, 1, 1 and 1; Krish combines them by majority vote, which gives 1. For regression he averages the outputs.</p>
+      <p>Someone asks why boosting does not simply take the last stump's output. Krish's answer is that every stump's output is important, so all of them are combined.</p>
+      <div class="result">
+        <span class="lbl">Not in the video: the standard vote is weighted by α</span>
+        <p>In standard AdaBoost each stump's vote counts in proportion to its performance \(\alpha_t\). With the classes coded \(-1\) and \(+1\):</p>
+        \[ H(\mathbf{x}) = \operatorname{sign}\Big(\sum_{t=1}^{T} \alpha_t\, h_t(\mathbf{x})\Big) \]
+        <p>A stump with a small total error has a large \(\alpha_t\) and a big say; a stump near a coin flip has \(\alpha_t \approx 0\) and barely counts. scikit-learn's AdaBoost regressor combines its trees with a weighted median rather than a plain average.</p>
+      </div>
+
+      <p class="code-cap">Not in the video · AdaBoost with stumps in scikit-learn</p>
+      <pre class="codeblock"><code><span class="kw">from</span> sklearn.ensemble <span class="kw">import</span> AdaBoostClassifier
+<span class="kw">from</span> sklearn.tree <span class="kw">import</span> DecisionTreeClassifier
+
+ada = AdaBoostClassifier(
+    estimator=DecisionTreeClassifier(max_depth=1),  <span class="cm"># a stump (also the default)</span>
+    n_estimators=100,                                <span class="cm"># number of stumps in the sequence</span>
+    random_state=0,
+)
+ada.fit(X_train, y_train)   <span class="cm"># reweights the records each round instead of resampling</span>
+ada.predict(X_test)         <span class="cm"># weighted vote of the stumps</span></code></pre>
+      <p class="note">scikit-learn passes the weights straight to the tree instead of drawing buckets. Its formula leaves out the ½ and multiplies only the wrong records' weights, by \((1-\mathit{TE})/\mathit{TE}\); after normalizing this gives the same weights as the update above, and the same vote. For the IIT Madras treatment of AdaBoost, see <a href="part-17.html#adaboost">Part 17</a> (part-17.html).</p>
+    </section>
+
+    <section id="white-box">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17145s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:45:45</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17181s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:46:21 the reasons</a>
+        </div>
+        <h2>White-box and black-box models</h2>
+      </div>
+      <p>Before moving on, Krish contrasts two kinds of model. In a <dfn>white-box model</dfn> you can follow how a prediction is made. In a <dfn>black-box model</dfn> you cannot.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Model</th><th>Kind</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Linear regression</td><td>white box</td><td>You can watch \(\theta\) change as gradient descent moves to the global minimum.</td></tr>
+            <tr><td>Decision tree</td><td>white box</td><td>The splits can be traced with paper and pen.</td></tr>
+            <tr><td>Random forest</td><td>black box</td><td>There are too many trees to follow how each one decides; the maths inside is complex.</td></tr>
+            <tr><td>Artificial neural network</td><td>black box</td><td>You cannot see what the many neurons do or how their weights get updated.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The video then turns to unsupervised learning with K-means clustering, in <a href="krish-ml-07.html">Part 7</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Ensemble technique</dt><dd>Several models used together on one problem. Bagging and boosting are the two kinds.</dd></div>
+        <div><dt>Bagging (bootstrap aggregation)</dt><dd>Models trained in parallel on row samples, combined by majority vote or by the mean.</dd></div>
+        <div><dt>Row sampling</dt><dd>Giving each model a sample of the records; rows can repeat across models.</dd></div>
+        <div><dt>Feature sampling</dt><dd>Giving each tree a subset of the columns; libraries draw a fresh subset at every split.</dd></div>
+        <div><dt>Majority voting</dt><dd>The class predicted by most models wins. Regression takes the mean instead.</dd></div>
+        <div><dt>Boosting</dt><dd>Weak learners trained one after another, each focusing on the previous one's mistakes.</dd></div>
+        <div><dt>Weak and strong learner</dt><dd>A weak learner predicts poorly on its own; many weak learners combined make a strong learner.</dd></div>
+        <div><dt>Random forest</dt><dd>Bagging with decision trees only, using row and feature sampling, to turn high variance into low variance.</dd></div>
+        <div><dt>Decision stump</dt><dd>A decision tree of depth one, a single split. AdaBoost's weak learner.</dd></div>
+        <div><dt>Sample weight</dt><dd>A weight per record, \(1/n\) at the start; the weights always sum to 1 after normalizing.</dd></div>
+        <div><dt>Total error (TE)</dt><dd>The sum of the sample weights of the records a stump misclassifies.</dd></div>
+        <div><dt>Performance of stump (α)</dt><dd>\(\tfrac12\ln\frac{1-\mathit{TE}}{\mathit{TE}}\): large when \(\mathit{TE}\) is small, 0 at \(\mathit{TE} = 0.5\).</dd></div>
+        <div><dt>Buckets</dt><dd>Ranges on [0, 1) as wide as the normalized weights; random numbers falling in them pick the next stump's records.</dd></div>
+        <div><dt>White box and black box</dt><dd>Whether you can follow how a model reaches its prediction (linear regression, a tree) or not (a forest, a neural network).</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>How do bagging and boosting differ in how each model gets its data and how the models are combined?</span><span class="tog"></span></summary>
+          <p>In bagging the models are independent and trained in parallel, each on its own row sample, and they are combined by majority vote (classification) or the mean (regression). In boosting the models form a sequence: each is trained on data that favours the records the previous model got wrong, and the weak learners together make one strong learner.</p></details>
+        <details><summary><span class="q">Q2</span><span>Five bagged classifiers output 1, 0, 0, 1, 0, and four bagged regressors output 10, 12, 11, 15. What do the two ensembles predict?</span><span class="tog"></span></summary>
+          <p>The classifier ensemble predicts 0, because three of the five votes are 0. The regressor ensemble predicts the mean, \((10 + 12 + 11 + 15)/4 = 12\).</p></details>
+        <details><summary><span class="q">Q3</span><span>Why does a random forest use many fully grown trees instead of one, and what happens to bias and variance?</span><span class="tog"></span></summary>
+          <p>One fully grown tree overfits: low bias, high variance. Trees trained on different rows and features overfit in different ways, so in the vote (or average) their individual errors largely cancel. The forest keeps the low bias and has much lower variance.</p></details>
+        <details><summary><span class="q">Q4</span><span>Do you need to standardize the features before training a random forest? Before KNN? Why?</span><span class="tog"></span></summary>
+          <p>Not for a random forest: each split compares one feature with a threshold, and rescaling the feature moves the threshold with it, so the same rows go each way. Yes for KNN: it uses Euclidean or Manhattan distance, and a feature with a large range would dominate the distance.</p></details>
+        <details><summary><span class="q">Q5</span><span>10 records start with equal weights and the first stump misclassifies 2 of them. Find TE, α, the updated weights and the normalized weights.</span><span class="tog"></span></summary>
+          <p>Each weight is 0.1, so \(\mathit{TE} = 0.2\) and \(\alpha = \tfrac12\ln(0.8/0.2) = \tfrac12\ln 4 = \ln 2 \approx 0.693\). Correct records: \(0.1 \cdot e^{-0.693} = 0.05\). Wrong records: \(0.1 \cdot e^{0.693} = 0.2\). The sum is \(8 \times 0.05 + 2 \times 0.2 = 0.8\), so the normalized weights are \(0.05/0.8 = 0.0625\) and \(0.2/0.8 = 0.25\). The two wrong records hold half the weight.</p></details>
+        <details><summary><span class="q">Q6</span><span>What is α for a stump with TE = 0.5, and what does that mean?</span><span class="tog"></span></summary>
+          <p>\(\alpha = \tfrac12\ln(0.5/0.5) = \tfrac12\ln 1 = 0\). The stump is no better than random guessing. Its multipliers are \(e^{0} = 1\), so the weights do not change, and in a weighted vote it gets no say.</p></details>
+        <details><summary><span class="q">Q7</span><span>With the normalized weights from Q5, how wide are the buckets, and what is the chance that one random draw picks a misclassified record?</span><span class="tog"></span></summary>
+          <p>Eight buckets are 0.0625 wide and two are 0.25 wide; together they cover 0 to 1. A draw lands in one of the two wide buckets with probability \(0.25 + 0.25 = 0.5\).</p></details>
+        <details><summary><span class="q">Q8</span><span>Why must the weights be normalized before the buckets are built?</span><span class="tog"></span></summary>
+          <p>The buckets have to cover the interval from 0 to 1 exactly, so that every random number between 0 and 1 lands in one bucket. That needs the weights to sum to 1. With Krish's unnormalized weights the buckets would only reach 0.649, and draws above that would pick no record.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="krish-ml-05.html"><span class="dir">← Part 5</span><span class="nm">Decision trees</span></a><a class="next" href="krish-ml-07.html"><span class="dir">Part 7 →</span><span class="nm">Clustering: K-means, hierarchical, silhouette, DBSCAN</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the YouTube auto-generated captions of Krish Naik's video <i>Complete Machine Learning in 6 Hours</i>. Timestamp links open the video at that moment. Krish does not code in this part; the two scikit-learn listings are added for these notes. Charts marked synthetic use data generated for these notes. Not affiliated with Krish Naik or IIT Madras.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- Averaging bagged, fully grown regression trees ---------- */
+  (() => {
+    const svg = document.getElementById('forest-svg'); if (!svg) return;
+    let seed = 2606;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const f = x => Math.sin(x) + 0.4 * Math.sin(2.7 * x);
+    const N = 40, T = 100, pts = [];
+    for (let i = 0; i < N; i++) { const x = 10 * rand(); pts.push([x, f(x) + 0.45 * normal()]); }
+    // A fully grown 1-D regression tree on a bootstrap sample: one leaf per distinct x, splits at midpoints.
+    const trees = [];
+    for (let t = 0; t < T; t++) {
+      const idx = new Set(); for (let i = 0; i < N; i++) idx.add(Math.floor(rand() * N));
+      const bag = [...idx].map(i => pts[i]).sort((a, b) => a[0] - b[0]);
+      trees.push({ ys: bag.map(p => p[1]), mids: bag.slice(1).map((p, i) => (p[0] + bag[i][0]) / 2) });
+    }
+    const pred = (tr, x) => { let lo = 0, hi = tr.mids.length; while (lo < hi) { const m = (lo + hi) >> 1; if (x < tr.mids[m]) hi = m; else lo = m + 1; } return tr.ys[lo]; };
+    const G = 400, grid = Array.from({ length: G }, (_, i) => 10 * (i + 0.5) / G);
+    const P = trees.map(tr => grid.map(x => pred(tr, x)));
+    const F = grid.map(f);
+    const mse = arr => arr.reduce((s, v, i) => s + (v - F[i]) ** 2, 0) / G;
+    const indiv = P.map(mse), cumIndiv = []; indiv.reduce((s, v, t) => (cumIndiv[t] = s + v), 0);
+
+    const X0 = 50, X1 = 620, sx = x => X0 + (X1 - X0) * x / 10, sy = y => 156 - 56 * y;
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = 0; v <= 10; v += 2) { mk('line', { x1: sx(v), x2: sx(v), y1: sy(2.5), y2: sy(-2.5) }, g); mk('text', { x: sx(v), y: sy(-2.5) + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v; }
+    for (let v = -2; v <= 2; v += 1) { mk('line', { x1: X0, x2: X1, y1: sy(v), y2: sy(v) }, g); mk('text', { x: X0 - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v; }
+    mk('line', { x1: X0, x2: X1, y1: sy(-2.5), y2: sy(-2.5), class: 'c-axis' }, svg);
+    mk('line', { x1: X0, x2: X0, y1: sy(2.5), y2: sy(-2.5), class: 'c-axis' }, svg);
+    mk('text', { x: (X0 + X1) / 2, y: sy(-2.5) + 32, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'feature x';
+
+    const stepPath = tr => { let d = `M${sx(0).toFixed(1)} ${sy(tr.ys[0]).toFixed(1)}`; tr.mids.forEach((m, k) => { d += ` H${sx(m).toFixed(1)} V${sy(tr.ys[k + 1]).toFixed(1)}`; }); return d + ` H${sx(10).toFixed(1)}`; };
+    const gTrees = mk('g', {}, svg);
+    const faint = trees.slice(0, 5).map(tr => mk('path', { d: stepPath(tr), style: 'fill: none; stroke: var(--muted); stroke-width: 1; opacity: .55' }, gTrees));
+    const truth = []; for (let i = 0; i <= 200; i++) { const x = 10 * i / 200; truth.push(`${sx(x).toFixed(1)} ${sy(f(x)).toFixed(1)}`); }
+    mk('path', { d: 'M' + truth.join(' L'), style: 'fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-dasharray: 6 4' }, svg);
+    const avgLine = mk('path', { class: 'c-user', style: 'fill: none' }, svg);
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    pts.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.6 }, gDots));
+    // legend
+    const ly = 344;
+    mk('line', { x1: 60, x2: 84, y1: ly - 4, y2: ly - 4, style: 'stroke: var(--ink); stroke-width: 1.6; stroke-dasharray: 6 4' }, svg);
+    mk('text', { x: 90, y: ly, class: 'c-note' }, svg).textContent = 'true curve';
+    mk('line', { x1: 180, x2: 204, y1: ly - 4, y2: ly - 4, style: 'stroke: var(--muted); stroke-width: 1; opacity: .8' }, svg);
+    mk('text', { x: 210, y: ly, class: 'c-note' }, svg).textContent = 'single trees';
+    mk('line', { x1: 310, x2: 334, y1: ly - 4, y2: ly - 4, class: 'c-user' }, svg);
+    mk('text', { x: 340, y: ly, class: 'c-note' }, svg).textContent = 'average of the trees';
+    mk('circle', { cx: 478, cy: ly - 4, r: 3.6, style: 'fill: var(--ink-2)' }, svg);
+    mk('text', { x: 488, y: ly, class: 'c-note' }, svg).textContent = 'synthetic data';
+
+    const slider = document.getElementById('forest-m'), out = document.getElementById('forest-m-out');
+    const show = document.getElementById('forest-show'), status = document.getElementById('forest-status');
+    const e1 = document.getElementById('forest-e1'), em = document.getElementById('forest-em');
+    let M = parseInt(slider.value, 10);
+    const draw = () => {
+      const avg = grid.map((_, i) => { let s = 0; for (let t = 0; t < M; t++) s += P[t][i]; return s / M; });
+      avgLine.setAttribute('d', 'M' + avg.map((v, i) => `${sx(grid[i]).toFixed(1)} ${sy(v).toFixed(1)}`).join(' L'));
+      faint.forEach((p, k) => { p.style.display = show.checked && k < M ? '' : 'none'; });
+      const e = mse(avg);
+      const one = cumIndiv[M - 1] / M;
+      out.textContent = M; em.textContent = e.toFixed(3); e1.textContent = one.toFixed(3);
+      status.textContent = M === 1 ? 'One tree: it jumps to every point in its sample, noise included.' : M >= 10 ? `Averaging ${M} trees: squared error ${e.toFixed(3)}, against ${one.toFixed(3)} for one of these trees on its own.` : '';
+    };
+    draw();
+    slider.addEventListener('input', () => { M = parseInt(slider.value, 10); draw(); });
+    show.addEventListener('change', draw);
+    document.getElementById('forest-play').addEventListener('click', () => {
+      if (reduce) { M = T; slider.value = T; draw(); return; }
+      const from = M, t0 = performance.now(), dur = 1600;
+      const step = now => { const k = Math.min(1, (now - t0) / dur); M = Math.round(from + (T - from) * k); slider.value = M; draw(); if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
+  })();
+
+  /* ---------- AdaBoost round calculator ---------- */
+  (() => {
+    const body = document.getElementById('ada-body'), svg = document.getElementById('ada-svg'); if (!body || !svg) return;
+    const n = 7, EPS = 1e-9;
+    let seed = 6061;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    let round, w, wrong, prevWrong, draws;
+    const reset = () => { round = 1; w = Array(n).fill(1 / n); wrong = new Set([3]); prevWrong = null; draws = null; };
+    reset();
+
+    const rows = [];
+    for (let i = 0; i < n; i++) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${i + 1}</td><td><input type="checkbox" id="ada-c${i + 1}" aria-label="Stump misclassifies record ${i + 1}" style="accent-color: var(--accent); width: 16px; height: 16px; margin: 0"></td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td>`;
+      body.appendChild(tr);
+      const cb = tr.querySelector('input');
+      cb.addEventListener('change', () => { if (cb.checked) wrong.add(i); else wrong.delete(i); draws = null; render(); });
+      rows.push({ tr, cb, tds: tr.querySelectorAll('td.num') });
+    }
+
+    const L = 20, W = 600, top = 34, h = 34, xs = v => L + W * v;
+    mk('text', { x: L, y: 14, class: 'd-s' }, svg).textContent = 'buckets on [0, 1): each record gets a width equal to its weight';
+    const gStrip = mk('g', {}, svg), gMarks = mk('g', {}, svg), gPick = mk('g', {}, svg);
+
+    const readout = id => document.getElementById(id);
+    const btnDraw = readout('ada-draw'), btnNext = readout('ada-next'), status = readout('ada-status');
+    const f3 = v => (Math.abs(v) < 5e-4 ? 0 : v).toFixed(3).replace('-', '−');
+
+    const compute = () => {
+      const te = [...wrong].reduce((s, i) => s + w[i], 0);
+      if (te < EPS || te > 1 - EPS) return { te, ok: false };
+      const a = 0.5 * Math.log((1 - te) / te);
+      const upd = w.map((v, i) => v * Math.exp(wrong.has(i) ? a : -a));
+      const sum = upd.reduce((s, v) => s + v, 0);
+      return { te, a, upd, sum, norm: upd.map(v => v / sum), ok: true };
+    };
+
+    const drawStrip = (weights, isWrong) => {
+      gStrip.textContent = '';
+      let c = 0, lastLbl = -1;
+      mk('text', { x: xs(0), y: top + h + 16, 'text-anchor': 'middle', class: 'd-al' }, gStrip).textContent = '0';
+      weights.forEach((v, i) => {
+        const x = xs(c), wd = W * v;
+        mk('rect', { x, y: top, width: wd, height: h, style: isWrong(i) ? 'fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5' : 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1' }, gStrip);
+        if (wd >= 14) mk('text', { x: x + wd / 2, y: top + h / 2 + 5, 'text-anchor': 'middle', class: 'd-t' }, gStrip).textContent = i + 1;
+        c += v;
+        const xe = xs(c);
+        if (i < n - 1 && xe - Math.max(xs(0), lastLbl) >= 38 && xs(1) - xe >= 30) { mk('text', { x: xe, y: top + h + 16, 'text-anchor': 'middle', class: 'd-al' }, gStrip).textContent = c.toFixed(3); lastLbl = xe; }
+      });
+      mk('text', { x: xs(1), y: top + h + 16, 'text-anchor': 'middle', class: 'd-al' }, gStrip).textContent = '1';
+    };
+
+    const render = () => {
+      const r = compute();
+      readout('ada-round').textContent = round;
+      readout('ada-te').textContent = f3(r.te);
+      rows.forEach((row, i) => {
+        row.cb.checked = wrong.has(i);
+        row.tr.style.background = wrong.has(i) ? 'var(--accent-soft)' : '';
+        row.tds[0].textContent = f3(w[i]);
+      });
+      if (r.ok) {
+        readout('ada-alpha').textContent = f3(r.a);
+        readout('ada-mult').textContent = `×${Math.exp(r.a).toFixed(3)} / ×${Math.exp(-r.a).toFixed(3)}`;
+        readout('ada-sum').textContent = f3(r.sum);
+        let c = 0;
+        rows.forEach((row, i) => { row.tds[1].textContent = f3(r.upd[i]); row.tds[2].textContent = f3(r.norm[i]); row.tds[3].textContent = `${f3(c)} – ${f3(c + r.norm[i])}`; c += r.norm[i]; });
+        drawStrip(r.norm, i => wrong.has(i));
+      } else {
+        readout('ada-alpha').textContent = r.te < EPS ? '∞' : '−∞';
+        ['ada-mult', 'ada-sum'].forEach(id => { readout(id).textContent = '–'; });
+        rows.forEach(row => { row.tds[1].textContent = '–'; row.tds[2].textContent = '–'; row.tds[3].textContent = '–'; });
+        drawStrip(w, () => false);
+      }
+      btnDraw.disabled = !r.ok; btnNext.disabled = !r.ok;
+
+      gMarks.textContent = ''; gPick.textContent = '';
+      if (!draws && r.ok) mk('text', { x: L, y: 126, class: 'd-s' }, gPick).textContent = `Press “Draw 7 records” to build stump ${round + 1}'s data set from these buckets.`;
+      if (draws && r.ok) {
+        draws.forEach(d => mk('path', { d: `M${xs(d.u) - 4} 20 L${xs(d.u) + 4} 20 L${xs(d.u)} 30 Z`, style: 'fill: var(--ink)' }, gMarks));
+        mk('text', { x: L, y: 126, class: 'd-s' }, gPick).textContent = `data for stump ${round + 1}:`;
+        draws.forEach((d, k) => {
+          const x = 160 + k * 40;
+          mk('rect', { x, y: 106, width: 32, height: 28, rx: 6, style: wrong.has(d.i) ? 'fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5' : 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1' }, gPick);
+          mk('text', { x: x + 16, y: 125, 'text-anchor': 'middle', class: 'd-t' }, gPick).textContent = d.i + 1;
+        });
+      }
+
+      let msg = '';
+      if (r.te < EPS) msg = round === 1 ? 'No record is marked wrong, so TE = 0 and α is infinite: a perfect stump leaves nothing to boost. Tick at least one record.' : `Round ${round}: tick the records stump ${round} gets wrong.`;
+      else if (r.te > 1 - EPS) msg = 'Every record is wrong: TE = 1 and α = −∞. Flipping this stump\'s answers would make it perfect.';
+      else if (draws) { const k = draws.filter(d => wrong.has(d.i)).length; msg = `Drawn: records ${draws.map(d => d.i + 1).join(', ')}. Misclassified records were picked ${k} of ${n} times.`; }
+      else if (Math.abs(r.te - 0.5) < EPS) msg = 'TE = 0.5: no better than a coin flip, so α = 0 and the weights do not change.' + (prevWrong && prevWrong.size === wrong.size && [...wrong].every(i => prevWrong.has(i)) ? ' These are the last stump\'s mistakes, which normalizing always leaves with exactly half the weight.' : '');
+      else if (r.te > 0.5) msg = 'TE above 0.5: worse than random, so α is negative and the formula shrinks the wrong records instead. scikit-learn discards such a stump and stops.';
+      else { const share = [...wrong].reduce((s, i) => s + r.norm[i], 0); msg = `The misclassified records' share of the weight rises from ${f3(r.te)} to ${f3(share)}.`; }
+      status.textContent = msg;
+    };
+
+    btnDraw.addEventListener('click', () => {
+      const r = compute(); if (!r.ok) return;
+      const cum = []; r.norm.reduce((s, v, i) => (cum[i] = s + v), 0);
+      draws = Array.from({ length: n }, () => { const u = rand(); let i = cum.findIndex(c => u < c); if (i < 0) i = n - 1; return { u, i }; });
+      render();
+    });
+    btnNext.addEventListener('click', () => {
+      const r = compute(); if (!r.ok) return;
+      w = r.norm; prevWrong = new Set(wrong); wrong = new Set(); draws = null; round += 1; render();
+    });
+    document.getElementById('ada-reset').addEventListener('click', () => { reset(); render(); });
+    render();
+  })();
+})();
+</script>
+</body>
+</html>
