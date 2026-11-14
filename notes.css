@@ -306,3 +306,10 @@ code, .code { font-family: var(--font-mono); font-size: .88em; background: var(-
 .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 .theme-toggle svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .theme-toggle svg path[d^="M20.5"] { fill: currentColor; stroke: none; }
+
+/* Code listings (practical sessions) */
+pre.codeblock { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 18px; overflow-x: auto; max-width: 100%; font: 13.5px/1.6 var(--font-mono); color: var(--ink); tab-size: 4; }
+pre.codeblock code { background: none; padding: 0; font-size: inherit; }
+pre.codeblock .cm { color: var(--muted); }
+pre.codeblock .kw { color: var(--accent); }
+.code-cap { font: 500 12px/1.3 var(--font-mono); color: var(--muted); letter-spacing: .04em; margin-bottom: -10px; }
