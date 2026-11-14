@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ML in 6 hours · Part 7 · Clustering · MLT Notes</title>
+<meta name="description" content="Notes on Krish Naik's Complete Machine Learning in 6 Hours, Part 7: K-means, the elbow method and K-means++, hierarchical clustering and dendrograms, the silhouette score, DBSCAN, and the clustering practical in Jupyter.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script src="theme.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html#extra">All notes</a><span class="sep">/</span><span>ML in 6 hours · Part 7 of 8</span><span class="sep">·</span><a href="krish-ml-04.html">← Part 4</a><span class="sep">·</span><a href="krish-ml-08.html">Part 8 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Krish Naik · Complete Machine Learning in 6 Hours</div>
+    <h1>Clustering: K-means, hierarchical, silhouette, DBSCAN</h1>
+    <p class="lede">Clustering groups data that has no labels. K-means and hierarchical clustering build the groups, the elbow method and the silhouette score help choose and check how many there are, and DBSCAN finds dense groups of any shape while leaving outliers out.</p>
+    <div class="meta">
+      <span><b>Part 7</b> of 8</span>
+      <span>Teacher <b>Krish Naik</b></span>
+      <span>About <b>48 min</b> of video</span>
+      <span><b>5</b> chapters</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17250s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:47:30 · K-means clustering</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18114s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:01:54 · Hierarchical clustering</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18688s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:11:28 · Silhouette score</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19066s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:17:46 · DBSCAN</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19557s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:25:57 · Clustering practical</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>K-means clustering</h4>
+      <ul>
+        <li><a href="#unsupervised">Grouping without an output</a></li>
+        <li><a href="#kmeans-steps">K-means step by step</a></li>
+        <li><a href="#elbow">Choosing K: the elbow</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Hierarchical clustering</h4>
+      <ul>
+        <li><a href="#hierarchical">Merge the nearest</a></li>
+        <li><a href="#cut-dendrogram">Cutting the dendrogram</a></li>
+        <li><a href="#hier-vs-kmeans">Which is slower?</a></li>
+        <li><a href="#init-problem">Bad starts and K-means++</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Silhouette score</h4>
+      <ul>
+        <li><a href="#silhouette-ab">a(i) and b(i)</a></li>
+        <li><a href="#silhouette-s">The silhouette s(i)</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>DBSCAN</h4>
+      <ul>
+        <li><a href="#dbscan-why">Why DBSCAN</a></li>
+        <li><a href="#dbscan-terms">ε, MinPts, point types</a></li>
+        <li><a href="#dbscan-clusters">From points to clusters</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Clustering practical</h4>
+      <ul>
+        <li><a href="#practical-setup">Imports and data</a></li>
+        <li><a href="#practical-elbow">Elbow curve in code</a></li>
+        <li><a href="#practical-silhouette">Silhouette for K = 2–6</a></li>
+        <li><a href="#practical-choice">Why K = 4</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html#extra">All notes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li><dfn>K-means</dfn>: choose K, place K centroids at random, give every point to its nearest centroid (Euclidean distance), move each centroid to the mean of its points, and repeat until no point changes group. <b>K-means++</b> starts the centroids far apart.</li>
+        <li><b>Elbow method</b>: run K-means for K = 1 to 10 and plot the <dfn>WCSS</dfn> (within-cluster sum of squares) against K. Take the K at the last sharp drop, where the curve bends and flattens.</li>
+        <li><dfn>Hierarchical clustering</dfn> joins the two nearest points or groups again and again, and records every join in a <b>dendrogram</b>. Cut it across the longest vertical line that no horizontal line crosses; the number of lines cut is the number of clusters. It is slower than K-means on large data.</li>
+        <li><dfn>Silhouette</dfn>: \(a(i)\) is a point's mean distance to its own cluster, \(b(i)\) its mean distance to the nearest other cluster, and \(s(i) = \frac{b(i) - a(i)}{\max(a(i),\, b(i))}\) lies in \([-1, 1]\). Near +1 is good; negative means the point sits closer to another cluster.</li>
+        <li><dfn>DBSCAN</dfn> uses a radius ε and a count MinPts. Core points have at least MinPts points within ε, border points are near a core point, and noise points are left out as outliers. Clusters can take any shape.</li>
+        <li>In the practical, the elbow on 4-blob data points to K = 4. Silhouette scores for K = 2…6 are 0.704, 0.588, 0.65, 0.563 and 0.45. K = 3, 5 and 6 show negative values, and K = 4 is preferred over K = 2, which agrees with the elbow.</li>
+      </ul>
+    </div>
+
+    <!-- ============ K-MEANS CLUSTERING ============ -->
+    <section id="unsupervised">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17250s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:47:30</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17336s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:48:56 clustering first, models after</a>
+        </div>
+        <h2>Clustering: grouping data without an output</h2>
+      </div>
+      <p>Clustering is unsupervised machine learning. There is no output column to predict: you only have features, say \(F_1\) and \(F_2\), and the points they describe. The aim is to put similar points into the same group, called a <dfn>cluster</dfn>. If the points form two clouds on a scatter plot, a good clustering returns those two clouds as cluster 1 and cluster 2.</p>
+      <p>He names K-means and hierarchical clustering as the main techniques and starts with K-means.</p>
+      <p>Krish gives one use straight away. In what he calls a custom ensemble, the first algorithm applied to the data set is a clustering algorithm. If it finds two or three groups, you then train a separate supervised model (regression or classification) on each group, provided the output is known.</p>
+      <p class="note">For the IIT Madras treatment of K-means, see <a href="part-06.html">Part 6</a> (the algorithm and why it converges) and <a href="part-07.html">Part 7</a> (initialization and choosing K).</p>
+    </section>
+
+    <section id="kmeans-steps">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17399s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:49:59</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17463s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:51:03 the steps</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17624s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:53:44 update the centroids</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17722s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:55:22 stop when nothing changes</a>
+        </div>
+        <h2>K-means step by step</h2>
+      </div>
+      <p>The K in K-means is the number of <dfn>centroids</dfn>, and so the number of clusters. Each cluster has one centroid at its centre. On a two-feature plot you might see that K = 2 by eye. Real data usually has many features, so you cannot see the groups. Instead you try several values of K and judge them (the elbow method, next section).</p>
+      <ol class="algo">
+        <li class="algo-title">K-means, as taught on the board</li>
+        <li><b>Choose K.</b> Try several values; take K = 2 for now.</li>
+        <li><b>Initialize K centroids</b> at random positions.</li>
+        <li><b>Assign</b> every point to its nearest centroid, using Euclidean distance. On the board this is a line halfway between the two centroids: every point on one side goes to that side's centroid.</li>
+        <li><b>Update</b> each centroid: move it to the average of the points assigned to it.</li>
+        <li><b>Repeat</b>: compute the distances again and reassign. If any point changed group, update again. When no point changes, the centroids have stopped moving and each group is final.</li>
+      </ol>
+      <div class="eq">\[ d(\mathbf{x}, \boldsymbol\mu_k) = \sqrt{\textstyle\sum_{j=1}^{d} (x_j - \mu_{kj})^2}, \qquad \boldsymbol\mu_k \leftarrow \frac{1}{|C_k|} \sum_{\mathbf{x} \in C_k} \mathbf{x} \]</div>
+      <p class="note">\(C_k\) is the set of points currently assigned to centroid \(\boldsymbol\mu_k\), and \(|C_k|\) is how many there are. The formulas are the standard ones for the two steps he describes in words.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 690 292" role="img" aria-label="Three panels of K-means with K equal to 2 on fourteen points in two groups. Panel 1: two random centroids, the perpendicular bisector between them and each point assigned to the nearer one. Panel 2: each centroid moves to the mean of its points and three points switch sides. Panel 3: the centroids move again and no point changes, so the algorithm stops.">
+<defs><marker id="kml07-ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="d-h" x="10" y="20">1. Random start, assign</text>
+<text class="d-s" x="10" y="38">nearest centroid wins (Euclidean)</text>
+<rect class="d-plot" x="10" y="52" width="210" height="210"/>
+<path d="M10 262 L220 262 L220 231.3 L10 183.3 Z" style="fill: var(--accent-soft); fill-opacity: .6"/>
+<line class="d-ln d-dash" x1="10" y1="183.3" x2="220" y2="231.3"/>
+<circle class="pt-tree" cx="41.5" cy="220" r="4.5"/>
+<circle class="pt-tree" cx="62.5" cy="236.8" r="4.5"/>
+<circle class="pt-tree" cx="52" cy="194.8" r="4.5"/>
+<circle class="pt-tree" cx="77.2" cy="211.6" r="4.5"/>
+<circle class="pt-no" cx="35.2" cy="182.2" r="4.5"/>
+<circle class="pt-no" cx="83.5" cy="186.4" r="4.5"/>
+<circle class="pt-no" cx="64.6" cy="169.6" r="4.5"/>
+<circle class="pt-no" cx="146.5" cy="131.8" r="4.5"/>
+<circle class="pt-no" cx="167.5" cy="98.2" r="4.5"/>
+<circle class="pt-no" cx="182.2" cy="127.6" r="4.5"/>
+<circle class="pt-no" cx="152.8" cy="85.6" r="4.5"/>
+<circle class="pt-no" cx="194.8" cy="94" r="4.5"/>
+<circle class="pt-no" cx="161.2" cy="148.6" r="4.5"/>
+<circle class="pt-no" cx="131.8" cy="110.8" r="4.5"/>
+<path class="pt-new" d="M102.4 235.6 L109.9 243.1 L102.4 250.6 L94.9 243.1 Z"/>
+<text class="d-t" x="112.4" y="247.1">c₁</text>
+<path class="pt-new" d="M119.2 162.1 L126.7 169.6 L119.2 177.1 L111.7 169.6 Z"/>
+<text class="d-t" x="129.2" y="163.6">c₂</text>
+<text class="d-h" x="240" y="20">2. Move to the mean, reassign</text>
+<text class="d-s" x="240" y="38">3 points switch sides</text>
+<rect class="d-plot" x="240" y="52" width="210" height="210"/>
+<path d="M240 262 L422.7 262 L240 98.4 Z" style="fill: var(--accent-soft); fill-opacity: .6"/>
+<line class="d-ln d-dash" x1="240" y1="98.4" x2="422.7" y2="262"/>
+<circle class="pt-tree" cx="271.5" cy="220" r="4.5"/>
+<circle class="pt-tree" cx="292.5" cy="236.8" r="4.5"/>
+<circle class="pt-tree" cx="282" cy="194.8" r="4.5"/>
+<circle class="pt-tree" cx="307.2" cy="211.6" r="4.5"/>
+<circle class="pt-tree" cx="265.2" cy="182.2" r="4.5"/>
+<circle class="c-hl" cx="265.2" cy="182.2" r="8.5"/>
+<circle class="pt-tree" cx="313.5" cy="186.4" r="4.5"/>
+<circle class="c-hl" cx="313.5" cy="186.4" r="8.5"/>
+<circle class="pt-tree" cx="294.6" cy="169.6" r="4.5"/>
+<circle class="c-hl" cx="294.6" cy="169.6" r="8.5"/>
+<circle class="pt-no" cx="376.5" cy="131.8" r="4.5"/>
+<circle class="pt-no" cx="397.5" cy="98.2" r="4.5"/>
+<circle class="pt-no" cx="412.2" cy="127.6" r="4.5"/>
+<circle class="pt-no" cx="382.8" cy="85.6" r="4.5"/>
+<circle class="pt-no" cx="424.8" cy="94" r="4.5"/>
+<circle class="pt-no" cx="391.2" cy="148.6" r="4.5"/>
+<circle class="pt-no" cx="361.8" cy="110.8" r="4.5"/>
+<path class="d-off" d="M332.4 237.1 L338.4 243.1 L332.4 249.1 L326.4 243.1 Z"/>
+<line class="d-ln-acc" x1="326.4" y1="239.4" x2="296" y2="220.5" marker-end="url(#kml07-ah1)"/>
+<path class="d-off" d="M349.2 163.6 L355.2 169.6 L349.2 175.6 L343.2 169.6 Z"/>
+<line class="d-ln-acc" x1="351.5" y1="163" x2="359" y2="142" marker-end="url(#kml07-ah1)"/>
+<path class="pt-new" d="M288.3 208.3 L295.8 215.8 L288.3 223.3 L280.8 215.8 Z"/>
+<text class="d-t" x="298.3" y="219.8">c₁</text>
+<path class="pt-new" d="M362 126 L369.5 133.5 L362 141 L354.5 133.5 Z"/>
+<text class="d-t" x="372" y="127.5">c₂</text>
+<text class="d-h" x="470" y="20">3. Repeat until stable</text>
+<text class="d-s" x="470" y="38">no point changes: stop</text>
+<rect class="d-plot" x="470" y="52" width="210" height="210"/>
+<path d="M470 262 L659.1 262 L482.8 52 L470 52 Z" style="fill: var(--accent-soft); fill-opacity: .6"/>
+<line class="d-ln d-dash" x1="482.8" y1="52" x2="659.1" y2="262"/>
+<circle class="pt-tree" cx="501.5" cy="220" r="4.5"/>
+<circle class="pt-tree" cx="522.5" cy="236.8" r="4.5"/>
+<circle class="pt-tree" cx="512" cy="194.8" r="4.5"/>
+<circle class="pt-tree" cx="537.2" cy="211.6" r="4.5"/>
+<circle class="pt-tree" cx="495.2" cy="182.2" r="4.5"/>
+<circle class="pt-tree" cx="543.5" cy="186.4" r="4.5"/>
+<circle class="pt-tree" cx="524.6" cy="169.6" r="4.5"/>
+<circle class="pt-no" cx="606.5" cy="131.8" r="4.5"/>
+<circle class="pt-no" cx="627.5" cy="98.2" r="4.5"/>
+<circle class="pt-no" cx="642.2" cy="127.6" r="4.5"/>
+<circle class="pt-no" cx="612.8" cy="85.6" r="4.5"/>
+<circle class="pt-no" cx="654.8" cy="94" r="4.5"/>
+<circle class="pt-no" cx="621.2" cy="148.6" r="4.5"/>
+<circle class="pt-no" cx="591.8" cy="110.8" r="4.5"/>
+<path class="d-off" d="M518.3 209.8 L524.3 215.8 L518.3 221.8 L512.3 215.8 Z"/>
+<line class="d-ln-acc" x1="518.8" y1="208.8" x2="518.8" y2="209.2" marker-end="url(#kml07-ah1)"/>
+<path class="d-off" d="M592 127.5 L598 133.5 L592 139.5 L586 133.5 Z"/>
+<line class="d-ln-acc" x1="597.9" y1="129.7" x2="614.8" y2="118.7" marker-end="url(#kml07-ah1)"/>
+<path class="pt-new" d="M519.5 192.7 L527 200.2 L519.5 207.7 L512 200.2 Z"/>
+<text class="d-t" x="529.5" y="204.2">c₁</text>
+<path class="pt-new" d="M622.4 106.3 L629.9 113.8 L622.4 121.3 L614.9 113.8 Z"/>
+<text class="d-t" x="632.4" y="107.8">c₂</text>
+<text class="d-s" x="10" y="286">filled: nearer c₁ · hollow: nearer c₂ · shaded: c₁'s side of the dashed bisector · ringed: switched this step</text>
+</svg>
+        </div>
+        <figcaption><b>K-means on two groups (illustrative points).</b> The dashed line is the perpendicular bisector of the two centroids, so each side is the set of points nearer to that centroid. After the first update three points cross to c₁'s side. After the second update nothing changes, so the algorithm stops with one centroid in the middle of each group.</figcaption>
+      </figure>
+      <p class="note">Not in the video: why it always stops. K-means lowers the WCSS (next section) at every assign and update step, and there are only finitely many ways to split the points, so it cannot go on forever. <a href="part-06.html">Part 6</a> proves this; <a href="part-07.html">Part 7</a> shows why the boundary between two centroids is the perpendicular bisector.</p>
+    </section>
+
+    <section id="elbow">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17786s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:56:26</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17824s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:57:04 WCSS</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17950s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:59:10 the elbow shape</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=17983s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:59:43 validate with silhouette</a>
+        </div>
+        <h2>Choosing K: the elbow method</h2>
+      </div>
+      <p>You cannot assume K = 2 just because a picture suggests it. The <dfn>elbow method</dfn> tries every K in a range, say 1 to 10. For each K it runs K-means and records the <dfn>WCSS</dfn>, the within-cluster sum of squares: the squared distance from every point to its own centroid, added up over all points. Then it plots WCSS against K.</p>
+      <ul>
+        <li><b>K = 1.</b> One centroid serves every point, so the distances are large and the WCSS is very high.</li>
+        <li><b>K = 2.</b> Each point now measures to the nearer of two centroids. The total must be smaller.</li>
+        <li><b>K = 3, 4, 5, …</b> The WCSS keeps falling. At first it drops sharply, then at some K the drops become small and the curve runs almost flat. The bend looks like an elbow, which gives the method its name.</li>
+      </ul>
+      <p>Pick the K where the last sharp drop ends; in his sketch that is K = 4. With K = 4 you get four groups, each with its own centroid. The method is costly, since K-means has to be run once for every candidate K.</p>
+      <div class="result">
+        <span class="lbl">Within-cluster sum of squares (standard form)</span>
+        \[ \text{WCSS}(K) = \sum_{k=1}^{K} \; \sum_{\mathbf{x} \in C_k} \lVert \mathbf{x} - \boldsymbol\mu_k \rVert^2 \]
+        <p>In scikit-learn this is the fitted model's <code>inertia_</code>.</p>
+      </div>
+      <p>The elbow method chooses K. To <i>validate</i> the clustering, Krish uses the silhouette score, covered after hierarchical clustering. The practical at the end of this part runs both, and the widget there lets you try them on synthetic data (<a href="#kc-fig">jump to it</a>).</p>
+      <p class="note">Not in the video: WCSS never goes up when K grows, and it reaches 0 when every point is its own cluster (K = n). That is why you look for a bend instead of the smallest value. <a href="part-07.html">Part 7</a> covers the course's version: the objective plus a penalty on K, with AIC and BIC.</p>
+    </section>
+
+    <!-- ============ HIERARCHICAL CLUSTERING ============ -->
+    <section id="hierarchical">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18111s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:01:51</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18311s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:05:11 the dendrogram</a>
+        </div>
+        <h2>Hierarchical clustering: merge the nearest, step by step</h2>
+      </div>
+      <p>Take points \(P_1, \dots, P_7\) on an \(x\)–\(y\) plot. Hierarchical clustering works step by step:</p>
+      <ol class="algo">
+        <li class="algo-title">Hierarchical clustering, as taught</li>
+        <li>Find the two points nearest to each other and combine them into one cluster.</li>
+        <li>Find the next nearest pair, where either side can be a single point or a group already formed, and combine those.</li>
+        <li>Repeat until every point is in one group. Each join happens at a larger distance than the one before.</li>
+      </ol>
+      <p>Next to the scatter plot he draws a second picture with the points along the bottom. Each join is drawn as a bracket whose height is the distance at which the two sides were joined. In his example the joins come in this order: \(P_1\) with \(P_2\), \(P_6\) with \(P_7\), \(P_3\) with \(P_5\), then \(P_4\) joins \(\{P_3, P_5\}\), then \(\{P_1, P_2\}\) joins \(\{P_3, P_4, P_5\}\), and finally \(\{P_6, P_7\}\) joins everything else. The finished tree, read from the single points at the bottom to one group at the top, is the <dfn>dendrogram</dfn>.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 300" role="img" aria-label="Left: seven points P1 to P7 with the order in which single-linkage clustering joins them. Right: the dendrogram of those merges, with merge distance on the vertical axis. The largest gap between merge heights is shaded and a horizontal cut through it crosses three vertical lines, giving three clusters.">
+<text class="d-h" x="20" y="20">Seven points, merged nearest-first</text>
+<rect class="d-plot" x="20" y="34" width="290" height="246"/>
+<ellipse class="d-ln-mut" cx="68.5" cy="68.1" rx="28.1" ry="24" style="stroke-dasharray: 4 3; stroke: var(--muted)"/>
+<ellipse class="d-ln-mut" cx="154.9" cy="145.1" rx="38.9" ry="38.9" style="stroke-dasharray: 4 3; stroke: var(--muted)"/>
+<ellipse class="d-ln-mut" cx="252.1" cy="219.4" rx="28.1" ry="29.5" style="stroke-dasharray: 4 3; stroke: var(--muted)"/>
+<line class="d-ln-acc" x1="60.4" y1="72.2" x2="76.6" y2="64.1"/>
+<text class="d-al" x="73.4" y="82" text-anchor="middle" style="fill: var(--accent)">1</text>
+<line class="d-ln-acc" x1="244" y1="228.8" x2="260.2" y2="209.9"/>
+<text class="d-al" x="260.5" y="230.5" text-anchor="middle" style="fill: var(--accent)">2</text>
+<line class="d-ln-acc" x1="136" y1="142.4" x2="160.3" y2="164"/>
+<text class="d-al" x="140.8" y="165.4" text-anchor="middle" style="fill: var(--accent)">3</text>
+<line class="d-ln-acc" x1="173.8" y1="126.2" x2="160.3" y2="164"/>
+<text class="d-al" x="177.4" y="152.8" text-anchor="middle" style="fill: var(--accent)">4</text>
+<line class="d-ln d-dash" x1="76.6" y1="64.1" x2="136" y2="142.4"/>
+<text class="d-al" x="97.5" y="113.9" text-anchor="middle" style="fill: var(--accent)">5</text>
+<line class="d-ln d-dash" x1="244" y1="228.8" x2="160.3" y2="164"/>
+<text class="d-al" x="208.9" y="191.7" text-anchor="middle" style="fill: var(--accent)">6</text>
+<circle class="pt-plain" cx="60.4" cy="72.2" r="4.5"/>
+<text class="d-s" x="52.4" y="64.2" text-anchor="end">P1</text>
+<circle class="pt-plain" cx="76.6" cy="64.1" r="4.5"/>
+<text class="d-s" x="84.6" y="56.1" text-anchor="start">P2</text>
+<circle class="pt-plain" cx="136" cy="142.4" r="4.5"/>
+<text class="d-s" x="127" y="146.4" text-anchor="end">P3</text>
+<circle class="pt-plain" cx="173.8" cy="126.2" r="4.5"/>
+<text class="d-s" x="182.8" y="130.2" text-anchor="start">P4</text>
+<circle class="pt-plain" cx="160.3" cy="164" r="4.5"/>
+<text class="d-s" x="169.3" y="178" text-anchor="start">P5</text>
+<circle class="pt-plain" cx="244" cy="228.8" r="4.5"/>
+<text class="d-s" x="235" y="234.8" text-anchor="end">P6</text>
+<circle class="pt-plain" cx="260.2" cy="209.9" r="4.5"/>
+<text class="d-s" x="269.2" y="213.9" text-anchor="start">P7</text>
+<text class="d-s" x="24" y="294">numbers: merge order · dashed ovals: the 3 clusters from the cut</text>
+<text class="d-h" x="350" y="20">Dendrogram</text>
+<rect x="372" y="94.6" width="296" height="99.1" style="fill: var(--accent-soft); fill-opacity: .7"/>
+<line class="d-ln" x1="364" y1="262" x2="364" y2="59.6"/>
+<line class="d-ln" x1="360" y1="262" x2="364" y2="262"/><text class="d-al" x="356" y="266" text-anchor="end">0</text>
+<line class="d-ln" x1="360" y1="216" x2="364" y2="216"/><text class="d-al" x="356" y="220" text-anchor="end">1</text>
+<line class="d-ln" x1="360" y1="170" x2="364" y2="170"/><text class="d-al" x="356" y="174" text-anchor="end">2</text>
+<line class="d-ln" x1="360" y1="124" x2="364" y2="124"/><text class="d-al" x="356" y="128" text-anchor="end">3</text>
+<line class="d-ln" x1="360" y1="78" x2="364" y2="78"/><text class="d-al" x="356" y="82" text-anchor="end">4</text>
+<text class="d-al" x="350" y="51.6">distance</text>
+<path class="d-ln" d="M392 262 V231.1 H434 V262" style="stroke-width: 1.8"/>
+<path class="d-ln" d="M602 262 V219.6 H644 V262" style="stroke-width: 1.8"/>
+<path class="d-ln" d="M476 262 V206.6 H518 V262" style="stroke-width: 1.8"/>
+<path class="d-ln" d="M560 262 V193.6 H497 V206.6" style="stroke-width: 1.8"/>
+<path class="d-ln" d="M413 231.1 V94.6 H528.5 V193.6" style="stroke-width: 1.8"/>
+<path class="d-ln" d="M623 219.6 V81.7 H470.8 V94.6" style="stroke-width: 1.8"/>
+<line class="d-ln-mut" x1="372" y1="193.6" x2="668" y2="193.6" style="stroke-dasharray: 2 3; stroke: var(--muted)"/>
+<line class="d-ln-mut" x1="372" y1="94.6" x2="668" y2="94.6" style="stroke-dasharray: 2 3; stroke: var(--muted)"/>
+<line class="d-ln-acc" x1="372" y1="144.1" x2="668" y2="144.1" style="stroke-dasharray: 6 4; stroke-width: 2"/>
+<text class="d-s" x="664" y="137.1" text-anchor="end" style="fill: var(--accent)">cut crosses 3 lines → 3 clusters</text>
+<text class="d-s" x="664" y="187.6" text-anchor="end">largest gap: no horizontal inside</text>
+<text class="d-s" x="392" y="282" text-anchor="middle">P1</text>
+<text class="d-s" x="434" y="282" text-anchor="middle">P2</text>
+<text class="d-s" x="476" y="282" text-anchor="middle">P3</text>
+<text class="d-s" x="518" y="282" text-anchor="middle">P5</text>
+<text class="d-s" x="560" y="282" text-anchor="middle">P4</text>
+<text class="d-s" x="602" y="282" text-anchor="middle">P6</text>
+<text class="d-s" x="644" y="282" text-anchor="middle">P7</text>
+</svg>
+        </div>
+        <figcaption><b>The same merge order as in the video, on illustrative coordinates.</b> Each bracket in the dendrogram sits at the distance between the closest members of the two groups it joins. The merge heights are 0.67, 0.92, 1.20, 1.49, 3.64 and 3.92. The shaded band is the largest gap between two consecutive heights, and the cut through it gives three clusters.</figcaption>
+      </figure>
+      <p class="note">Not in the video: this bottom-up version is called <dfn>agglomerative</dfn> clustering. The top-down alternative, <dfn>divisive</dfn> clustering, starts with one cluster holding every point and keeps splitting. To join groups you also need a rule for the distance between two groups, called the <i>linkage</i>: single (closest pair, used in the figure), complete (farthest pair), average, or Ward (the join that raises the WCSS least, the default in scikit-learn's <code>AgglomerativeClustering</code>).</p>
+    </section>
+
+    <section id="cut-dendrogram">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18343s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:05:43</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18373s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:06:13 count the lines</a>
+        </div>
+        <h2>How many clusters? Cut the longest free vertical line</h2>
+      </div>
+      <p>The dendrogram also tells you how many clusters to keep. Krish's rule:</p>
+      <ol class="algo">
+        <li class="algo-title">Reading the number of clusters from a dendrogram</li>
+        <li>Extend every horizontal line of the dendrogram across the whole width.</li>
+        <li>Find the longest vertical line that none of these horizontal lines passes through.</li>
+        <li>Draw a horizontal line through it. The number of vertical lines it crosses is the number of clusters.</li>
+      </ol>
+      <p>His hand-drawn cut crossed four lines, so four clusters. He added that the sketch was rough and the right answer for it might be three. In the figure above the longest free stretch lies between heights 1.49 and 3.64. A cut there crosses three lines, so the clusters are \(\{P_1, P_2\}\), \(\{P_3, P_4, P_5\}\) and \(\{P_6, P_7\}\).</p>
+      <p class="note">The same rule, stated another way: cut inside the largest gap between consecutive merge heights. A large gap means the next join would bring together groups that are much farther apart than anything joined so far.</p>
+    </section>
+
+    <section id="hier-vs-kmeans">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18435s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:07:15</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18529s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:08:49 how do we validate?</a>
+        </div>
+        <h2>Which takes longer: K-means or hierarchical?</h2>
+      </div>
+      <p>This is a common interview question. Hierarchical clustering takes more time. With many data points it keeps building the dendrogram one join at a time, and with, say, 10 features and many points you could not even read the dendrogram, let alone draw it by hand. His advice: for a small data set hierarchical clustering is fine, and for a large one use K-means.</p>
+      <p class="note">Not in the video: standard agglomerative clustering keeps the distance between every pair of points, so memory grows as \(n^2\) and time grows at least as fast. One K-means pass costs about \(n \times K \times d\) distance terms, repeated for a handful of iterations.</p>
+      <p>He then asks how a clustering model is validated. A classifier has a confusion matrix, accuracy, precision, recall and the true positive rate. A clustering has no true labels, so it needs its own measure: the <b>silhouette score</b>. He opens its Wikipedia page, then first goes back to one more problem with K-means.</p>
+    </section>
+
+    <section id="init-problem">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18559s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:09:19</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18664s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:11:04 K-means++</a>
+        </div>
+        <h2>Bad starting centroids, and K-means++</h2>
+      </div>
+      <p>K-means starts from random centroids, and a bad start can give groups that do not match the real ones. In his example the data clearly forms two groups, yet a poor random start carves it up as if there were three. The fix is a condition on the start: the initial centroids should be <b>far apart</b> from each other. Then each one moves to the centre of a real group as the updates run.</p>
+      <p>An algorithm called <dfn>K-means++</dfn> makes sure the initialized centroids are far apart. In scikit-learn it is the option <code>init='k-means++'</code>, which the practical uses.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 280" role="img" aria-label="Two runs of K-means with K equal to 3 on the same three groups. Left: two starting centroids fall in the left group, so it is split in two while the two right groups are merged; the run stops there with a high WCSS. Right: starting centroids spread across the groups give one centroid per group and a low WCSS.">
+<defs><marker id="kml07-ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="d-h" x="12" y="20">Random start: two centroids in one group</text>
+<text class="d-s" x="12" y="38">stuck: left group split, right groups merged</text>
+<rect class="d-plot" x="12" y="48" width="326" height="204"/>
+<circle class="pt-tree" cx="53.8" cy="121.7" r="4.5"/>
+<circle class="pt-tree" cx="96.7" cy="106.1" r="4.5"/>
+<circle class="pt-no" cx="120.1" cy="137.3" r="4.5"/>
+<circle class="pt-no" cx="77.2" cy="168.5" r="4.5"/>
+<circle class="pt-tree" cx="46" cy="156.8" r="4.5"/>
+<circle class="pt-no" cx="108.4" cy="176.3" r="4.5"/>
+<circle class="pt-no" cx="85" cy="141.2" r="4.5"/>
+<circle class="pt-plain" cx="243.6" cy="68.4" r="4.5"/>
+<circle class="pt-plain" cx="272.2" cy="58" r="4.5"/>
+<circle class="pt-plain" cx="287.8" cy="78.8" r="4.5"/>
+<circle class="pt-plain" cx="259.2" cy="99.6" r="4.5"/>
+<circle class="pt-plain" cx="238.4" cy="91.8" r="4.5"/>
+<circle class="pt-plain" cx="280" cy="104.8" r="4.5"/>
+<circle class="pt-plain" cx="264.4" cy="81.4" r="4.5"/>
+<circle class="pt-plain" cx="251.4" cy="221.8" r="4.5"/>
+<circle class="pt-plain" cx="241" cy="193.2" r="4.5"/>
+<circle class="pt-plain" cx="261.8" cy="177.6" r="4.5"/>
+<circle class="pt-plain" cx="282.6" cy="206.2" r="4.5"/>
+<circle class="pt-plain" cx="274.8" cy="227" r="4.5"/>
+<circle class="pt-plain" cx="287.8" cy="185.4" r="4.5"/>
+<circle class="pt-plain" cx="264.4" cy="201" r="4.5"/>
+<path class="d-off" d="M56.4 109.7 L61.9 115.2 L56.4 120.7 L50.9 115.2 Z" style="stroke: var(--ink-2)"/>
+<path class="pt-new" d="M65.5 120.7 L73 128.2 L65.5 135.7 L58 128.2 Z"/>
+<path class="d-off" d="M108.4 161.7 L113.9 167.2 L108.4 172.7 L102.9 167.2 Z" style="stroke: var(--ink-2)"/>
+<path class="pt-new" d="M97.7 148.3 L105.2 155.8 L97.7 163.3 L90.2 155.8 Z"/>
+<path class="d-off" d="M238.4 130.5 L243.9 136 L238.4 141.5 L232.9 136 Z" style="stroke: var(--ink-2)"/>
+<line class="d-ln d-dash" x1="245.2" y1="137.7" x2="255.2" y2="140.1" marker-end="url(#kml07-ah3)"/>
+<path class="pt-new" d="M265 135 L272.5 142.5 L265 150 L257.5 142.5 Z"/>
+<text class="d-t" x="12" y="272">WCSS = 91.2</text>
+<text class="d-h" x="352" y="20">Spread-out start (the K-means++ idea)</text>
+<text class="d-s" x="352" y="38">one centroid per group</text>
+<rect class="d-plot" x="352" y="48" width="326" height="204"/>
+<circle class="pt-tree" cx="393.8" cy="121.7" r="4.5"/>
+<circle class="pt-tree" cx="436.7" cy="106.1" r="4.5"/>
+<circle class="pt-tree" cx="460.1" cy="137.3" r="4.5"/>
+<circle class="pt-tree" cx="417.2" cy="168.5" r="4.5"/>
+<circle class="pt-tree" cx="386" cy="156.8" r="4.5"/>
+<circle class="pt-tree" cx="448.4" cy="176.3" r="4.5"/>
+<circle class="pt-tree" cx="425" cy="141.2" r="4.5"/>
+<circle class="pt-no" cx="583.6" cy="68.4" r="4.5"/>
+<circle class="pt-no" cx="612.2" cy="58" r="4.5"/>
+<circle class="pt-no" cx="627.8" cy="78.8" r="4.5"/>
+<circle class="pt-no" cx="599.2" cy="99.6" r="4.5"/>
+<circle class="pt-no" cx="578.4" cy="91.8" r="4.5"/>
+<circle class="pt-no" cx="620" cy="104.8" r="4.5"/>
+<circle class="pt-no" cx="604.4" cy="81.4" r="4.5"/>
+<circle class="pt-plain" cx="591.4" cy="221.8" r="4.5"/>
+<circle class="pt-plain" cx="581" cy="193.2" r="4.5"/>
+<circle class="pt-plain" cx="601.8" cy="177.6" r="4.5"/>
+<circle class="pt-plain" cx="622.6" cy="206.2" r="4.5"/>
+<circle class="pt-plain" cx="614.8" cy="227" r="4.5"/>
+<circle class="pt-plain" cx="627.8" cy="185.4" r="4.5"/>
+<circle class="pt-plain" cx="604.4" cy="201" r="4.5"/>
+<path class="d-off" d="M412 120.1 L417.5 125.6 L412 131.1 L406.5 125.6 Z" style="stroke: var(--ink-2)"/>
+<line class="d-ln d-dash" x1="415.8" y1="131.5" x2="418.5" y2="135.6" marker-end="url(#kml07-ah3)"/>
+<path class="pt-new" d="M423.9 136.5 L431.4 144 L423.9 151.5 L416.4 144 Z"/>
+<path class="d-off" d="M617.4 60.3 L622.9 65.8 L617.4 71.3 L611.9 65.8 Z" style="stroke: var(--ink-2)"/>
+<line class="d-ln d-dash" x1="613.1" y1="71.3" x2="609.8" y2="75.4" marker-end="url(#kml07-ah3)"/>
+<path class="pt-new" d="M603.7 75.8 L611.2 83.3 L603.7 90.8 L596.2 83.3 Z"/>
+<path class="d-off" d="M588.8 208.5 L594.3 214 L588.8 219.5 L583.3 214 Z" style="stroke: var(--ink-2)"/>
+<line class="d-ln d-dash" x1="594.5" y1="210" x2="598.1" y2="207.5" marker-end="url(#kml07-ah3)"/>
+<path class="pt-new" d="M606.3 194.2 L613.8 201.7 L606.3 209.2 L598.8 201.7 Z"/>
+<text class="d-t" x="352" y="272">WCSS = 23.1</text>
+</svg>
+        </div>
+        <figcaption><b>Same data, same K = 3, two starts (illustrative points).</b> On the left two starting centroids fall in the left group. K-means splits that group in two, merges the two right-hand groups, and stops there, since no point wants to move. On the right the starts are spread out, one per group, and K-means finds the real groups with a much lower WCSS. Dashed diamonds are the starting centroids, filled diamonds the final ones.</figcaption>
+      </figure>
+      <p class="note">Not in the video: K-means++ picks the first centroid uniformly at random from the data. Each later centroid is a data point chosen at random with probability proportional to \(D(\mathbf{x})^2\), its squared distance to the nearest centroid chosen so far, so far-away points are likely picks. Ordinary K-means then runs from there. scikit-learn's <code>KMeans</code> also repeats the whole run from several starts (<code>n_init</code>) and keeps the one with the lowest WCSS. See <a href="part-07.html#kmeans-pp">Part 7</a> for the course's treatment and its guarantee.</p>
+    </section>
+
+    <!-- ============ SILHOUETTE SCORE ============ -->
+    <section id="silhouette-ab">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18696s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:11:36</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18728s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:12:08 a(i)</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18793s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:13:13 b(i)</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18890s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:14:50 which is bigger?</a>
+        </div>
+        <h2>Silhouette score: a(i) and b(i)</h2>
+      </div>
+      <p>The silhouette score measures how good a clustering is, for K-means, hierarchical clustering or any other method. It is built in three steps, one point at a time.</p>
+      <p><b>Step 1, \(a(i)\).</b> Take a point \(i\) in its cluster \(C_i\). Compute its distance to every other point in the same cluster, add them up, and divide by \(|C_i| - 1\), the number of other points. So \(a(i)\) is the average distance from \(i\) to its own cluster-mates: how tightly it sits in its cluster.</p>
+      <p><b>Step 2, \(b(i)\).</b> Find the nearest other cluster. Compute the distance from \(i\) to every point in that cluster and average them. So \(b(i)\) measures how far the point is from the closest group it does not belong to.</p>
+      <div class="eq">\[ a(i) = \frac{1}{|C_i| - 1} \sum_{j \in C_i,\; j \ne i} d(i, j), \qquad b(i) = \min_{C \ne C_i} \; \frac{1}{|C|} \sum_{j \in C} d(i, j) \]</div>
+      <p class="callout">Correction: on the board he first calls \(i\) the centroid. It is a data point, as he says himself a few minutes later, and every distance runs from that point to the other points. No centroid is involved.</p>
+      <p>In a good clustering, points are close to their own cluster and far from the others, so <b>\(b(i) &gt; a(i)\)</b> for most points.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 330" role="img" aria-label="Point i in its own cluster A, joined by solid lines to the other members of A and by dashed lines to the members of the nearest other cluster B. A third cluster C is farther away. On the right, a(i), b(i) and s(i) are worked out and s(i) is marked on a scale from minus one to plus one.">
+<rect class="d-plot" x="16" y="16" width="300" height="300"/>
+<line class="d-ln-mut" x1="117.2" y1="253.2" x2="117.2" y2="94.8" style="stroke-dasharray: 2 3"/>
+<line class="d-ln-mut" x1="117.2" y1="253.2" x2="79.2" y2="73.2" style="stroke-dasharray: 2 3"/>
+<line class="d-ln-mut" x1="117.2" y1="253.2" x2="147.6" y2="66" style="stroke-dasharray: 2 3"/>
+<line class="d-ln d-dash" x1="117.2" y1="253.2" x2="231.2" y2="231.6"/>
+<line class="d-ln d-dash" x1="117.2" y1="253.2" x2="254" y2="267.6"/>
+<line class="d-ln d-dash" x1="117.2" y1="253.2" x2="269.2" y2="224.4"/>
+<line class="d-ln d-dash" x1="117.2" y1="253.2" x2="238.8" y2="289.2"/>
+<line class="d-ln-acc" x1="117.2" y1="253.2" x2="79.2" y2="224.4"/>
+<line class="d-ln-acc" x1="117.2" y1="253.2" x2="86.8" y2="282"/>
+<line class="d-ln-acc" x1="117.2" y1="253.2" x2="56.4" y2="253.2"/>
+<circle class="pt-tree" cx="79.2" cy="224.4" r="5"/>
+<circle class="pt-tree" cx="86.8" cy="282" r="5"/>
+<circle class="pt-tree" cx="56.4" cy="253.2" r="5"/>
+<circle class="pt-no" cx="231.2" cy="231.6" r="5"/>
+<circle class="pt-no" cx="254" cy="267.6" r="5"/>
+<circle class="pt-no" cx="269.2" cy="224.4" r="5"/>
+<circle class="pt-no" cx="238.8" cy="289.2" r="5"/>
+<circle class="pt-plain" cx="117.2" cy="94.8" r="5" style="fill: var(--muted)"/>
+<circle class="pt-plain" cx="79.2" cy="73.2" r="5" style="fill: var(--muted)"/>
+<circle class="pt-plain" cx="147.6" cy="66" r="5" style="fill: var(--muted)"/>
+<circle class="pt-new" cx="117.2" cy="253.2" r="6.5"/>
+<text class="d-t" x="121.2" y="275.2">i</text>
+<text class="d-t" x="52.6" y="307.2" style="fill: var(--accent)">cluster A (own)</text>
+<text class="d-t" x="212.2" y="307.2">cluster B (nearest)</text>
+<text class="d-t" x="166.6" y="73.2" style="fill: var(--muted)">cluster C</text>
+<text class="d-s" x="166.6" y="88.2">mean distance 4.92:</text>
+<text class="d-s" x="166.6" y="102.2">farther than B, not used</text>
+<text class="d-t" x="350" y="44">a(i) = mean of the 3 solid lines</text>
+<text class="d-s" x="350" y="61">= 1.34</text>
+<text class="d-t" x="350" y="94">b(i) = mean of the 4 dashed lines</text>
+<text class="d-s" x="350" y="111">= 3.53</text>
+<text class="d-t" x="350" y="144">s(i) = (b − a) / max(a, b)</text>
+<text class="d-s" x="350" y="161">= (3.53 − 1.34) / 3.53 = 0.62</text>
+<line class="d-ln" x1="372" y1="232" x2="650" y2="232" style="stroke-width: 1.6"/>
+<line class="d-ln" x1="372" y1="227" x2="372" y2="237"/><text class="d-al" x="372" y="252" text-anchor="middle">−1</text>
+<line class="d-ln" x1="441.5" y1="227" x2="441.5" y2="237"/><text class="d-al" x="441.5" y="252" text-anchor="middle">−0.5</text>
+<line class="d-ln" x1="511" y1="227" x2="511" y2="237"/><text class="d-al" x="511" y="252" text-anchor="middle">0</text>
+<line class="d-ln" x1="580.5" y1="227" x2="580.5" y2="237"/><text class="d-al" x="580.5" y="252" text-anchor="middle">0.5</text>
+<line class="d-ln" x1="650" y1="227" x2="650" y2="237"/><text class="d-al" x="650" y="252" text-anchor="middle">+1</text>
+<text class="d-s" x="372" y="272">a &gt; b: closer to</text><text class="d-s" x="372" y="286">another cluster</text>
+<text class="d-s" x="511" y="272" text-anchor="middle">on the</text><text class="d-s" x="511" y="286" text-anchor="middle">boundary</text>
+<text class="d-s" x="650" y="272" text-anchor="end">well inside</text><text class="d-s" x="650" y="286" text-anchor="end">its own cluster</text>
+<circle class="pt-new" cx="597.3" cy="232" r="6.5"/>
+<text class="d-t" x="597.3" y="218" text-anchor="middle">s(i) = 0.62</text>
+</svg>
+        </div>
+        <figcaption><b>One point's silhouette (illustrative points).</b> \(a(i)\) averages the three solid lines to the rest of cluster A. \(b(i)\) averages the four dashed lines to cluster B, the nearest other cluster. Cluster C is farther on average (4.92), so it plays no part. Here \(s(i) = 0.62\): the point clearly belongs where it is.</figcaption>
+      </figure>
+    </section>
+
+    <section id="silhouette-s">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18922s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:15:22</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18955s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:15:55 the formula</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=18993s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:16:33 s = 0</a>
+        </div>
+        <h2>The silhouette s(i) and what its value means</h2>
+      </div>
+      <p><b>Step 3</b> combines the two distances into one number per point:</p>
+      <div class="result">
+        <span class="lbl">Silhouette of point i</span>
+        \[ s(i) = \frac{b(i) - a(i)}{\max\{a(i),\, b(i)\}} \quad \text{if } |C_i| &gt; 1, \qquad -1 \le s(i) \le 1 \]
+        <p>The <b>silhouette score</b> of a clustering is the mean of \(s(i)\) over all points.</p>
+      </div>
+      <ul>
+        <li><b>Close to +1</b>: \(b(i)\) is much larger than \(a(i)\). The point sits well inside its own cluster, and the closer to +1, the better the model.</li>
+        <li><b>Around 0</b>: \(a(i) \approx b(i)\). The point is on the boundary between two clusters, and the clustering still needs work.</li>
+        <li><b>Towards −1</b>: \(a(i) &gt; b(i)\). The point is closer to another cluster than to its own, which is the sign of a bad clustering.</li>
+      </ul>
+      <p class="note">From the definition he shows: a point that is alone in its cluster has no \(a(i)\), and its \(s(i)\) is set to 0. Not in the video: dividing by the larger of the two distances is what keeps \(s(i)\) between −1 and +1.</p>
+    </section>
+
+    <!-- ============ DBSCAN ============ -->
+    <section id="dbscan-why">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19027s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:17:07</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19089s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:18:09 the outlier problem</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19151s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:19:11 the name</a>
+        </div>
+        <h2>DBSCAN: why another algorithm?</h2>
+      </div>
+      <p>DBSCAN rests on four terms: <b>MinPts</b>, <b>core points</b>, <b>border points</b> and <b>noise points</b>, plus a radius ε that comes with MinPts.</p>
+      <p>First the problem it solves. Suppose most points form two groups and one point lies far away from both. K-means has to put every point in some cluster, so the outlier gets grouped with one of them, or pulls a centroid of its own. It would be better to leave the outlier out of every group and call it a <dfn>noise point</dfn>.</p>
+      <p>DBSCAN does that. The name stands for <i>density-based spatial clustering of applications with noise</i>. Krish says that these days he uses it instead of K-means or hierarchical clustering.</p>
+    </section>
+
+    <section id="dbscan-terms">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19181s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:19:41 ε and MinPts</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19213s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:20:13 core</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19277s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:21:17 border</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19339s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:22:19 noise</a>
+        </div>
+        <h2>ε, MinPts and three kinds of point</h2>
+      </div>
+      <p><dfn>ε</dfn> (epsilon) is the radius of a circle drawn around a point. <dfn>MinPts</dfn> is a hyperparameter: the number of points that must lie inside that circle. With ε and MinPts fixed, every point is one of three kinds.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Point</th><th>Test, with circle of radius ε around it</th><th>What happens to it</th></tr></thead>
+          <tbody>
+            <tr><td><b>Core</b></td><td>At least MinPts points inside (his example: MinPts = 4)</td><td>Builds and grows a cluster</td></tr>
+            <tr><td><b>Border</b></td><td>Fewer than MinPts points inside, but at least one of them is a core point</td><td>Joins that core point's cluster</td></tr>
+            <tr><td><b>Noise</b></td><td>No core point inside</td><td>Treated as an outlier and never put in a group</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="callout">He first says a border point needs "at least one point" in its circle, then corrects himself <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19402s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:23:22</a>: it needs at least one <i>core</i> point. A point whose circle holds only non-core points is noise.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 290" role="img" aria-label="DBSCAN point types with MinPts equal to 4 and a fixed radius epsilon. A core point has five points inside its epsilon circle. A border point has only two, but one of them is a core point. A noise point has no other point inside its circle.">
+<rect class="d-plot" x="12" y="20" width="440" height="252"/>
+<circle cx="158.4" cy="125.6" r="44" style="fill: var(--accent-soft); fill-opacity: .5; stroke: var(--accent); stroke-dasharray: 5 4; stroke-width: 1.3"/>
+<circle cx="246.4" cy="90.4" r="44" style="fill: var(--accent-soft); fill-opacity: .5; stroke: var(--accent); stroke-dasharray: 5 4; stroke-width: 1.3"/>
+<circle cx="356.4" cy="174" r="44" style="fill: none; stroke: var(--muted); stroke-dasharray: 5 4; stroke-width: 1.3"/>
+<line class="d-ln" x1="158.4" y1="125.6" x2="127.3" y2="156.7"/>
+<text class="d-t" x="128.4" y="140.6" text-anchor="end">ε</text>
+<circle class="pt-tree" cx="118.8" cy="130" r="5"/>
+<circle class="pt-tree" cx="136.4" cy="103.6" r="5"/>
+<circle class="pt-tree" cx="140.8" cy="152" r="5"/>
+<circle class="pt-tree" cx="158.4" cy="125.6" r="5"/>
+<circle class="pt-tree" cx="176" cy="103.6" r="5"/>
+<circle class="pt-tree" cx="171.6" cy="152" r="5"/>
+<circle class="pt-tree" cx="193.6" cy="130" r="5"/>
+<circle class="pt-tree" cx="211.2" cy="108" r="5"/>
+<circle cx="110" cy="165.2" r="5" style="fill: var(--surface); stroke: var(--accent); stroke-width: 2"/>
+<circle cx="149.6" cy="75" r="5" style="fill: var(--surface); stroke: var(--accent); stroke-width: 2"/>
+<circle cx="246.4" cy="90.4" r="5" style="fill: var(--surface); stroke: var(--accent); stroke-width: 2"/>
+<path class="d-ln" d="M351.9 169.5 L360.9 178.5 M360.9 169.5 L351.9 178.5" style="stroke: var(--muted); stroke-width: 2"/>
+<path class="d-ln" d="M409.1 63.9 L418.1 72.9 M418.1 63.9 L409.1 72.9" style="stroke: var(--muted); stroke-width: 2"/>
+<text class="d-s" x="158.4" y="189.6" text-anchor="middle">core: 7 points within ε</text>
+<text class="d-s" x="296.4" y="92.4">border: 2 within ε,</text>
+<text class="d-s" x="296.4" y="106.4">one is a core point</text>
+<text class="d-s" x="356.4" y="236" text-anchor="middle">noise: alone within ε</text>
+<text class="d-h" x="478" y="40">MinPts = 4</text>
+<text class="d-s" x="478" y="58">counting the point itself</text>
+<circle class="pt-tree" cx="484" cy="92" r="5"/>
+<text class="d-t" x="498" y="96">core</text>
+<text class="d-s" x="498" y="112">≥ MinPts points within ε</text>
+<circle cx="484" cy="140" r="5" style="fill: var(--surface); stroke: var(--accent); stroke-width: 2"/>
+<text class="d-t" x="498" y="144">border</text>
+<text class="d-s" x="498" y="160">fewer, but within ε of a core</text>
+<path class="d-ln" d="M479.5 183.5 L488.5 192.5 M488.5 183.5 L479.5 192.5" style="stroke: var(--muted); stroke-width: 2"/>
+<text class="d-t" x="498" y="192">noise</text>
+<text class="d-s" x="498" y="208">neither: left out as an outlier</text>
+<text class="d-s" x="478" y="246">Core points within ε of each other,</text>
+<text class="d-s" x="478" y="260">plus their border points, form</text>
+<text class="d-s" x="478" y="274">one cluster.</text>
+</svg>
+        </div>
+        <figcaption><b>Core, border and noise with MinPts = 4 (illustrative points).</b> Circles have radius ε. The core point has 7 points within ε, itself included. The border point on the right has only 2, but one of them is a core point. The two points on the far right have nothing near them and are noise. The two hollow points at the edge of the group are border points too.</figcaption>
+      </figure>
+      <div class="eq">\[ N_\varepsilon(p) = \{\, q : d(p, q) \le \varepsilon \,\}, \qquad p \text{ is a core point} \iff |N_\varepsilon(p)| \ge \text{MinPts} \]</div>
+      <p class="note">Not in the video: the formal definition above. In scikit-learn, <code>min_samples</code> plays the role of MinPts and counts the point itself, so a count of 4 within ε includes the centre point. Someone asked whether ε has a unit. It is a distance in the same units as the features, and he said a way to choose it would come in the practical. It does not appear in this part of the video; a common method is sketched at the end of the next section.</p>
+    </section>
+
+    <section id="dbscan-clusters">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19369s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:22:49</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19434s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:23:54 DBSCAN vs K-means</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19465s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:24:25 his advice</a>
+        </div>
+        <h2>From points to clusters, and DBSCAN against K-means</h2>
+      </div>
+      <p>Draw a circle around every point. Core points whose circles overlap, together with the border points they reach, are combined into one group. Noise points are ignored. The groups follow the dense regions of the data, whatever shape those have.</p>
+      <ol class="algo">
+        <li class="algo-title">DBSCAN, written out (standard procedure)</li>
+        <li>For every point, count the points within ε of it.</li>
+        <li>Mark the core points: count \(\ge\) MinPts.</li>
+        <li>Start a new cluster at a core point that has no cluster yet. Add every point within ε of it, and keep expanding from each <i>core</i> point that gets added.</li>
+        <li>Border points are added when a core point reaches them, but the cluster does not expand from them.</li>
+        <li>Repeat from step 3 until every core point has a cluster. What is left is noise (label −1 in scikit-learn).</li>
+      </ol>
+      <p>He then shows a side-by-side picture: a traditional method such as K-means on the left, DBSCAN on the right. K-means puts the scattered outliers into groups and lumps a large region into one blue cluster. DBSCAN keeps the outliers out and returns the separate dense groups. His advice is to use DBSCAN directly without worrying about anything.</p>
+      <p class="note">Not in the video: DBSCAN still has two settings to tune, and one ε cannot fit clusters of very different density. Distances also become less informative with many features, and features on different scales should be standardized first, since ε is a single distance.</p>
+
+      <figure id="db-fig">
+        <div class="controls">
+          <span style="display: inline-flex; align-items: center; gap: 10px; white-space: nowrap"><label for="db-eps">Radius ε</label>
+          <input type="range" id="db-eps" min="0.05" max="0.6" step="0.01" value="0.22">
+          <output id="db-eps-out" for="db-eps">0.22</output></span>
+          <span style="display: inline-flex; align-items: center; gap: 10px; white-space: nowrap"><label for="db-min">MinPts</label>
+          <input type="range" id="db-min" min="2" max="15" step="1" value="7">
+          <output id="db-min-out" for="db-min">7</output></span>
+          <label class="check"><input type="checkbox" id="db-disc" checked> ε-discs around core points</label>
+          <label class="check"><input type="checkbox" id="db-km"> Show K-means (K = 3) instead</label>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Clusters</span><span class="v mine" id="db-c">–</span></div>
+          <div><span class="k">Core</span><span class="v" id="db-core">–</span></div>
+          <div><span class="k">Border</span><span class="v" id="db-border">–</span></div>
+          <div><span class="k">Noise</span><span class="v" id="db-noise">–</span></div>
+        </div>
+        <div class="status" id="db-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="db-svg" viewBox="0 0 560 420" role="img" aria-label="Two hundred and two synthetic points: two interleaved half-moons, one round blob and twelve scattered outliers. DBSCAN marks core points as filled shapes, border points as hollow shapes and noise as crosses, with one shape and colour per cluster. Sliders change epsilon and MinPts; a checkbox switches to K-means with three clusters."></svg></div>
+        <figcaption><b>DBSCAN on synthetic data (seeded).</b> Filled shapes are core points, hollow shapes are border points, crosses are noise; each cluster has its own shape and colour. Click or tap a point to see its ε-circle and why it gets its label (counts include the point itself). Make ε smaller and the moons break into pieces; make it larger and they merge. Tick the K-means box to see straight boundaries cut through the moons and every outlier forced into a cluster.</figcaption>
+      </figure>
+
+      <h3>In scikit-learn (not in the video)</h3>
+      <p>The practical below does not run DBSCAN, although he lists it at the start. This is the standard way to call it, and the k-distance plot is a common way to choose ε.</p>
+      <pre class="codeblock"><code>from sklearn.cluster import DBSCAN
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import StandardScaler
+
+X_scaled = StandardScaler().fit_transform(X)        <span class="cm"># eps is one distance, so put features on one scale</span>
+
+<span class="cm"># choose eps: sorted distance from each point to its 5th neighbour (itself included)</span>
+dist, _ = NearestNeighbors(n_neighbors=5).fit(X_scaled).kneighbors(X_scaled)
+plt.plot(np.sort(dist[:, -1]))                      <span class="cm"># take eps near the bend of this curve</span>
+plt.show()
+
+db = DBSCAN(eps=0.3, min_samples=5).fit(X_scaled)   <span class="cm"># min_samples = MinPts, counting the point itself</span>
+labels = db.labels_                                 <span class="cm"># cluster number per point, -1 for noise</span>
+n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+n_noise = int((labels == -1).sum())
+is_core = np.zeros(len(X), dtype=bool)
+is_core[db.core_sample_indices_] = True             <span class="cm"># border points: not core and label != -1</span></code></pre>
+    </section>
+
+    <!-- ============ CLUSTERING PRACTICAL ============ -->
+    <section id="practical-setup">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19500s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:25:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19532s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:25:32 no overfitting here</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19563s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:26:03 imports</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19595s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:26:35 make_blobs</a>
+        </div>
+        <h2>Practical: imports and sample data</h2>
+      </div>
+      <p class="note">The code in this practical is reconstructed from the video's audio and the scikit-learn example he copies from.</p>
+      <p>He shares a GitHub link, starts Jupyter Notebook from the Anaconda prompt, and plans three things: K-means, silhouette scoring, and a look at the output.</p>
+      <p>Someone in the chat asks how to tell whether a clustering model is overfitting or underfitting. He answers that there are no true outputs to compare with, so clustering has no underfitting or overfitting.</p>
+      <p>The imports are K-means from <code>sklearn.cluster</code>, plus <code>silhouette_samples</code> and <code>silhouette_score</code> from <code>sklearn.metrics</code>, the functions used to validate clustering models. Matplotlib and NumPy handle the plots.</p>
+      <pre class="codeblock"><code>from sklearn.datasets import make_blobs
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_samples, silhouette_score
+
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import numpy as np</code></pre>
+      <p>Sample data comes from <code>make_blobs</code>: random points with two features, generated around four centres. <code>range_n_clusters</code> lists the values of K that the silhouette step will compare. <code>X</code> holds the two feature columns. <code>y</code> holds the blob each point was generated from; clustering never uses it.</p>
+      <pre class="codeblock"><code><span class="cm"># 500 points, 2 features, 4 centres (the setup of scikit-learn's silhouette example)</span>
+X, y = make_blobs(n_samples=500, n_features=2, centers=4, cluster_std=1,
+                  center_box=(-10.0, 10.0), shuffle=True, random_state=1)
+
+range_n_clusters = [2, 3, 4, 5, 6]
+
+X[:5]    <span class="cm"># two feature columns</span>
+y[:5]    <span class="cm"># generating blob of each point (0-3)</span></code></pre>
+    </section>
+
+    <section id="practical-elbow">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19625s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:27:05</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19686s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:28:06 inertia_</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19716s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:28:36 pick K = 4</a>
+        </div>
+        <h2>Elbow curve in code</h2>
+      </div>
+      <p>For K from 1 to 10, fit K-means with K-means++ initialization (so the starting centroids are far apart) and <code>random_state=0</code>, and append the fitted model's <code>inertia_</code> to a list called <code>wcss</code>. Then plot the list against K.</p>
+      <pre class="codeblock"><code>wcss = []
+for i in range(1, 11):
+    kmeans = KMeans(n_clusters=i, init='k-means++', random_state=0)
+    kmeans.fit(X)
+    wcss.append(kmeans.inertia_)     <span class="cm"># WCSS for this K</span>
+
+plt.plot(range(1, 11), wcss, marker='o')
+plt.title('The elbow method')
+plt.xlabel('Number of clusters K')
+plt.ylabel('WCSS')
+plt.show()</code></pre>
+      <p class="note">He describes <code>inertia_</code> as the distance between the centroids and all the other points. More precisely, it is the sum of squared distances from each point to its own (nearest) centroid, which is the WCSS.</p>
+      <p>The plot has the elbow shape. Look for the last abrupt change: after K = 4 the drops are small, so he selects K = 4 and fits the final model. The silhouette step then checks whether K = 4 is valid.</p>
+      <pre class="codeblock"><code>kmeans = KMeans(n_clusters=4, init='k-means++', random_state=0)
+y_pred = kmeans.fit_predict(X)       <span class="cm"># cluster label 0-3 for every point</span></code></pre>
+    </section>
+
+    <section id="practical-silhouette">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19746s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:29:06</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19779s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:29:39 the loop</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19878s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:31:18 the scores</a>
+        </div>
+        <h2>Silhouette analysis for K = 2 to 6</h2>
+      </div>
+      <p>The next cell is long. He took it directly from the silhouette example on the scikit-learn site and says most of it only draws the plots. The parts that matter: for each K in <code>range_n_clusters</code>, fit K-means with <code>random_state=10</code> for reproducibility, call <code>fit_predict</code>, then compute the average silhouette with <code>silhouette_score</code> and one value per point with <code>silhouette_samples</code>. Those per-point values are drawn as one horizontal bar per point, grouped by cluster, with a red dashed line at the average.</p>
+      <pre class="codeblock"><code>for n_clusters in range_n_clusters:
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 7))
+    ax1.set_xlim([-0.1, 1])
+    ax1.set_ylim([0, len(X) + (n_clusters + 1) * 10])
+
+    clusterer = KMeans(n_clusters=n_clusters, random_state=10)
+    cluster_labels = clusterer.fit_predict(X)
+
+    silhouette_avg = silhouette_score(X, cluster_labels)          <span class="cm"># mean s(i)</span>
+    print("For n_clusters =", n_clusters,
+          "The average silhouette_score is :", silhouette_avg)
+
+    sample_silhouette_values = silhouette_samples(X, cluster_labels)   <span class="cm"># s(i) per point</span>
+
+    y_lower = 10
+    for i in range(n_clusters):                                   <span class="cm"># one band of bars per cluster</span>
+        ith = np.sort(sample_silhouette_values[cluster_labels == i])
+        y_upper = y_lower + ith.shape[0]
+        color = cm.nipy_spectral(float(i) / n_clusters)
+        ax1.fill_betweenx(np.arange(y_lower, y_upper), 0, ith,
+                          facecolor=color, edgecolor=color, alpha=0.7)
+        ax1.text(-0.05, y_lower + 0.5 * ith.shape[0], str(i))
+        y_lower = y_upper + 10
+
+    ax1.axvline(x=silhouette_avg, color="red", linestyle="--")    <span class="cm"># the average</span>
+    ax1.set_xlabel("The silhouette coefficient values")
+    ax1.set_ylabel("Cluster label")
+
+    colors = cm.nipy_spectral(cluster_labels.astype(float) / n_clusters)
+    ax2.scatter(X[:, 0], X[:, 1], marker='.', s=30, lw=0, alpha=0.7, c=colors)
+    centers = clusterer.cluster_centers_
+    ax2.scatter(centers[:, 0], centers[:, 1], marker='o', c="white", s=200, edgecolor='k')
+    plt.suptitle("Silhouette analysis for KMeans with n_clusters = %d" % n_clusters)
+
+plt.show()</code></pre>
+      <p class="note">Condensed from the scikit-learn example he copies; a few labels and tick settings are dropped.</p>
+      <p>The printed averages, as he reads them out:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">K</th><th class="num">Average silhouette</th><th>Negative bars in the plot?</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td class="num">2</td><td class="num">0.704</td><td>No: all values between 0 and 1</td><td>Candidate</td></tr>
+            <tr><td class="num">3</td><td class="num">0.588</td><td>Yes, in one cluster</td><td>Rejected</td></tr>
+            <tr><td class="num">4</td><td class="num">0.65</td><td>No</td><td><b>Candidate, chosen</b></td></tr>
+            <tr><td class="num">5</td><td class="num">0.563</td><td>Yes</td><td>Rejected</td></tr>
+            <tr><td class="num">6</td><td class="num">0.45</td><td>Yes</td><td>Rejected</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="practical-choice">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19948s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:32:28</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=19981s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:33:01 negative values</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20043s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:34:03 take the larger K</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=20074s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:34:34 matches the elbow</a>
+        </div>
+        <h2>Reading the plots: why K = 4</h2>
+      </div>
+      <p>K = 2 has the highest average, 0.704. Should you pick it? He says not to decide from the average alone. Also check whether any cluster has negative silhouette values.</p>
+      <ul>
+        <li><b>K = 2</b>: every bar is between 0 and 1, nothing goes below 0. Two clusters may work, so keep it as a candidate.</li>
+        <li><b>K = 3</b>: one cluster has negative values. For those points \(a(i) &gt; b(i)\): they are nearer to the points of a neighbouring cluster than to their own. The scatter plot may look fine, but he rejects K = 3.</li>
+        <li><b>K = 4</b>: no negative values, and the scatter plot shows the points divided cleanly into four groups.</li>
+        <li><b>K = 5 and K = 6</b>: some negative values again, so both are rejected.</li>
+      </ul>
+      <p>That leaves 2 and 4. His rule when two values survive: take the larger one, because he expects it to give a more general model. So K = 4. The elbow method also gave K = 4, so the two methods agree, and the silhouette score has validated the clustering.</p>
+      <p class="note">Not in the video: the data was generated from four centres, so 4 is the true answer here. A high score at K = 2 usually means some groups sit close together, so a coarse split into two also looks clean. That is one reason to read the per-point plot and the elbow together.</p>
+
+      <figure id="kc-fig">
+        <div class="controls">
+          <label for="kc-k">Number of clusters K</label>
+          <input type="range" id="kc-k" min="1" max="10" step="1" value="3">
+          <output id="kc-k-out" for="kc-k">K = 3</output>
+        </div>
+        <div class="readouts">
+          <div><span class="k">WCSS (inertia_)</span><span class="v mine" id="kc-w">–</span></div>
+          <div><span class="k">Mean silhouette</span><span class="v" id="kc-s">–</span></div>
+          <div><span class="k">Points with s(i) &lt; 0</span><span class="v" id="kc-neg">–</span></div>
+        </div>
+        <div class="status" id="kc-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="kc-svg" viewBox="0 0 720 400" role="img" aria-label="Left: 220 synthetic points from four blobs, coloured and shaped by their K-means++ cluster, with centroids. Top right: WCSS against K from 1 to 10, an elbow curve with the current K highlighted. Bottom right: the silhouette value of every point as horizontal bars grouped by cluster, with a dashed line at the mean."></svg></div>
+        <figcaption><b>The practical's analysis on synthetic data</b> (four seeded blobs, 220 points, K-means++ with eight restarts per K). Slide K and watch the three panels together: WCSS always falls, the elbow sits at K = 4, K = 2 has the highest mean silhouette, and K = 3, 5 and 6 leave some points with negative values. Click or tap a point to see its \(a(i)\), \(b(i)\) and \(s(i)\).</figcaption>
+      </figure>
+
+      <p>He closes the session with a recap (K-means, hierarchical clustering, the silhouette score and DBSCAN) and lists the next session's topics: SVM and SVR, XGBoost and PCA. Then he starts on bias and variance, which opens <a href="krish-ml-08.html">Part 8</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Clustering</dt><dd>Unsupervised learning that groups similar points; there is no output column.</dd></div>
+        <div><dt>Centroid</dt><dd>The centre of a cluster in K-means, the mean of the points assigned to it.</dd></div>
+        <div><dt>K-means</dt><dd>Assign each point to its nearest centroid, move centroids to their points' means, repeat until nothing changes.</dd></div>
+        <div><dt>WCSS (<code>inertia_</code>)</dt><dd>Within-cluster sum of squares: total squared distance from points to their own centroids.</dd></div>
+        <div><dt>Elbow method</dt><dd>Plot WCSS against K and take the K where the sharp drops end.</dd></div>
+        <div><dt>K-means++</dt><dd>An initialization that places the starting centroids far apart; <code>init='k-means++'</code>.</dd></div>
+        <div><dt>Hierarchical (agglomerative) clustering</dt><dd>Repeatedly join the two nearest points or groups until one group is left.</dd></div>
+        <div><dt>Dendrogram</dt><dd>The tree of joins, with each join drawn at the distance where it happened.</dd></div>
+        <div><dt>Silhouette \(s(i)\)</dt><dd>\((b(i) - a(i))/\max(a(i), b(i))\), from −1 (wrong cluster) to +1 (well placed).</dd></div>
+        <div><dt>Silhouette score</dt><dd>The mean of \(s(i)\) over all points; <code>silhouette_score</code> in scikit-learn.</dd></div>
+        <div><dt>ε (eps)</dt><dd>The radius of the neighbourhood circle DBSCAN draws around each point.</dd></div>
+        <div><dt>MinPts (<code>min_samples</code>)</dt><dd>How many points a circle must hold for its centre to be a core point.</dd></div>
+        <div><dt>Core, border, noise</dt><dd>Enough neighbours; too few but next to a core point; neither, so left out as an outlier.</dd></div>
+        <div><dt>DBSCAN</dt><dd>Density-based spatial clustering of applications with noise: clusters are dense regions joined through core points.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Points 1, 2, 4, 10 and 11 lie on a line. Run K-means with K = 2 from centroids 1 and 4. Where does it stop?</span><span class="tog"></span></summary>
+          <p>Assign: 1 and 2 go to centroid 1; 4, 10 and 11 go to centroid 4. Update: the centroids move to 1.5 and \((4+10+11)/3 \approx 8.33\). Reassign: 4 is now 2.5 from 1.5 and 4.33 from 8.33, so it switches. Update: \((1+2+4)/3 \approx 2.33\) and 10.5. Reassign: nothing changes, so it stops with groups \(\{1, 2, 4\}\) and \(\{10, 11\}\).</p></details>
+        <details><summary><span class="q">Q2</span><span>Why not simply choose the K with the smallest WCSS?</span><span class="tog"></span></summary>
+          <p>WCSS keeps falling as K grows and is 0 when every point is its own cluster. The smallest value always points to the largest K tried. The elbow method looks for the K after which extra centroids stop buying much.</p></details>
+        <details><summary><span class="q">Q3</span><span>A dendrogram of 7 points has merge heights 0.5, 0.8, 1.0, 1.3, 4.0 and 4.6. How many clusters does the longest-vertical-line rule give?</span><span class="tog"></span></summary>
+          <p>The largest gap between consecutive heights is from 1.3 to 4.0. A cut there comes after 4 merges, and each merge reduces the count by one: \(7 - 4 = 3\) clusters.</p></details>
+        <details><summary><span class="q">Q4</span><span>Point i has a(i) = 2 and b(i) = 5. Point j has a(j) = 4 and b(j) = 3. Compute both silhouettes and say what they mean.</span><span class="tog"></span></summary>
+          <p>\(s(i) = (5 - 2)/5 = 0.6\): well inside its cluster. \(s(j) = (3 - 4)/4 = -0.25\): on average it is closer to the neighbouring cluster than to its own, so it is probably in the wrong cluster.</p></details>
+        <details><summary><span class="q">Q5</span><span>In the practical K = 2 has the highest average silhouette (0.704). Why does Krish still choose K = 4?</span><span class="tog"></span></summary>
+          <p>He also checks the per-point plots. K = 3, 5 and 6 have negative values and are rejected; K = 2 and K = 4 have none. Between the two he takes the larger, expecting a more general model, and K = 4 also matches the elbow curve.</p></details>
+        <details><summary><span class="q">Q6</span><span>With MinPts = 4, point A has 6 points within ε, point B has 2 (one of them A), and point C has only itself. Label each.</span><span class="tog"></span></summary>
+          <p>A is a core point (6 ≥ 4). B has too few neighbours to be core, but A is within ε, so B is a border point in A's cluster. C has no core point within ε, so it is noise and belongs to no cluster.</p></details>
+        <details><summary><span class="q">Q7</span><span>You have a million rows. K-means or hierarchical clustering? Why?</span><span class="tog"></span></summary>
+          <p>K-means. Hierarchical clustering keeps building the dendrogram one join at a time and, in its standard form, needs the distance between every pair of points, which grows as \(n^2\). With a million rows it is too slow and the dendrogram is unreadable anyway.</p></details>
+        <details><summary><span class="q">Q8</span><span>What problem does <code>init='k-means++'</code> address, and how?</span><span class="tog"></span></summary>
+          <p>Random starting centroids can land close together, and K-means can then stop at a poor split, for example one real group cut in two while two others are merged. K-means++ spreads the starting centroids out: each new one is drawn with probability proportional to its squared distance from the centroids already chosen.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="krish-ml-04.html"><span class="dir">← Part 4</span><span class="nm">Naive Bayes and KNN</span></a><a class="next" href="krish-ml-08.html"><span class="dir">Part 8 →</span><span class="nm">Bias–variance, XGBoost and SVM</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the YouTube auto-generated captions of Krish Naik's video <i>Complete Machine Learning in 6 Hours</i>. Timestamp links open the video at that moment. Code is reconstructed from the audio. Charts marked synthetic use data generated for these notes. Not affiliated with Krish Naik or IIT Madras.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const mkRand = s => {
+    let seed = s;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    return { rand, normal };
+  };
+  const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
+  /* one shape and colour per cluster: 4 shapes x 3 colours gives 12 distinct looks */
+  const SHAPES = ['circle', 'square', 'triangle', 'diamond'], COLS = ['var(--accent)', 'var(--ok)', 'var(--ink-2)'];
+  const colOf = k => COLS[k % 3];
+  /* K-means widget: clusters 3-5 are outlined so no two of the first six look alike */
+  const kcStyle = k => k % 6 < 3 ? `fill: ${colOf(k)}; stroke: var(--surface); stroke-width: 1` : `fill: var(--surface); stroke: ${colOf(k)}; stroke-width: 1.6`;
+  const shapeD = (k, x, y, r) => {
+    const s = SHAPES[k % 4];
+    if (s === 'square') { const h = r * 0.88; return `M${x - h} ${y - h}h${2 * h}v${2 * h}h${-2 * h}Z`; }
+    if (s === 'triangle') { const h = r * 1.2; return `M${x} ${y - h}L${x + h * 0.95} ${y + h * 0.68}L${x - h * 0.95} ${y + h * 0.68}Z`; }
+    if (s === 'diamond') { const h = r * 1.22; return `M${x} ${y - h}L${x + h} ${y}L${x} ${y + h}L${x - h} ${y}Z`; }
+    return `M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
+  };
+  /* K-means with K-means++ starts; keeps the best of `reps` runs */
+  const kmeans = (pts, K, r, reps) => {
+    const n = pts.length; let best = null;
+    for (let rep = 0; rep < reps; rep++) {
+      const cs = [pts[Math.floor(r.rand() * n)].slice()];
+      while (cs.length < K) {
+        const s = pts.map(p => Math.min(...cs.map(c => d2(p, c))));
+        const tot = s.reduce((a, b) => a + b, 0); let u = r.rand() * tot, j = 0;
+        while (j < n - 1 && (u -= s[j]) > 0) j++;
+        cs.push(pts[j].slice());
+      }
+      const lab = new Array(n).fill(-1);
+      for (let it = 0; it < 100; it++) {
+        let ch = false;
+        pts.forEach((p, i) => { let bi = 0, bd = Infinity; cs.forEach((c, k) => { const v = d2(p, c); if (v < bd) { bd = v; bi = k; } }); if (lab[i] !== bi) { lab[i] = bi; ch = true; } });
+        for (let k = 0; k < K; k++) { let sx = 0, sy = 0, m = 0; pts.forEach((p, i) => { if (lab[i] === k) { sx += p[0]; sy += p[1]; m++; } }); if (m) cs[k] = [sx / m, sy / m]; }
+        if (!ch) break;
+      }
+      const w = pts.reduce((a, p, i) => a + d2(p, cs[lab[i]]), 0);
+      if (!best || w < best.w) best = { w, lab: lab.slice(), cs: cs.map(c => c.slice()) };
+    }
+    return best;
+  };
+  const toSvg = (svg, e) => { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); };
+  const niceStep = span => { const raw = span / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; };
+
+  /* ---------- Choosing K: elbow and silhouette ---------- */
+  (() => {
+    const svg = document.getElementById('kc-svg'); if (!svg) return;
+    const { normal } = mkRand(707);
+    const centres = [[2.5, -3.5], [5, 4], [-1.5, -2], [-1.5, -7]];
+    const pts = [];
+    centres.forEach(c => { for (let i = 0; i < 55; i++) pts.push([c[0] + normal(), c[1] + normal()]); });
+    const n = pts.length;
+    const D = pts.map(p => pts.map(q => Math.sqrt(d2(p, q))));
+    const r = mkRand(708);
+    const runs = [];
+    for (let K = 1; K <= 10; K++) runs.push(kmeans(pts, K, r, 8));
+    runs.forEach((run, idx) => {
+      const K = idx + 1; if (K < 2) return;
+      run.sil = pts.map((p, i) => {
+        const sums = new Array(K).fill(0), cnt = new Array(K).fill(0);
+        for (let j = 0; j < n; j++) { if (j === i) continue; sums[run.lab[j]] += D[i][j]; cnt[run.lab[j]]++; }
+        const own = run.lab[i]; if (!cnt[own]) return { a: 0, b: 0, s: 0 };
+        const a = sums[own] / cnt[own]; let b = Infinity;
+        for (let k = 0; k < K; k++) if (k !== own && cnt[k]) b = Math.min(b, sums[k] / cnt[k]);
+        return { a, b, s: (b - a) / Math.max(a, b) };
+      });
+      run.mean = run.sil.reduce((s, v) => s + v.s, 0) / n;
+      run.neg = run.sil.filter(v => v.s < 0).length;
+    });
+    const W = runs.map(x => x.w);
+    let elbowK = 1; for (let K = 2; K <= 10; K++) if ((W[K - 2] - W[K - 1]) / W[K - 2] > 0.3) elbowK = K;
+
+    /* scatter, equal scale on both axes */
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) + 1.6;
+    const cx0 = (Math.max(...xs) + Math.min(...xs)) / 2, cy0 = (Math.max(...ys) + Math.min(...ys)) / 2;
+    const PX = 14, PY = 30, SZ = 360, sc = SZ / span;
+    const sx = x => PX + (x - cx0 + span / 2) * sc, sy = y => PY + SZ - (y - cy0 + span / 2) * sc;
+    mk('rect', { x: PX, y: PY, width: SZ, height: SZ, class: 'c-faint', style: 'fill: none' }, svg);
+    mk('text', { x: PX, y: 20, class: 'c-title' }, svg).textContent = 'Synthetic data, coloured by cluster';
+    const gPts = mk('g', {}, svg);
+    const dots = pts.map(() => mk('path', {}, gPts));
+    const gCen = mk('g', {}, svg);
+    const ring = mk('circle', { r: 9, class: 'c-hl', style: 'display: none' }, svg);
+
+    /* elbow chart */
+    const EX0 = 478, EX1 = 704, EY0 = 40, EY1 = 168;
+    const ex = K => EX0 + (K - 1) / 9 * (EX1 - EX0);
+    const wStep = niceStep(W[0]), wTop = Math.ceil(W[0] / wStep) * wStep;
+    const ey = w => EY1 - w / wTop * (EY1 - EY0);
+    mk('text', { x: 436, y: 20, class: 'c-title' }, svg).textContent = 'Elbow: WCSS against K';
+    for (let v = 0; v <= wTop + 1e-9; v += wStep) {
+      mk('line', { x1: EX0, x2: EX1, y1: ey(v), y2: ey(v), class: 'c-faint' }, svg);
+      mk('text', { x: EX0 - 6, y: ey(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v >= 1000 ? (v / 1000) + 'k' : v;
+    }
+    for (let K = 1; K <= 10; K++) mk('text', { x: ex(K), y: EY1 + 15, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = K;
+    mk('text', { x: EX1, y: EY1 + 30, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = 'K';
+    const guide = mk('line', { y1: EY0 - 4, y2: EY1, class: 'c-faint', style: 'stroke-dasharray: 3 3; stroke: var(--muted)' }, svg);
+    mk('path', { d: W.map((w, i) => (i ? 'L' : 'M') + ex(i + 1) + ' ' + ey(w)).join(''), class: 'c-line', style: 'fill: none' }, svg);
+    W.forEach((w, i) => mk('circle', { cx: ex(i + 1), cy: ey(w), r: 3.2, style: 'fill: var(--ink-2)' }, svg));
+    mk('text', { x: ex(elbowK) + 8, y: ey(W[elbowK - 1]) - 9, class: 'c-note' }, svg).textContent = 'elbow';
+    const cur = mk('circle', { r: 6, class: 'c-pt-hi' }, svg);
+
+    /* silhouette bars */
+    const SX0 = 466, SX1 = 704, SY0 = 236, SY1 = 390, SLO = -0.3, SHI = 1;
+    const ssx = v => SX0 + (Math.max(SLO, v) - SLO) / (SHI - SLO) * (SX1 - SX0);
+    const sTitle = mk('text', { x: 436, y: 214, class: 'c-title' }, svg);
+    for (let v = -0.2; v <= 1.0001; v += 0.2) {
+      const vv = Math.round(v * 10) / 10;
+      mk('line', { x1: ssx(vv), x2: ssx(vv), y1: SY0, y2: SY1, class: vv === 0 ? 'c-axis' : 'c-faint' }, svg);
+      mk('text', { x: ssx(vv), y: SY0 - 6, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = vv;
+    }
+    const gBars = mk('g', {}, svg);
+    const meanLine = mk('line', { y1: SY0, y2: SY1, class: 'c-err' }, svg);
+    const noSil = mk('text', { x: (SX0 + SX1) / 2, y: (SY0 + SY1) / 2, 'text-anchor': 'middle', class: 'c-note' }, svg);
+
+    const slider = document.getElementById('kc-k'), out = document.getElementById('kc-k-out');
+    const wOut = document.getElementById('kc-w'), sOut = document.getElementById('kc-s'), nOut = document.getElementById('kc-neg'), status = document.getElementById('kc-status');
+    let K = parseInt(slider.value, 10), sel = -1;
+    const draw = () => {
+      const run = runs[K - 1];
+      out.textContent = 'K = ' + K;
+      pts.forEach((p, i) => { const k = run.lab[i]; dots[i].setAttribute('d', shapeD(k, sx(p[0]), sy(p[1]), 4)); dots[i].setAttribute('style', kcStyle(k)); });
+      gCen.replaceChildren();
+      run.cs.forEach(c => mk('circle', { cx: sx(c[0]), cy: sy(c[1]), r: 7, class: 'c-centroid' }, gCen));
+      guide.setAttribute('x1', ex(K)); guide.setAttribute('x2', ex(K));
+      cur.setAttribute('cx', ex(K)); cur.setAttribute('cy', ey(W[K - 1]));
+      wOut.textContent = Math.round(W[K - 1]).toLocaleString('en-US');
+      sTitle.textContent = `Silhouette s(i) of every point, K = ${K}`;
+      gBars.replaceChildren();
+      let msg;
+      if (K === 1) {
+        sOut.textContent = '–'; nOut.textContent = '–'; meanLine.style.display = 'none';
+        noSil.textContent = 'needs at least two clusters';
+        msg = 'One centroid: the WCSS is the total spread of the data. The silhouette needs at least two clusters.';
+      } else {
+        noSil.textContent = ''; meanLine.style.display = '';
+        const gap = 3, h = (SY1 - SY0 - gap * (K - 1)) / n;
+        let y = SY0;
+        for (let k = 0; k < K; k++) {
+          const vals = run.sil.filter((v, i) => run.lab[i] === k).map(v => v.s).sort((a, b) => b - a);
+          if (!vals.length) continue;
+          let d = `M${ssx(0)} ${y}`;
+          vals.forEach((v, j) => { d += `L${ssx(v)} ${y + j * h}L${ssx(v)} ${y + (j + 1) * h}`; });
+          d += `L${ssx(0)} ${y + vals.length * h}Z`;
+          mk('path', { d, style: `fill: ${colOf(k)}; fill-opacity: ${k % 6 < 3 ? .75 : .35}` }, gBars);
+          mk('path', { d: shapeD(k, 446, y + vals.length * h / 2, 4), style: kcStyle(k) }, gBars);
+          y += vals.length * h + gap;
+        }
+        meanLine.setAttribute('x1', ssx(run.mean)); meanLine.setAttribute('x2', ssx(run.mean));
+        sOut.textContent = run.mean.toFixed(3); nOut.textContent = run.neg;
+        msg = (K === elbowK ? `This is the elbow: after K = ${K} each extra centroid lowers the WCSS only a little. ` : '') +
+          (run.neg ? `${run.neg} point${run.neg > 1 ? 's have' : ' has'} s(i) < 0: closer, on average, to a neighbouring cluster than to ${run.neg > 1 ? 'their' : 'its'} own.` : 'No point has a negative silhouette.');
+      }
+      if (sel >= 0) {
+        const p = pts[sel]; ring.style.display = ''; ring.setAttribute('cx', sx(p[0])); ring.setAttribute('cy', sy(p[1]));
+        if (K > 1) { const v = run.sil[sel]; msg += ` Selected point: a(i) = ${v.a.toFixed(2)}, b(i) = ${v.b.toFixed(2)}, s(i) = ${v.s.toFixed(2)}.`; }
+      } else ring.style.display = 'none';
+      status.textContent = msg;
+    };
+    draw();
+    slider.addEventListener('input', () => { K = parseInt(slider.value, 10); draw(); });
+    svg.addEventListener('click', e => {
+      const q = toSvg(svg, e);
+      if (q.x < PX || q.x > PX + SZ || q.y < PY || q.y > PY + SZ) return;
+      let bi = -1, bd = 14 * 14;
+      pts.forEach((p, i) => { const v = (sx(p[0]) - q.x) ** 2 + (sy(p[1]) - q.y) ** 2; if (v < bd) { bd = v; bi = i; } });
+      sel = bi; draw();
+    });
+  })();
+
+  /* ---------- DBSCAN: eps, MinPts and the three kinds of point ---------- */
+  (() => {
+    const svg = document.getElementById('db-svg'); if (!svg) return;
+    const { rand, normal } = mkRand(1957);
+    const pts = [], NM = 75, NB = 40, NN = 12, s = 0.07;
+    for (let i = 0; i < NM; i++) { const t = Math.PI * (i + rand()) / NM; pts.push([Math.cos(t) + s * normal(), Math.sin(t) + s * normal()]); }
+    for (let i = 0; i < NM; i++) { const t = Math.PI * (i + rand()) / NM; pts.push([1 - Math.cos(t) + s * normal(), 0.5 - Math.sin(t) + s * normal()]); }
+    for (let i = 0; i < NB; i++) pts.push([2.75 + 0.2 * normal(), 1.75 + 0.2 * normal()]);
+    const dense = pts.slice(); let tries = 0;
+    while (pts.length < 2 * NM + NB + NN && tries < 5000) { tries++; const p = [-1.5 + 4.9 * rand(), -1.1 + 3.6 * rand()]; if (dense.every(q => Math.hypot(p[0] - q[0], p[1] - q[1]) > 0.38)) pts.push(p); }
+    const n = pts.length;
+    const D = pts.map(p => pts.map(q => Math.sqrt(d2(p, q))));
+    const km = kmeans(pts, 3, mkRand(1958), 8);
+    const S = 108, sx = x => 10 + S * (x + 1.6), sy = y => 410 - S * (y + 1.15);
+    mk('rect', { x: 2, y: 2, width: 556, height: 416, class: 'c-faint', style: 'fill: none' }, svg);
+    const gDisc = mk('g', { style: 'fill: var(--accent-soft); fill-opacity: .6' }, svg);
+    const selCircle = mk('circle', { style: 'fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 5 4; display: none' }, svg);
+    const gNb = mk('g', {}, svg);
+    const gPts = mk('g', {}, svg);
+    const marks = pts.map(() => mk('path', {}, gPts));
+    const sel0 = mk('circle', { r: 8, class: 'c-hl', style: 'display: none' }, svg);
+    const eS = document.getElementById('db-eps'), eO = document.getElementById('db-eps-out');
+    const mS = document.getElementById('db-min'), mO = document.getElementById('db-min-out');
+    const disc = document.getElementById('db-disc'), kmBox = document.getElementById('db-km');
+    const rC = document.getElementById('db-c'), rCore = document.getElementById('db-core'), rB = document.getElementById('db-border'), rN = document.getElementById('db-noise'), status = document.getElementById('db-status');
+    let sel = -1;
+    const dbscan = (eps, minPts) => {
+      const nb = D.map(row => row.reduce((a, d, j) => { if (d <= eps) a.push(j); return a; }, []));
+      const core = nb.map(l => l.length >= minPts), lab = new Array(n).fill(-1);
+      let c = 0;
+      for (let i = 0; i < n; i++) {
+        if (!core[i] || lab[i] !== -1) continue;
+        const stack = [i]; lab[i] = c;
+        while (stack.length) { const u = stack.pop(); nb[u].forEach(v => { if (lab[v] === -1) { lab[v] = c; if (core[v]) stack.push(v); } }); }
+        c++;
+      }
+      const type = lab.map((l, i) => core[i] ? 'core' : l >= 0 ? 'border' : 'noise');
+      return { nb, core, lab, type, c };
+    };
+    const draw = () => {
+      const eps = parseFloat(eS.value), minPts = parseInt(mS.value, 10), useKm = kmBox.checked;
+      eO.textContent = eps.toFixed(2); mO.textContent = minPts;
+      const res = dbscan(eps, minPts);
+      gDisc.replaceChildren(); gNb.replaceChildren();
+      if (disc.checked && !useKm) pts.forEach((p, i) => { if (res.core[i]) mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: S * eps }, gDisc); });
+      pts.forEach((p, i) => {
+        const X = sx(p[0]), Y = sy(p[1]), m = marks[i];
+        if (useKm) { const k = km.lab[i]; m.setAttribute('d', shapeD(k, X, Y, 4.2)); m.setAttribute('style', `fill: ${colOf(k)}; stroke: var(--surface); stroke-width: 1`); return; }
+        const t = res.type[i], k = res.lab[i];
+        if (t === 'noise') { m.setAttribute('d', `M${X - 4} ${Y - 4}L${X + 4} ${Y + 4}M${X + 4} ${Y - 4}L${X - 4} ${Y + 4}`); m.setAttribute('style', 'fill: none; stroke: var(--muted); stroke-width: 1.8'); }
+        else if (t === 'core') { m.setAttribute('d', shapeD(k, X, Y, 4.2)); m.setAttribute('style', `fill: ${colOf(k)}; stroke: var(--surface); stroke-width: 1`); }
+        else { m.setAttribute('d', shapeD(k, X, Y, 4)); m.setAttribute('style', `fill: var(--surface); stroke: ${colOf(k)}; stroke-width: 1.8`); }
+      });
+      let msg;
+      if (useKm) {
+        rC.textContent = 3; rCore.textContent = '–'; rB.textContent = '–'; rN.textContent = '–';
+        msg = 'K-means with K = 3 draws straight boundaries: both moons are cut, and every outlier is forced into a cluster.';
+      } else {
+        const nCore = res.core.filter(Boolean).length, nNoise = res.type.filter(t => t === 'noise').length;
+        rC.textContent = res.c; rCore.textContent = nCore; rB.textContent = n - nCore - nNoise; rN.textContent = nNoise;
+        msg = res.c === 3 ? `The two moons and the blob come out as three clusters, and ${nNoise} points are left as noise.`
+          : res.c > 3 ? `${res.c} clusters: for this MinPts, ε is too small and dense regions break into pieces.`
+          : res.c === 0 ? 'No point has MinPts neighbours within ε, so everything is noise.'
+          : `${res.c} cluster${res.c > 1 ? 's' : ''}: ε is large enough to join groups that should stay apart.`;
+      }
+      if (sel >= 0 && !useKm) {
+        const p = pts[sel], cnt = res.nb[sel].length, t = res.type[sel];
+        selCircle.setAttribute('cx', sx(p[0])); selCircle.setAttribute('cy', sy(p[1])); selCircle.setAttribute('r', S * eps); selCircle.style.display = '';
+        sel0.setAttribute('cx', sx(p[0])); sel0.setAttribute('cy', sy(p[1])); sel0.style.display = '';
+        res.nb[sel].forEach(j => { if (j !== sel) mk('circle', { cx: sx(pts[j][0]), cy: sy(pts[j][1]), r: 6.5, class: 'c-hl', style: 'stroke-width: 1.2' }, gNb); });
+        const why = t === 'core' ? `at least MinPts = ${minPts}, so it is a core point.`
+          : t === 'border' ? `fewer than MinPts = ${minPts}, but a core point is among them, so it is a border point.`
+          : `fewer than MinPts = ${minPts} and no core point among them, so it is noise.`;
+        msg += ` Selected point: ${cnt} point${cnt > 1 ? 's' : ''} within ε (itself included), ${why}`;
+      } else { selCircle.style.display = 'none'; sel0.style.display = 'none'; }
+      status.textContent = msg;
+    };
+    draw();
+    [eS, mS].forEach(el => el.addEventListener('input', draw));
+    [disc, kmBox].forEach(el => el.addEventListener('change', draw));
+    svg.addEventListener('click', e => {
+      const q = toSvg(svg, e);
+      let bi = -1, bd = 16 * 16;
+      pts.forEach((p, i) => { const v = (sx(p[0]) - q.x) ** 2 + (sy(p[1]) - q.y) ** 2; if (v < bd) { bd = v; bi = i; } });
+      sel = bi; draw();
+    });
+  })();
+})();
+</script>
+</body>
+</html>
