@@ -1,0 +1,995 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ridge, Lasso and logistic regression · ML in 6 hours, Part 2 · MLT Notes</title>
+<meta name="description" content="Notes on Krish Naik's Complete Machine Learning in 6 Hours, Part 2 (1:07:14–2:13:52): overfitting, ridge and lasso regression, logistic regression, log loss, the confusion matrix, precision, recall and the F-beta score.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script src="theme.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html#extra">All notes</a><span class="sep">/</span><span>ML in 6 hours · Part 2 of 8</span><span class="sep">·</span><a href="krish-ml-03.html">Part 3 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Krish Naik · Complete Machine Learning in 6 Hours</div>
+    <h1>Ridge, Lasso and logistic regression</h1>
+    <p class="lede">A line that passes through every training point can still fail on new data, so ridge and lasso regression add a penalty on the slopes, and lasso can also drop useless features. Logistic regression then squashes a line through a sigmoid to classify, is trained with log loss, and is judged with the confusion matrix, precision, recall and the F-beta score.</p>
+    <div class="meta">
+      <span><b>Part 2</b> of 8</span>
+      <span>Teacher <b>Krish Naik</b></span>
+      <span>About <b>67 min</b> of video</span>
+      <span><b>2</b> chapters</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=4034s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:07:14 · Ridge and Lasso</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5588s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:33:08 · Logistic regression</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Ridge and Lasso</h4>
+      <ul>
+        <li><a href="#overfitting">Overfitting and underfitting</a></li>
+        <li><a href="#ridge">Ridge: the L2 penalty</a></li>
+        <li><a href="#lasso">Lasso: L1 and feature selection</a></li>
+        <li><a href="#choosing-lambda">Choosing λ</a></li>
+        <li><a href="#assumptions">Linear regression assumptions</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Logistic regression</h4>
+      <ul>
+        <li><a href="#why-logistic">Why not linear regression</a></li>
+        <li><a href="#sigmoid">The sigmoid</a></li>
+        <li><a href="#log-loss">Cost function: log loss</a></li>
+        <li><a href="#convergence">Convergence algorithm</a></li>
+        <li><a href="#confusion">Confusion matrix</a></li>
+        <li><a href="#imbalance">Imbalanced data</a></li>
+        <li><a href="#precision-recall">Precision and recall</a></li>
+        <li><a href="#f-beta">F-beta score</a></li>
+        <li><a href="#next">What comes next</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html#extra">All notes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li><dfn>Overfitting</dfn> means good results on the training data and poor results on test data (Krish: low bias, high variance). <dfn>Underfitting</dfn> is poor on both. The goal is a <b>generalized model</b> that does well on both.</li>
+        <li><b>Ridge</b> (L2) adds \(\lambda\,(\text{slope})^2\) to the squared-error cost, so steep lines cost more. <b>Lasso</b> (L1) adds \(\lambda\,|\text{slope}|\) and can also drop useless features. \(\lambda\) is a hyperparameter chosen by cross-validation.</li>
+        <li>A regression line on 0/1 labels is pulled around by outliers and gives outputs below 0 and above 1. Logistic regression squashes the line with the sigmoid \(g(z) = 1/(1 + e^{-z})\) and predicts 1 when \(z \ge 0\).</li>
+        <li>Squared error with a sigmoid inside is non-convex, so logistic regression uses <b>log loss</b>: \(-\log h_\theta(x)\) when \(y = 1\) and \(-\log(1 - h_\theta(x))\) when \(y = 0\), minimized by gradient descent.</li>
+        <li>On imbalanced data accuracy misleads. <b>Precision</b> \(= \frac{TP}{TP+FP}\) watches false positives, <b>recall</b> \(= \frac{TP}{TP+FN}\) watches false negatives, and \(F_\beta\) weighs the two: \(\beta &lt; 1\) favours precision, \(\beta &gt; 1\) favours recall.</li>
+      </ul>
+    </div>
+
+    <!-- ============ CHAPTER: RIDGE AND LASSO ============ -->
+    <section id="overfitting">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=4080s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:08:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=4235s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:10:35 overfitting</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=4302s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:11:42 underfitting</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=4390s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:13:10 three models</a>
+        </div>
+        <h2>Overfitting and underfitting</h2>
+      </div>
+      <p>The chapter starts from the linear regression cost function of <a href="krish-ml-01.html">Part 1</a>, the average squared gap between prediction and truth:</p>
+      <div class="eq">\[ J(\theta_0, \theta_1) = \frac{1}{2m}\sum_{i=1}^{m}\big(h_\theta(x^{(i)}) - y^{(i)}\big)^2, \qquad h_\theta(x) = \theta_0 + \theta_1 x \]</div>
+      <p>Now take a training set of just two points. The best-fit line passes through both, so every error is zero and \(J = 0\). To keep the picture simple Krish lets the line pass through the origin, so \(\theta_0 = 0\) and only the slope \(\theta_1\) is learnt.</p>
+      <p>Zero cost looks perfect, since gradient descent exists to make the cost small. Then new points arrive. The line's predictions for them can land far from their true values. This is <dfn>overfitting</dfn>: the model performs well on the training data and fails to perform well on the test data.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 300" role="img" aria-label="Two training points on the line y equals 2x through the origin. Two new test points sit well below that line, with long dashed errors. A flatter ridge line with slope 1.67 passes closer to the test points.">
+          <line class="d-rule" x1="60" y1="262" x2="590" y2="262"/>
+          <line class="d-rule" x1="60" y1="262" x2="60" y2="14"/>
+          <line class="d-rule" x1="160" y1="262" x2="160" y2="267"/>
+          <text class="d-al" x="160" y="280" text-anchor="middle">1</text>
+          <line class="d-rule" x1="260" y1="262" x2="260" y2="267"/>
+          <text class="d-al" x="260" y="280" text-anchor="middle">2</text>
+          <line class="d-rule" x1="360" y1="262" x2="360" y2="267"/>
+          <text class="d-al" x="360" y="280" text-anchor="middle">3</text>
+          <line class="d-rule" x1="460" y1="262" x2="460" y2="267"/>
+          <text class="d-al" x="460" y="280" text-anchor="middle">4</text>
+          <line class="d-rule" x1="560" y1="262" x2="560" y2="267"/>
+          <text class="d-al" x="560" y="280" text-anchor="middle">5</text>
+          <line class="d-rule" x1="55" y1="214" x2="60" y2="214"/>
+          <text class="d-al" x="50" y="218" text-anchor="end">2</text>
+          <line class="d-rule" x1="55" y1="166" x2="60" y2="166"/>
+          <text class="d-al" x="50" y="170" text-anchor="end">4</text>
+          <line class="d-rule" x1="55" y1="118" x2="60" y2="118"/>
+          <text class="d-al" x="50" y="122" text-anchor="end">6</text>
+          <line class="d-rule" x1="55" y1="70" x2="60" y2="70"/>
+          <text class="d-al" x="50" y="74" text-anchor="end">8</text>
+          <line class="d-rule" x1="55" y1="22" x2="60" y2="22"/>
+          <text class="d-al" x="50" y="26" text-anchor="end">10</text>
+          <text class="d-al" x="590" y="254" text-anchor="end">x</text>
+          <text class="d-al" x="68" y="22">y</text>
+          <line class="d-ln" x1="60" y1="262" x2="540" y2="31.6" style="stroke-width:2"/>
+          <line class="d-ln-acc" x1="60" y1="262" x2="580" y2="54" style="stroke-width:2"/>
+          <text class="d-s" x="440" y="58" text-anchor="end">y = 2x: training cost 0</text>
+          <text class="d-s" x="500" y="106" style="fill: var(--accent)">ridge: slope 1.67</text>
+          <line class="d-ln d-dash" x1="355" y1="151.6" x2="355" y2="118"/>
+          <line class="d-ln-acc d-dash" x1="365" y1="151.6" x2="365" y2="142"/>
+          <line class="d-ln d-dash" x1="455" y1="122.8" x2="455" y2="70"/>
+          <line class="d-ln-acc d-dash" x1="465" y1="122.8" x2="465" y2="102"/>
+          <circle class="pt-plain" cx="160" cy="214" r="5"/>
+          <circle class="pt-plain" cx="260" cy="166" r="5"/>
+          <circle class="pt-no" cx="360" cy="151.6" r="5"/>
+          <circle class="pt-no" cx="460" cy="122.8" r="5"/>
+          <circle class="pt-plain" cx="84" cy="30" r="5"/><text class="d-s" x="96" y="34">training points</text>
+          <circle class="pt-no" cx="84" cy="50" r="5"/><text class="d-s" x="96" y="54">new test points</text>
+          <line class="d-ln d-dash" x1="78" y1="70" x2="92" y2="70"/><text class="d-s" x="96" y="74">test error</text>
+          </svg>
+        </div>
+        <figcaption><b>A perfect fit that does not generalize</b> (illustrative points). The grey line \(y = 2x\) goes through both training points, so its training cost is 0, but it misses the two test points by 1.4 and 2.2. The flatter blue line is what ridge regression with \(\lambda = 1\) picks for these training points (next section); it misses the test points by only 0.4 and 0.87.</figcaption>
+      </figure>
+
+      <p>Krish attaches a word to each half. Doing well on the training data is <b>low bias</b>; doing badly on the test data is <b>high variance</b>. In his usage, bias always refers to the training data and variance to the test data.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Case</th><th>Training data</th><th>Test data</th><th>His labels</th></tr></thead>
+          <tbody>
+            <tr><td><b>Overfitting</b></td><td>good</td><td>poor</td><td>low bias, high variance</td></tr>
+            <tr><td><b>Underfitting</b></td><td>poor</td><td>poor</td><td>high bias, high variance</td></tr>
+            <tr><td><b>Generalized model</b></td><td>good</td><td>good</td><td>low bias, low variance</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Three models</h3>
+      <p>He compares three models by their accuracy:</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Model</th><th class="num">Training accuracy</th><th class="num">Test accuracy</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td>Model 1</td><td class="num">90%</td><td class="num">80%</td><td>Overfitting</td></tr>
+            <tr><td>Model 2</td><td class="num">92%</td><td class="num">91%</td><td>Generalized model</td></tr>
+            <tr><td>Model 3</td><td class="num">70%</td><td class="num">65%</td><td>Underfitting</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The generalized model is the one to aim for, because it keeps giving good output when new data comes in. Ridge and lasso are his tools for pulling an overfit linear model back towards it.</p>
+      <p class="callout">Not in the video: in the standard bias–variance decomposition an underfit model has high bias and <i>low</i> variance. Its training and test scores are both poor and close together, as for Model 3. The "high variance" in the table follows from Krish's shorthand that variance means test performance. The video has its own chapter on bias and variance; see <a href="krish-ml-08.html">Part 8</a>. For the IIT Madras treatment of zero training error by memorizing, see Part 10 (<a href="part-10.html#memorizing">part-10.html</a>).</p>
+    </section>
+
+    <section id="ridge">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=4610s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:16:50</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=4685s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:18:05 worked example</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=4949s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:22:29 λ and iterations</a>
+        </div>
+        <h2>Ridge regression: the L2 penalty</h2>
+      </div>
+      <p>Write \(\hat y^{(i)}\) for the prediction \(h_\theta(x^{(i)})\). For the two-point line the sum of \((\hat y^{(i)} - y^{(i)})^2\) is zero, and that zero is the warning sign. <dfn>Ridge regression</dfn>, also called <dfn>L2 regularization</dfn>, adds one more term to the cost: \(\lambda\) times the square of the slope.</p>
+      <div class="eq">\[ J(\theta_1) = \sum_{i}\big(\hat y^{(i)} - y^{(i)}\big)^2 + \lambda\,\theta_1^2, \qquad \hat y = \theta_1 x \quad (\theta_0 = 0) \]</div>
+      <p>The cost can no longer drop to zero just by fitting the training points exactly, because a steep line now pays for its slope.</p>
+
+      <h3>Worked example</h3>
+      <p>Krish sets \(\lambda = 1\) and starts from the line through both points, which has slope 2. The errors are zero, so \(J = 0 + 1 \times 2^2 = 4\) (he first says 3, then corrects it). Gradient descent does not stop there, since 4 can still be lowered. It changes \(\theta_1\) and finds a flatter line. The training errors are now small but nonzero, and the penalty falls faster than they rise. With slope 1.5 the penalty is \(1.5^2 = 2.25\), so the cost is 2.25 plus a small error, which is below 4.</p>
+      <p>He leaves the "small error" unspecified. With the illustrative points \((1, 2)\) and \((2, 4)\), which lie on a line of slope 2, it is \((1.5 - 2)^2 + (3 - 4)^2 = 1.25,\) so \(J(1.5) = 3.5\).</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 690 300" role="img" aria-label="Cost against the slope theta 1 for the two training points. Without the penalty the cost is a parabola with minimum 0 at slope 2. With lambda equal to 1 the curve is lifted and its minimum moves left to slope 5 over 3, cost 3.33. Marked: cost 4 at slope 2 and cost 3.5 at slope 1.5.">
+          <defs><marker id="kml02-f2ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+          <line class="d-rule" x1="70" y1="262" x2="404" y2="262"/>
+          <line class="d-rule" x1="70" y1="262" x2="70" y2="16"/>
+          <line class="d-rule" x1="103" y1="262" x2="103" y2="267"/>
+          <text class="d-al" x="103" y="280" text-anchor="middle">1.0</text>
+          <line class="d-rule" x1="185.5" y1="262" x2="185.5" y2="267"/>
+          <text class="d-al" x="185.5" y="280" text-anchor="middle">1.5</text>
+          <line class="d-rule" x1="268" y1="262" x2="268" y2="267"/>
+          <text class="d-al" x="268" y="280" text-anchor="middle">2.0</text>
+          <line class="d-rule" x1="350.5" y1="262" x2="350.5" y2="267"/>
+          <text class="d-al" x="350.5" y="280" text-anchor="middle">2.5</text>
+          <line class="d-rule" x1="65" y1="182" x2="70" y2="182"/>
+          <text class="d-al" x="60" y="186" text-anchor="end">4</text>
+          <line class="d-rule" x1="65" y1="102" x2="70" y2="102"/>
+          <text class="d-al" x="60" y="106" text-anchor="end">8</text>
+          <line class="d-rule" x1="65" y1="22" x2="70" y2="22"/>
+          <text class="d-al" x="60" y="26" text-anchor="end">12</text>
+          <text class="d-al" x="404" y="296" text-anchor="end">slope θ₁</text>
+          <text class="d-al" x="76" y="22">cost J(θ₁)</text>
+          <path class="d-ln" d="M70 118 L73.3 122.8 L76.6 127.4 L79.9 132 L83.2 136.6 L86.5 141 L89.8 145.4 L93.1 149.6 L96.4 153.8 L99.7 158 L103 162 L106.3 166 L109.6 169.8 L112.9 173.6 L116.2 177.4 L119.5 181 L122.8 184.6 L126.1 188 L129.4 191.4 L132.7 194.8 L136 198 L139.3 201.2 L142.6 204.2 L145.9 207.2 L149.2 210.2 L152.5 213 L155.8 215.8 L159.1 218.4 L162.4 221 L165.7 223.6 L169 226 L172.3 228.4 L175.6 230.6 L178.9 232.8 L182.2 235 L185.5 237 L188.8 239 L192.1 240.8 L195.4 242.6 L198.7 244.4 L202 246 L205.3 247.6 L208.6 249 L211.9 250.4 L215.2 251.8 L218.5 253 L221.8 254.2 L225.1 255.2 L228.4 256.2 L231.7 257.2 L235 258 L238.3 258.8 L241.6 259.4 L244.9 260 L248.2 260.6 L251.5 261 L254.8 261.4 L258.1 261.6 L261.4 261.8 L264.7 262 L268 262 L271.3 262 L274.6 261.8 L277.9 261.6 L281.2 261.4 L284.5 261 L287.8 260.6 L291.1 260 L294.4 259.4 L297.7 258.8 L301 258 L304.3 257.2 L307.6 256.2 L310.9 255.2 L314.2 254.2 L317.5 253 L320.8 251.8 L324.1 250.4 L327.4 249 L330.7 247.6 L334 246 L337.3 244.4 L340.6 242.6 L343.9 240.8 L347.2 239 L350.5 237 L353.8 235 L357.1 232.8 L360.4 230.6 L363.7 228.4 L367 226 L370.3 223.6 L373.6 221 L376.9 218.4 L380.2 215.8 L383.5 213 L386.8 210.2 L390.1 207.2 L393.4 204.2 L396.7 201.2 L400 198" style="stroke-width:2"/>
+          <path class="d-ln-acc" d="M70 105.2 L73.3 109.3 L76.6 113.3 L79.9 117.2 L83.2 121.1 L86.5 124.8 L89.8 128.4 L93.1 132 L96.4 135.4 L99.7 138.8 L103 142 L106.3 145.2 L109.6 148.2 L112.9 151.2 L116.2 154 L119.5 156.8 L122.8 159.5 L126.1 162 L129.4 164.5 L132.7 166.9 L136 169.2 L139.3 171.4 L142.6 173.5 L145.9 175.5 L149.2 177.4 L152.5 179.2 L155.8 180.9 L159.1 182.5 L162.4 184 L165.7 185.5 L169 186.8 L172.3 188 L175.6 189.2 L178.9 190.2 L182.2 191.2 L185.5 192 L188.8 192.8 L192.1 193.4 L195.4 194 L198.7 194.4 L202 194.8 L205.3 195.1 L208.6 195.2 L211.9 195.3 L215.2 195.3 L218.5 195.2 L221.8 195 L225.1 194.7 L228.4 194.3 L231.7 193.8 L235 193.2 L238.3 192.5 L241.6 191.7 L244.9 190.8 L248.2 189.9 L251.5 188.8 L254.8 187.6 L258.1 186.4 L261.4 185 L264.7 183.6 L268 182 L271.3 180.4 L274.6 178.6 L277.9 176.8 L281.2 174.8 L284.5 172.8 L287.8 170.7 L291.1 168.4 L294.4 166.1 L297.7 163.7 L301 161.2 L304.3 158.6 L307.6 155.9 L310.9 153.1 L314.2 150.2 L317.5 147.2 L320.8 144.1 L324.1 140.9 L327.4 137.6 L330.7 134.3 L334 130.8 L337.3 127.2 L340.6 123.6 L343.9 119.8 L347.2 116 L350.5 112 L353.8 108 L357.1 103.8 L360.4 99.6 L363.7 95.2 L367 90.8 L370.3 86.3 L373.6 81.6 L376.9 76.9 L380.2 72.1 L383.5 67.2 L386.8 62.2 L390.1 57.1 L393.4 51.9 L396.7 46.6 L400 41.2" style="stroke-width:2.2"/>
+          <text class="d-s" x="406" y="202">λ = 0</text>
+          <text class="d-s" x="406" y="51.2" style="fill: var(--accent)">λ = 1</text>
+          <path class="d-ln-acc" d="M262 172 Q 226.8 138 189.5 182" marker-end="url(#kml02-f2ah)"/>
+          <text class="d-s" x="226.8" y="132" text-anchor="middle">a gradient step lowers θ₁</text>
+          <circle class="pt-plain" cx="268" cy="262" r="5"/>
+          <circle class="pt-tree" cx="268" cy="182" r="5"/>
+          <circle class="pt-tree" cx="185.5" cy="192" r="5"/>
+          <circle class="pt-new" cx="213" cy="195.3" r="5"/>
+          <text class="d-t" x="277" y="254">A</text>
+          <text class="d-t" x="277" y="187">B</text>
+          <text class="d-t" x="176.5" y="210" text-anchor="end">C</text>
+          <text class="d-t" x="213" y="217.3" text-anchor="middle">D</text>
+          <text class="d-row" x="448" y="60">Points on the curves</text>
+          <text class="d-t" x="448" y="86">A</text><text class="d-s" x="466" y="86">λ = 0 minimum: θ₁ = 2, cost 0</text>
+          <text class="d-t" x="448" y="112">B</text><text class="d-s" x="466" y="112">λ = 1, θ₁ = 2: 0 + 1·2² = 4</text>
+          <text class="d-t" x="448" y="138">C</text><text class="d-s" x="466" y="138">λ = 1, θ₁ = 1.5: 1.25 + 2.25 = 3.5</text>
+          <text class="d-t" x="448" y="164">D</text><text class="d-s" x="466" y="164">λ = 1 minimum: θ₁ = 5/3, cost 3.33</text>
+          <text class="d-s" x="448" y="200">Data: (1, 2) and (2, 4).</text>
+          <text class="d-s" x="448" y="218">Squared error = 5(θ₁ − 2)².</text>
+          </svg>
+        </div>
+        <figcaption><b>The penalty moves the minimum.</b> Cost against the slope for the illustrative points \((1, 2)\) and \((2, 4)\). Without the penalty (grey) the best slope is 2 with cost 0. With \(\lambda = 1\) (blue) the whole curve is lifted by \(\theta_1^2\), more so for steeper lines, and its lowest point moves left to \(\theta_1 = 5/3\). B and C are Krish's two evaluations.</figcaption>
+      </figure>
+
+      <p class="note">Not in the video: setting \(\frac{dJ}{d\theta_1} = 10(\theta_1 - 2) + 2\lambda\theta_1\) to zero gives \(\theta_1 = \frac{10}{5 + \lambda}\) for these two points. A bigger \(\lambda\) gives a flatter line, and \(\lambda = 0\) gives back slope 2.</p>
+      <p>The penalty is about steepness. A very steep slope often goes with overfitting, so ridge keeps the line less steep while still following the data. The result sits closer to low bias and low variance, and new points end up nearer the line, as the blue line in the first figure shows.</p>
+
+      <h3>Two hyperparameters</h3>
+      <ul>
+        <li><b>\(\lambda\)</b> sets how strongly the penalty pushes the steepness down. It is a hyperparameter, chosen by hyperparameter tuning in the practical session (<a href="krish-ml-03.html">Part 3</a>).</li>
+        <li><b>The number of iterations</b> is how many times gradient descent updates \(\theta_1\): the convergence algorithm. After enough iterations the cost stops falling and settles at a small value, and he checks \(R^2\) or adjusted \(R^2\) as the iterations go on. The cost never reaches zero; if it did, the model would be overfitting again.</li>
+      </ul>
+      <p class="note">Not in the video: with several features the ridge penalty is \(\lambda(\theta_1^2 + \theta_2^2 + \dots + \theta_n^2)\), and the intercept \(\theta_0\) is normally left out of it. A very large \(\lambda\) flattens the line so much that the model underfits.</p>
+    </section>
+
+    <section id="lasso">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5030s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:23:50</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5077s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:24:37 feature selection</a>
+        </div>
+        <h2>Lasso regression: the L1 penalty and feature selection</h2>
+      </div>
+      <p><dfn>Lasso regression</dfn>, or <dfn>L1 regularization</dfn>, keeps the squared-error term and replaces the squared slope by its absolute value (Krish says "mod of the slope"):</p>
+      <div class="eq">\[ J(\theta_1) = \sum_{i}\big(\hat y^{(i)} - y^{(i)}\big)^2 + \lambda\,|\theta_1| \]</div>
+      <p>Lasso also prevents overfitting. Its second use is <dfn>feature selection</dfn>. With many features the prediction is</p>
+      <div class="eq">\[ \hat y = \theta_0 + \theta_1 x_1 + \theta_2 x_2 + \dots + \theta_n x_n \]</div>
+      <p>so there is one slope per feature, and the penalty covers all of them. For a feature that plays no real part in predicting the output, the coefficient becomes very small, close to zero, which amounts to dropping that feature. His reason for the difference from ridge: squaring makes the penalty grow quickly, while the absolute value does not, so lasso ends up neglecting the features that are not important.</p>
+      <p class="note">Correction: he writes the penalty as \(|\theta_0 + \theta_1 + \dots + \theta_n|\), the absolute value of a sum. The L1 penalty is the sum of absolute values, \(\lambda(|\theta_1| + |\theta_2| + \dots + |\theta_n|)\), again usually without \(\theta_0\).</p>
+
+      <h3>Not in the video: why lasso gives exact zeros</h3>
+      <p>Minimizing squared error plus a penalty is the same as minimizing the squared error inside a region around the origin. For ridge the region is a disc; for lasso it is a diamond with its corners on the axes. Points of equal squared error form ellipses around the unpenalized solution \(\hat\theta\), and the answer is where the first ellipse touches the region. The diamond's corners stick out, so the touch often happens at a corner, where one coefficient is exactly 0. The disc has no corners, so ridge shrinks every coefficient without setting any to zero.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 660 300" role="img" aria-label="Two panels. Left: the ridge constraint is a disc; the smallest loss ellipse around the least-squares point touches it at a point where both coefficients are nonzero. Right: the lasso constraint is a diamond; the touching ellipse meets it at the corner on the theta 1 axis, so theta 2 is exactly zero.">
+          <text class="d-h" x="20" y="22">Ridge (L2): θ₁² + θ₂² ≤ t</text>
+          <line class="d-rule" x1="19" y1="180" x2="307" y2="180"/>
+          <line class="d-rule" x1="100" y1="252" x2="100" y2="45"/>
+          <text class="d-al" x="307" y="194" text-anchor="end">θ₁</text>
+          <text class="d-al" x="106" y="55">θ₂</text>
+          <circle class="d-plot" cx="100" cy="180" r="63" style="fill: var(--accent-soft); stroke: var(--accent); stroke-width:1.4"/>
+          <ellipse class="d-ln d-dash" cx="203.5" cy="121.5" rx="21.4" ry="33.8" transform="rotate(20 203.5 121.5)"/>
+          <ellipse class="d-ln" cx="203.5" cy="121.5" rx="42.7" ry="67.6" transform="rotate(20 203.5 121.5)"/>
+          <circle class="pt-new" cx="203.5" cy="121.5" r="5"/>
+          <text class="d-t" x="211.5" y="125.5">θ̂</text>
+          <circle class="pt-tree" cx="160.1" cy="161.1" r="5.5"/>
+          <text class="d-s" x="20" y="270">touches at (1.34, 0.42):</text>
+          <text class="d-s" x="20" y="286">both slopes shrink, neither is 0</text>
+          <text class="d-h" x="350" y="22">Lasso (L1): |θ₁| + |θ₂| ≤ t</text>
+          <line class="d-rule" x1="349" y1="180" x2="637" y2="180"/>
+          <line class="d-rule" x1="430" y1="252" x2="430" y2="45"/>
+          <text class="d-al" x="637" y="194" text-anchor="end">θ₁</text>
+          <text class="d-al" x="436" y="55">θ₂</text>
+          <path class="d-plot" d="M493 180 L430 117 L367 180 L430 243 Z" style="fill: var(--accent-soft); stroke: var(--accent); stroke-width:1.4"/>
+          <ellipse class="d-ln d-dash" cx="533.5" cy="121.5" rx="23.6" ry="37.3" transform="rotate(20 533.5 121.5)"/>
+          <ellipse class="d-ln" cx="533.5" cy="121.5" rx="47.1" ry="74.5" transform="rotate(20 533.5 121.5)"/>
+          <circle class="pt-new" cx="533.5" cy="121.5" r="5"/>
+          <text class="d-t" x="541.5" y="125.5">θ̂</text>
+          <circle class="pt-tree" cx="493" cy="180" r="5.5"/>
+          <text class="d-s" x="350" y="270">touches at the corner (1.40, 0):</text>
+          <text class="d-s" x="350" y="286">θ₂ = 0, so feature 2 is dropped</text>
+          <line class="d-rule" x1="330" y1="8" x2="330" y2="292"/>
+          </svg>
+        </div>
+        <figcaption><b>Disc against diamond</b> (illustrative loss, same in both panels). The dashed and solid ellipses are contours of the squared error around the unpenalized \(\hat\theta = (2.3, 1.3)\); the solid one is the first to touch the region. Ridge lands on the rim with both coefficients nonzero. Lasso lands on the corner, so \(\theta_2 = 0\). For the IIT Madras treatment, see Part 12 (<a href="part-12.html#diamond">part-12.html</a>), which builds both regions step by step.</figcaption>
+      </figure>
+
+      <figure id="shrink-fig">
+        <div class="controls">
+          <label for="shrink-lam">Penalty strength λ</label>
+          <input type="range" id="shrink-lam" min="0" max="300" step="1" value="40">
+          <output id="shrink-lam-out" for="shrink-lam">40</output>
+          <button class="btn" id="shrink-play" type="button">Sweep λ from 0 to 300</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Lasso: coefficients at 0</span><span class="v mine" id="shrink-l0">–</span></div>
+          <div><span class="k">Ridge: coefficients at 0</span><span class="v" id="shrink-r0">–</span></div>
+          <div><span class="k">Ridge: smallest |θ|</span><span class="v" id="shrink-rmin">–</span></div>
+        </div>
+        <div class="status" id="shrink-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="shrink-svg" viewBox="0 0 560 290" role="img" aria-label="Bar chart of five coefficients, ridge and lasso side by side, with dashed outlines for the unpenalized values. As lambda grows ridge bars shrink smoothly while lasso bars for the useless features x4 and x5 drop to exactly zero first."></svg></div>
+        <figcaption><b>Ridge shrinks, lasso selects.</b> Synthetic data generated for these notes: 50 points, five standardized features, true coefficients 3, −2, 1.5, 0 and 0, plus noise, centred so there is no intercept. Each pair of bars is the fitted coefficient for one feature: ridge minimizes \(\sum(\hat y - y)^2 + \lambda\sum\theta_j^2\), lasso minimizes \(\sum(\hat y - y)^2 + \lambda\sum|\theta_j|\), and the dashed outline is plain least squares (\(\lambda = 0\)). Raise \(\lambda\): lasso sets the two useless features to exactly 0 early, while ridge only makes them small. The same \(\lambda\) is not equally strong in the two penalties, so compare the patterns, not the bar heights.</figcaption>
+      </figure>
+    </section>
+
+    <section id="choosing-lambda">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5220s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:27:00 cross-validation</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5275s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:27:55 summary</a>
+        </div>
+        <h2>Choosing λ, and the two penalties side by side</h2>
+      </div>
+      <p>\(\lambda\) is found by <dfn>cross-validation</dfn>: train the model with several values of \(\lambda\), evaluate each one, and keep the value that performs best. Throughout, the aim is to reduce the cost without it ever reaching zero; how far it falls depends on \(\lambda\) and the slopes. His practical advice is to try both penalties and use whichever gives the better performance metric.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th></th><th>Ridge</th><th>Lasso</th></tr></thead>
+          <tbody>
+            <tr><td>Also called</td><td>L2 regularization</td><td>L1 regularization</td></tr>
+            <tr><td>Cost</td><td>\(\sum(h_\theta(x^{(i)}) - y^{(i)})^2 + \lambda\,(\text{slope})^2\)</td><td>\(\sum(h_\theta(x^{(i)}) - y^{(i)})^2 + \lambda\,|\text{slope}|\)</td></tr>
+            <tr><td>Purpose</td><td>Prevent overfitting</td><td>Prevent overfitting; feature selection</td></tr>
+            <tr><td>Unimportant features</td><td>Coefficients shrink</td><td>Coefficients go to (near) zero; the feature is neglected</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Not in the video: elastic net, which adds both penalties at once, is not mentioned in this part.</p>
+    </section>
+
+    <section id="assumptions">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5385s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:29:45</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5510s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:31:50 multicollinearity</a>
+        </div>
+        <h2>Assumptions of linear regression</h2>
+      </div>
+      <p>Before moving to classification, Krish lists what helps linear regression work well.</p>
+      <ol>
+        <li><b>Normally distributed features.</b> The model trains well when the features follow a normal (Gaussian) distribution. If a feature does not, apply <dfn>feature transformation</dfn>: a mathematical function applied to the data to bring it closer to normal.</li>
+        <li><b>Standardization.</b> Scale each feature with the z-score, \(z = (x - \mu)/\sigma\), so it has mean 0 and standard deviation 1 (the standard scaler). Wherever gradient descent is involved this helps: with small, comparable values, training reaches the global minimum quickly, while very large values stretch the cost surface and slow it down. It is optional; he recommends it because it cuts training time.</li>
+        <li><b>Linearity.</b> The model gives good answers when the relationship in the data is linear. He notes that logistic regression shares this property.</li>
+        <li><b>No multicollinearity.</b> If two inputs, say \(x_1\) and \(x_2\), are 95% correlated with each other, keeping both adds little. Drop one and keep the other. The <dfn>variance inflation factor</dfn> (VIF) is the usual check, and he promises a separate video on it. He also names homoscedasticity as one more assumption.</li>
+      </ol>
+      <p class="note">Not in the video: the classical normality assumption concerns the residuals \(y - \hat y\), so making skewed features more normal is a practical habit more than a formal requirement. VIF for feature \(j\) is \(1/(1 - R_j^2)\), where \(R_j^2\) comes from regressing \(x_j\) on the other features; values above about 5 to 10 are a common warning sign. Homoscedasticity means the errors have the same spread for all inputs.</p>
+    </section>
+
+    <!-- ============ CHAPTER: LOGISTIC REGRESSION ============ -->
+    <section id="why-logistic">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5588s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:33:08</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5650s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:34:10 study hours</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=5855s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:37:35 the outlier</a>
+        </div>
+        <h2>Classification, and why a regression line falls short</h2>
+      </div>
+      <p>Logistic regression is the first classification algorithm in the video. The example: from a student's hours of study and hours of play, predict pass or fail. There are two fixed categories, so this is <dfn>binary classification</dfn>, where logistic regression works very well. Asked whether it can handle more than two classes, Krish says yes.</p>
+      <p class="note">Not in the video: the usual routes to more classes are one-vs-rest (one binary model per class) and the softmax version of logistic regression.</p>
+      <p>Keep one feature, hours of study from 1 to 7. Students who studied less than 3 hours failed and those who studied more passed. Encode fail as 0 and pass as 1.</p>
+
+      <h3>First attempt: a regression line with a 0.5 cut-off</h3>
+      <p>Fit an ordinary best-fit line through the 0/1 points and compare its output with 0.5, halfway between the classes:</p>
+      <div class="eq">\[ \text{predict } 0 \text{ (fail) if } h_\theta(x) &lt; 0.5, \qquad \text{predict } 1 \text{ (pass) if } h_\theta(x) \ge 0.5 \]</div>
+      <p>A new student whose point on the line reads 0.25 is predicted to fail; one further right reads above 0.5 and is predicted to pass. So far it works.</p>
+
+      <h3>Two problems</h3>
+      <ol>
+        <li><b>An outlier moves the line.</b> Add a student who studied 9 or 10 hours and passed. The least-squares line tilts to reach that point, so the place where it crosses 0.5 moves right. Students who really passed now get outputs below 0.5 and are predicted to fail.</li>
+        <li><b>Outputs leave the range 0 to 1.</b> The line rises above 1 on the right and, extended to the left, drops below 0. For two classes coded 0 and 1 the output should stay between 0 and 1.</li>
+      </ol>
+      <p>The fix is to <b>squash</b> the line at both ends so its output stays between 0 and 1. That is the job of the sigmoid.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 690 300" role="img" aria-label="Left: study hours against fail 0 or pass 1. A least-squares line crosses 0.5 at 2.9 hours, dips below 0 and rises above 1. Adding one pass at 10 hours flattens the line so it crosses 0.5 at 3.6 hours, and the student who studied 3.5 hours is now predicted to fail. Right: the sigmoid curve g of z rises from 0 to 1, equals 0.5 at z equals 0, and never leaves the range 0 to 1.">
+          <defs><marker id="kml02-f4ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+          <text class="d-h" x="20" y="22">Linear regression on pass / fail</text>
+          <line class="d-rule" x1="50" y1="187" x2="400" y2="187"/>
+          <line class="d-rule" x1="50" y1="250" x2="50" y2="40"/>
+          <line class="d-ln-mut" x1="50" y1="82" x2="400" y2="82"/>
+          <line class="d-ln d-dash" x1="50" y1="134.5" x2="400" y2="134.5" style="stroke-dasharray: 2 4"/>
+          <text class="d-al" x="44" y="191" text-anchor="end">0 fail</text>
+          <text class="d-al" x="44" y="138.5" text-anchor="end">0.5</text>
+          <text class="d-al" x="44" y="86" text-anchor="end">1 pass</text>
+          <text class="d-al" x="50" y="268" text-anchor="middle">0</text>
+          <text class="d-al" x="216.6" y="268" text-anchor="middle">5</text>
+          <text class="d-al" x="383.3" y="268" text-anchor="middle">10</text>
+          <text class="d-al" x="400" y="284" text-anchor="end">study hours</text>
+          <line class="d-ln" x1="50" y1="247.4" x2="227.9" y2="40" style="stroke-width:2"/>
+          <line class="d-ln-acc d-dash" x1="50" y1="184.7" x2="398.3" y2="40" style="stroke-width:2"/>
+          <line class="d-ln-mut" x1="146.8" y1="134.5" x2="146.8" y2="250" style="stroke-dasharray: 2 3"/>
+          <text class="d-al" x="146.8" y="268" text-anchor="middle">2.9</text>
+          <line class="d-ln-mut" x1="170.8" y1="134.5" x2="170.8" y2="250" style="stroke-dasharray: 2 3"/>
+          <text class="d-al" x="170.8" y="268" text-anchor="middle">3.6</text>
+          <circle class="pt-plain" cx="146.8" cy="134.5" r="3"/>
+          <circle class="pt-tree" cx="170.8" cy="134.5" r="3"/>
+          <circle class="pt-plain" cx="83.3" cy="187" r="4.5"/>
+          <circle class="pt-plain" cx="100" cy="187" r="4.5"/>
+          <circle class="pt-plain" cx="116.7" cy="187" r="4.5"/>
+          <circle class="pt-plain" cx="133.3" cy="187" r="4.5"/>
+          <circle class="pt-plain" cx="166.7" cy="82" r="4.5"/>
+          <circle class="pt-plain" cx="183.3" cy="82" r="4.5"/>
+          <circle class="pt-plain" cx="200" cy="82" r="4.5"/>
+          <circle class="pt-new" cx="383.3" cy="82" r="5"/>
+          <text class="d-s" x="379.3" y="102" text-anchor="end">outlier: 10 h, pass</text>
+          <circle class="d-ln-acc" cx="166.7" cy="82" r="9"/>
+          <text class="d-s" x="58" y="50">3.5 h: now</text><text class="d-s" x="58" y="64">predicted fail</text>
+          <line class="d-ln" x1="138" y1="64" x2="158.7" y2="76" marker-end="url(#kml02-f4ah)"/>
+          <text class="d-s" x="66" y="246">below 0</text>
+          <text class="d-s" x="236" y="50.5">above 1</text>
+          <text class="d-s" x="236" y="170">solid: fit to 7 points</text>
+          <text class="d-s" x="236" y="186" style="fill: var(--accent)">dashed: refit with the outlier</text>
+          <line class="d-rule" x1="420" y1="8" x2="420" y2="292"/>
+          <text class="d-h" x="440" y="22">Squashed: g(z) = 1 / (1 + e⁻ᶻ)</text>
+          <line class="d-rule" x1="450.0" y1="187" x2="660.0" y2="187"/>
+          <line class="d-ln-mut" x1="450.0" y1="82" x2="660.0" y2="82"/>
+          <line class="d-ln d-dash" x1="450.0" y1="134.5" x2="660.0" y2="134.5" style="stroke-dasharray: 2 4"/>
+          <line class="d-rule" x1="555.0" y1="218.5" x2="555.0" y2="55.8"/>
+          <path class="d-ln-acc" d="M450 186.7 L451.8 186.7 L453.5 186.7 L455.2 186.6 L457 186.6 L458.8 186.6 L460.5 186.5 L462.2 186.5 L464 186.4 L465.8 186.4 L467.5 186.3 L469.2 186.2 L471 186.1 L472.8 186.1 L474.5 186 L476.2 185.8 L478 185.7 L479.8 185.6 L481.5 185.4 L483.2 185.3 L485 185.1 L486.8 184.9 L488.5 184.7 L490.2 184.5 L492 184.2 L493.8 183.9 L495.5 183.6 L497.2 183.3 L499 182.9 L500.8 182.5 L502.5 182 L504.2 181.5 L506 181 L507.8 180.4 L509.5 179.7 L511.2 179 L513 178.3 L514.8 177.4 L516.5 176.5 L518.2 175.5 L520 174.5 L521.8 173.3 L523.5 172.1 L525.2 170.8 L527 169.4 L528.8 167.8 L530.5 166.2 L532.2 164.5 L534 162.7 L535.8 160.8 L537.5 158.8 L539.2 156.6 L541 154.4 L542.8 152.2 L544.5 149.8 L546.2 147.4 L548 144.9 L549.8 142.3 L551.5 139.7 L553.2 137.1 L555 134.5 L556.8 131.9 L558.5 129.3 L560.2 126.7 L562 124.1 L563.8 121.6 L565.5 119.2 L567.2 116.8 L569 114.6 L570.8 112.4 L572.5 110.2 L574.2 108.2 L576 106.3 L577.8 104.5 L579.5 102.8 L581.2 101.2 L583 99.6 L584.8 98.2 L586.5 96.9 L588.2 95.7 L590 94.5 L591.8 93.5 L593.5 92.5 L595.2 91.6 L597 90.7 L598.8 90 L600.5 89.3 L602.2 88.6 L604 88 L605.8 87.5 L607.5 87 L609.2 86.5 L611 86.1 L612.8 85.7 L614.5 85.4 L616.2 85.1 L618 84.8 L619.8 84.5 L621.5 84.3 L623.2 84.1 L625 83.9 L626.8 83.7 L628.5 83.6 L630.2 83.4 L632 83.3 L633.8 83.2 L635.5 83 L637.2 82.9 L639 82.9 L640.8 82.8 L642.5 82.7 L644.2 82.6 L646 82.6 L647.8 82.5 L649.5 82.5 L651.2 82.4 L653 82.4 L654.8 82.4 L656.5 82.3 L658.2 82.3 L660 82.3" style="stroke-width:2.4"/>
+          <text class="d-al" x="467.5" y="268" text-anchor="middle">-5</text>
+          <text class="d-al" x="555" y="268" text-anchor="middle">0</text>
+          <text class="d-al" x="642.5" y="268" text-anchor="middle">5</text>
+          <text class="d-al" x="660.0" y="284" text-anchor="end">z = θ₀ + θ₁x</text>
+          <text class="d-al" x="446.0" y="86" text-anchor="end">1</text>
+          <text class="d-al" x="446.0" y="138.5" text-anchor="end">0.5</text>
+          <text class="d-al" x="446.0" y="191" text-anchor="end">0</text>
+          <circle class="pt-new" cx="555.0" cy="134.5" r="4.5"/>
+          <text class="d-s" x="563.0" y="55.8">z ≥ 0: predict 1</text>
+          <text class="d-s" x="547.0" y="218.5" text-anchor="end">z &lt; 0: predict 0</text>
+          </svg>
+        </div>
+        <figcaption><b>Left: a regression line as a classifier</b> (illustrative data: fails at 1, 1.5, 2 and 2.5 hours, passes at 3.5, 4 and 4.5). The solid line crosses 0.5 at 2.9 hours and separates the classes, but it dips below 0 and climbs above 1. One extra pass at 10 hours flattens the refitted dashed line, its 0.5 crossing moves to 3.6 hours, and the student with 3.5 hours is now predicted to fail. <b>Right: the sigmoid</b> maps any \(z\) into the range 0 to 1 and equals 0.5 at \(z = 0\).</figcaption>
+      </figure>
+    </section>
+
+    <section id="sigmoid">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=6012s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:40:12</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=6170s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:42:50 the formula</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=6236s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:43:56 the 0.5 rule</a>
+        </div>
+        <h2>Squashing the line: the sigmoid</h2>
+      </div>
+      <p>With \(n\) features the linear part is written compactly as</p>
+      <div class="eq">\[ \theta_0 + \theta_1 x_1 + \theta_2 x_2 + \dots + \theta_n x_n = \theta^\top x \]</div>
+      <p class="note">Not in the video: for \(\theta^\top x\) to include \(\theta_0\), the vector \(x\) gets an extra first entry \(x_0 = 1\).</p>
+      <p>Logistic regression applies a function \(g\) on top of the line. With one feature, let \(z = \theta_0 + \theta_1 x\). Then</p>
+      <div class="eq">\[ h_\theta(x) = g(z) = \frac{1}{1 + e^{-z}} = \frac{1}{1 + e^{-(\theta_0 + \theta_1 x)}} \]</div>
+      <p>\(g\) is the <dfn>sigmoid</dfn>, or <dfn>logistic function</dfn>. Its graph is an S-shaped curve that rises from 0 to 1 and crosses 0.5 at \(z = 0\). That gives the classification rule:</p>
+      <div class="result">
+        <span class="lbl">The 0.5 rule</span>
+        \[ g(z) \ge 0.5 \iff z \ge 0 \;\Rightarrow\; \text{predict } 1, \qquad g(z) &lt; 0.5 \iff z &lt; 0 \;\Rightarrow\; \text{predict } 0 \]
+      </div>
+      <p class="note">Not in the video: the <dfn>decision boundary</dfn> is where \(\theta^\top x = 0\). With one feature it is a single cut-off value of \(x\); with two features it is a straight line.</p>
+      <p>The name joins the two steps: a regression line, then the logistic (sigmoid) squash. Asked whether squashing also helps with the outlier problem, Krish says it does.</p>
+      <p>For the IIT Madras treatment, see Part 15 (<a href="part-15.html#sigmoid">part-15.html</a>), which motivates the sigmoid as a probability model.</p>
+    </section>
+
+    <section id="log-loss">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=6366s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:46:06</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=6521s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:48:41 non-convex</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=6680s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:51:20 log loss</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=6882s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:54:42 one formula</a>
+        </div>
+        <h2>The cost function: from squared error to log loss</h2>
+      </div>
+      <p>The training set is \(\{(x^{(1)}, y^{(1)}), \dots, (x^{(m)}, y^{(m)})\}\) with every \(y^{(i)} \in \{0, 1\}\). For simplicity Krish again sets \(\theta_0 = 0\), so \(z = \theta_1 x\) and the only parameter to learn is \(\theta_1\).</p>
+
+      <h3>Squared error does not work</h3>
+      <p>The first idea is to keep the linear regression cost and only swap in the sigmoid:</p>
+      <div class="eq">\[ J(\theta_1) = \frac{1}{m}\sum_{i=1}^{m}\frac12\big(h_\theta(x^{(i)}) - y^{(i)}\big)^2, \qquad h_\theta(x) = \frac{1}{1 + e^{-\theta_1 x}} \]</div>
+      <p>With a straight-line \(h_\theta\) this cost is a convex bowl, a parabola with one minimum that gradient descent always reaches. With the sigmoid inside it becomes <dfn>non-convex</dfn>: the curve has several dips, the local minima. The slope is zero at each of them, so \(\theta_1\) stops being updated and gradient descent can get stuck there without ever reaching the global minimum.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 700 270" role="img" aria-label="Three panels. A convex bowl with one minimum, the squared-error cost of linear regression. A wavy non-convex curve with several local minima, sketched for a sigmoid inside squared error. The two log-loss curves: minus log h, zero at h equals 1, for label 1; and minus log of 1 minus h, zero at h equals 0, for label 0.">
+          <text class="d-h" x="14" y="22">Linear regression</text>
+          <text class="d-s" x="14" y="40">squared error: convex</text>
+          <line class="d-rule" x1="20" y1="220" x2="210" y2="220"/>
+          <path class="d-ln" d="M24.2 70.3 L27 79.2 L29.8 87.9 L32.5 96.2 L35.2 104.4 L38 112.2 L40.8 119.8 L43.5 127.1 L46.2 134.1 L49 140.8 L51.8 147.3 L54.5 153.4 L57.3 159.4 L60 165 L62.8 170.4 L65.5 175.4 L68.2 180.3 L71 184.8 L73.8 189.1 L76.5 193.1 L79.2 196.8 L82 200.2 L84.8 203.4 L87.5 206.2 L90.2 208.9 L93 211.2 L95.8 213.3 L98.5 215.1 L101.2 216.6 L104 217.8 L106.8 218.8 L109.5 219.4 L112.2 219.9 L115 220 L117.8 219.9 L120.5 219.4 L123.2 218.8 L126 217.8 L128.8 216.6 L131.5 215.1 L134.2 213.3 L137 211.2 L139.8 208.9 L142.5 206.2 L145.2 203.4 L148 200.2 L150.8 196.8 L153.5 193.1 L156.2 189.1 L159 184.8 L161.8 180.3 L164.5 175.5 L167.2 170.4 L170 165 L172.8 159.4 L175.5 153.5 L178.2 147.3 L181 140.8 L183.8 134.1 L186.5 127.1 L189.2 119.8 L192 112.2 L194.8 104.4 L197.5 96.2 L200.2 87.9 L203 79.2 L205.8 70.3" style="stroke-width:2"/>
+          <circle class="pt-tree" cx="115" cy="220" r="5"/>
+          <text class="d-s" x="115" y="240" text-anchor="middle">one minimum, always reached</text>
+          <text class="d-al" x="210" y="258" text-anchor="end">θ₁</text>
+          <line class="d-rule" x1="230" y1="8" x2="230" y2="262"/>
+          <text class="d-h" x="244" y="22">Sigmoid inside squared error</text>
+          <text class="d-s" x="244" y="40">non-convex (sketch, as drawn)</text>
+          <line class="d-rule" x1="246" y1="220" x2="446" y2="220"/>
+          <path class="d-ln" d="M246 75.5 L246.8 78.6 L247.6 81.5 L248.5 84.3 L249.3 86.8 L250.1 89.2 L250.9 91.4 L251.8 93.4 L252.6 95.2 L253.4 96.8 L254.2 98.2 L255.1 99.3 L255.9 100.3 L256.7 101.1 L257.6 101.7 L258.4 102.1 L259.2 102.3 L260 102.3 L260.9 102.2 L261.7 101.9 L262.5 101.5 L263.3 101 L264.1 100.3 L265 99.6 L265.8 98.8 L266.6 97.9 L267.4 96.9 L268.3 95.9 L269.1 94.9 L269.9 93.9 L270.8 92.8 L271.6 91.9 L272.4 90.9 L273.2 90 L274.1 89.2 L274.9 88.5 L275.7 87.9 L276.5 87.4 L277.4 87 L278.2 86.7 L279 86.6 L279.8 86.7 L280.6 86.9 L281.5 87.3 L282.3 87.8 L283.1 88.6 L283.9 89.5 L284.8 90.6 L285.6 91.9 L286.4 93.3 L287.2 94.9 L288.1 96.7 L288.9 98.7 L289.7 100.8 L290.6 103.1 L291.4 105.5 L292.2 108 L293 110.7 L293.9 113.4 L294.7 116.3 L295.5 119.2 L296.3 122.1 L297.1 125.2 L298 128.2 L298.8 131.3 L299.6 134.3 L300.4 137.4 L301.3 140.4 L302.1 143.3 L302.9 146.2 L303.8 149 L304.6 151.8 L305.4 154.3 L306.2 156.8 L307.1 159.2 L307.9 161.3 L308.7 163.4 L309.5 165.2 L310.4 166.9 L311.2 168.4 L312 169.7 L312.8 170.8 L313.7 171.7 L314.5 172.3 L315.3 172.8 L316.1 173.1 L316.9 173.2 L317.8 173.1 L318.6 172.8 L319.4 172.3 L320.2 171.6 L321.1 170.8 L321.9 169.8 L322.7 168.6 L323.6 167.3 L324.4 165.9 L325.2 164.3 L326 162.7 L326.9 161 L327.7 159.2 L328.5 157.3 L329.3 155.5 L330.2 153.6 L331 151.7 L331.8 149.8 L332.6 147.9 L333.4 146.1 L334.3 144.3 L335.1 142.7 L335.9 141.1 L336.8 139.6 L337.6 138.2 L338.4 136.9 L339.2 135.8 L340.1 134.9 L340.9 134.1 L341.7 133.4 L342.5 132.9 L343.4 132.6 L344.2 132.5 L345 132.5 L345.8 132.8 L346.7 133.2 L347.5 133.8 L348.3 134.5 L349.1 135.5 L349.9 136.6 L350.8 137.8 L351.6 139.2 L352.4 140.8 L353.2 142.4 L354.1 144.2 L354.9 146.1 L355.7 148 L356.6 150.1 L357.4 152.2 L358.2 154.3 L359 156.5 L359.9 158.7 L360.7 160.9 L361.5 163 L362.3 165.2 L363.2 167.2 L364 169.3 L364.8 171.2 L365.6 173 L366.4 174.7 L367.3 176.3 L368.1 177.7 L368.9 179 L369.8 180.2 L370.6 181.1 L371.4 181.9 L372.2 182.5 L373.1 182.9 L373.9 183.1 L374.7 183.1 L375.5 182.9 L376.4 182.5 L377.2 181.9 L378 181.1 L378.8 180.1 L379.6 178.9 L380.5 177.5 L381.3 175.9 L382.1 174.2 L382.9 172.3 L383.8 170.2 L384.6 168 L385.4 165.7 L386.2 163.3 L387.1 160.8 L387.9 158.2 L388.7 155.5 L389.6 152.8 L390.4 150 L391.2 147.2 L392 144.5 L392.9 141.7 L393.7 139 L394.5 136.3 L395.3 133.6 L396.1 131.1 L397 128.6 L397.8 126.3 L398.6 124 L399.4 121.9 L400.3 119.9 L401.1 118.1 L401.9 116.4 L402.8 114.9 L403.6 113.5 L404.4 112.4 L405.2 111.4 L406.1 110.6 L406.9 109.9 L407.7 109.5 L408.5 109.2 L409.4 109.1 L410.2 109.2 L411 109.4 L411.8 109.8 L412.7 110.3 L413.5 111 L414.3 111.8 L415.1 112.7 L416 113.7 L416.8 114.8 L417.6 116 L418.4 117.2 L419.2 118.5 L420.1 119.8 L420.9 121.1 L421.7 122.4 L422.6 123.7 L423.4 124.9 L424.2 126.1 L425 127.2 L425.9 128.3 L426.7 129.2 L427.5 130 L428.3 130.7 L429.2 131.3 L430 131.7 L430.8 131.9 L431.6 132 L432.5 131.9 L433.3 131.6 L434.1 131.1 L434.9 130.4 L435.8 129.5 L436.6 128.4 L437.4 127.1 L438.2 125.6 L439.1 123.9 L439.9 122 L440.7 119.9 L441.5 117.6 L442.4 115.2 L443.2 112.5 L444 109.7" style="stroke-width:2"/>
+          <circle class="pt-no" cx="259.9" cy="102.3" r="4.5"/>
+          <circle class="pt-no" cx="316.9" cy="173.2" r="4.5"/>
+          <circle class="pt-tree" cx="374.4" cy="183.1" r="4.5"/>
+          <circle class="pt-no" cx="431.5" cy="132" r="4.5"/>
+          <text class="d-s" x="374.4" y="205.1" text-anchor="middle">global minimum</text>
+          <text class="d-s" x="259.9" y="124.3" text-anchor="middle">local</text>
+          <text class="d-s" x="431.5" y="154" text-anchor="middle">local</text>
+          <text class="d-s" x="316.9" y="195.2" text-anchor="middle">local</text>
+          <text class="d-s" x="346" y="240" text-anchor="middle">slope 0 at every dip: θ₁ can stop</text>
+          <text class="d-al" x="446" y="258" text-anchor="end">θ₁</text>
+          <line class="d-rule" x1="462" y1="8" x2="462" y2="262"/>
+          <text class="d-h" x="476" y="22">Log loss, one example</text>
+          <text class="d-s" x="476" y="40">cost against the prediction h</text>
+          <line class="d-rule" x1="500" y1="220" x2="680" y2="220"/>
+          <line class="d-rule" x1="500" y1="220" x2="500" y2="56.0"/>
+          <text class="d-al" x="495" y="184" text-anchor="end">1</text>
+          <text class="d-al" x="495" y="144" text-anchor="end">2</text>
+          <text class="d-al" x="495" y="104" text-anchor="end">3</text>
+          <text class="d-al" x="495" y="64" text-anchor="end">4</text>
+          <text class="d-al" x="500" y="236" text-anchor="middle">0</text>
+          <text class="d-al" x="590" y="236" text-anchor="middle">0.5</text>
+          <text class="d-al" x="680" y="236" text-anchor="middle">1</text>
+          <text class="d-al" x="680" y="258" text-anchor="end">h = hθ(x)</text>
+          <path class="d-ln-acc" d="M503.3 60 L504.2 69.5 L505.1 77.2 L506 83.7 L506.8 89.2 L507.7 94.1 L508.6 98.4 L509.5 102.4 L510.4 105.9 L511.3 109.2 L512.2 112.2 L513.1 115 L513.9 117.7 L514.8 120.1 L515.7 122.5 L516.6 124.7 L517.5 126.7 L518.4 128.7 L519.3 130.6 L520.2 132.4 L521 134.1 L521.9 135.8 L522.8 137.4 L523.7 138.9 L524.6 140.4 L525.5 141.8 L526.4 143.2 L527.2 144.5 L528.1 145.8 L529 147 L529.9 148.2 L530.8 149.4 L531.7 150.5 L532.6 151.6 L533.5 152.7 L534.3 153.7 L535.2 154.8 L536.1 155.8 L537 156.7 L537.9 157.7 L538.8 158.6 L539.7 159.5 L540.6 160.4 L541.4 161.3 L542.3 162.1 L543.2 162.9 L544.1 163.7 L545 164.5 L545.9 165.3 L546.8 166.1 L547.6 166.8 L548.5 167.6 L549.4 168.3 L550.3 169 L551.2 169.7 L552.1 170.4 L553 171.1 L553.9 171.7 L554.7 172.4 L555.6 173 L556.5 173.7 L557.4 174.3 L558.3 174.9 L559.2 175.5 L560.1 176.1 L561 176.7 L561.8 177.3 L562.7 177.8 L563.6 178.4 L564.5 179 L565.4 179.5 L566.3 180 L567.2 180.6 L568.1 181.1 L568.9 181.6 L569.8 182.1 L570.7 182.6 L571.6 183.1 L572.5 183.6 L573.4 184.1 L574.3 184.6 L575.1 185.1 L576 185.5 L576.9 186 L577.8 186.5 L578.7 186.9 L579.6 187.4 L580.5 187.8 L581.4 188.2 L582.2 188.7 L583.1 189.1 L584 189.5 L584.9 189.9 L585.8 190.4 L586.7 190.8 L587.6 191.2 L588.5 191.6 L589.3 192 L590.2 192.4 L591.1 192.8 L592 193.2 L592.9 193.5 L593.8 193.9 L594.7 194.3 L595.6 194.7 L596.4 195 L597.3 195.4 L598.2 195.8 L599.1 196.1 L600 196.5 L600.9 196.8 L601.8 197.2 L602.6 197.5 L603.5 197.9 L604.4 198.2 L605.3 198.6 L606.2 198.9 L607.1 199.2 L608 199.6 L608.9 199.9 L609.7 200.2 L610.6 200.5 L611.5 200.8 L612.4 201.2 L613.3 201.5 L614.2 201.8 L615.1 202.1 L616 202.4 L616.8 202.7 L617.7 203 L618.6 203.3 L619.5 203.6 L620.4 203.9 L621.3 204.2 L622.2 204.5 L623 204.8 L623.9 205.1 L624.8 205.4 L625.7 205.6 L626.6 205.9 L627.5 206.2 L628.4 206.5 L629.3 206.8 L630.1 207 L631 207.3 L631.9 207.6 L632.8 207.8 L633.7 208.1 L634.6 208.4 L635.5 208.6 L636.4 208.9 L637.2 209.2 L638.1 209.4 L639 209.7 L639.9 209.9 L640.8 210.2 L641.7 210.4 L642.6 210.7 L643.5 210.9 L644.3 211.2 L645.2 211.4 L646.1 211.7 L647 211.9 L647.9 212.1 L648.8 212.4 L649.7 212.6 L650.5 212.9 L651.4 213.1 L652.3 213.3 L653.2 213.6 L654.1 213.8 L655 214 L655.9 214.2 L656.8 214.5 L657.6 214.7 L658.5 214.9 L659.4 215.1 L660.3 215.4 L661.2 215.6 L662.1 215.8 L663 216 L663.9 216.2 L664.7 216.5 L665.6 216.7 L666.5 216.9 L667.4 217.1 L668.3 217.3 L669.2 217.5 L670.1 217.7 L670.9 217.9 L671.8 218.1 L672.7 218.3 L673.6 218.6 L674.5 218.8 L675.4 219 L676.3 219.2 L677.2 219.4 L678 219.6 L678.9 219.8 L679.8 220" style="stroke-width:2.2"/>
+          <path class="d-ln" d="M500.2 220 L501.1 219.8 L502 219.6 L502.8 219.4 L503.7 219.2 L504.6 219 L505.5 218.8 L506.4 218.6 L507.3 218.3 L508.2 218.1 L509.1 217.9 L509.9 217.7 L510.8 217.5 L511.7 217.3 L512.6 217.1 L513.5 216.9 L514.4 216.7 L515.3 216.5 L516.1 216.2 L517 216 L517.9 215.8 L518.8 215.6 L519.7 215.4 L520.6 215.1 L521.5 214.9 L522.4 214.7 L523.2 214.5 L524.1 214.2 L525 214 L525.9 213.8 L526.8 213.6 L527.7 213.3 L528.6 213.1 L529.5 212.9 L530.3 212.6 L531.2 212.4 L532.1 212.1 L533 211.9 L533.9 211.7 L534.8 211.4 L535.7 211.2 L536.5 210.9 L537.4 210.7 L538.3 210.4 L539.2 210.2 L540.1 209.9 L541 209.7 L541.9 209.4 L542.8 209.2 L543.6 208.9 L544.5 208.6 L545.4 208.4 L546.3 208.1 L547.2 207.8 L548.1 207.6 L549 207.3 L549.9 207 L550.7 206.8 L551.6 206.5 L552.5 206.2 L553.4 205.9 L554.3 205.6 L555.2 205.4 L556.1 205.1 L557 204.8 L557.8 204.5 L558.7 204.2 L559.6 203.9 L560.5 203.6 L561.4 203.3 L562.3 203 L563.2 202.7 L564 202.4 L564.9 202.1 L565.8 201.8 L566.7 201.5 L567.6 201.2 L568.5 200.8 L569.4 200.5 L570.3 200.2 L571.1 199.9 L572 199.6 L572.9 199.2 L573.8 198.9 L574.7 198.6 L575.6 198.2 L576.5 197.9 L577.4 197.5 L578.2 197.2 L579.1 196.8 L580 196.5 L580.9 196.1 L581.8 195.8 L582.7 195.4 L583.6 195 L584.4 194.7 L585.3 194.3 L586.2 193.9 L587.1 193.5 L588 193.2 L588.9 192.8 L589.8 192.4 L590.7 192 L591.5 191.6 L592.4 191.2 L593.3 190.8 L594.2 190.4 L595.1 189.9 L596 189.5 L596.9 189.1 L597.8 188.7 L598.6 188.2 L599.5 187.8 L600.4 187.4 L601.3 186.9 L602.2 186.5 L603.1 186 L604 185.5 L604.9 185.1 L605.7 184.6 L606.6 184.1 L607.5 183.6 L608.4 183.1 L609.3 182.6 L610.2 182.1 L611.1 181.6 L611.9 181.1 L612.8 180.6 L613.7 180 L614.6 179.5 L615.5 179 L616.4 178.4 L617.3 177.8 L618.2 177.3 L619 176.7 L619.9 176.1 L620.8 175.5 L621.7 174.9 L622.6 174.3 L623.5 173.7 L624.4 173 L625.3 172.4 L626.1 171.7 L627 171.1 L627.9 170.4 L628.8 169.7 L629.7 169 L630.6 168.3 L631.5 167.6 L632.4 166.8 L633.2 166.1 L634.1 165.3 L635 164.5 L635.9 163.7 L636.8 162.9 L637.7 162.1 L638.6 161.3 L639.4 160.4 L640.3 159.5 L641.2 158.6 L642.1 157.7 L643 156.7 L643.9 155.8 L644.8 154.8 L645.7 153.7 L646.5 152.7 L647.4 151.6 L648.3 150.5 L649.2 149.4 L650.1 148.2 L651 147 L651.9 145.8 L652.8 144.5 L653.6 143.2 L654.5 141.8 L655.4 140.4 L656.3 138.9 L657.2 137.4 L658.1 135.8 L659 134.1 L659.8 132.4 L660.7 130.6 L661.6 128.7 L662.5 126.7 L663.4 124.7 L664.3 122.5 L665.2 120.1 L666.1 117.7 L666.9 115 L667.8 112.2 L668.7 109.2 L669.6 105.9 L670.5 102.4 L671.4 98.4 L672.3 94.1 L673.2 89.2 L674 83.7 L674.9 77.2 L675.8 69.5 L676.7 60" style="stroke-width:2.2"/>
+          <text class="d-s" x="514.4" y="72" style="fill: var(--accent)">y = 1: −log h</text>
+          <text class="d-s" x="658.4" y="116" text-anchor="end">y = 0: −log(1 − h)</text>
+          <circle class="pt-tree" cx="680" cy="220" r="4.5"/>
+          <circle class="pt-plain" cx="500" cy="220" r="4.5"/>
+          </svg>
+        </div>
+        <figcaption><b>Why the cost had to change.</b> Left: linear regression's squared error is a convex bowl. Middle: a sketch of the non-convex curve Krish draws for squared error with a sigmoid inside; gradient descent can stop at any of the hollow dips. Right (to scale): the two halves of log loss for one example, with cost 0 when the prediction \(h\) matches the label and growing without limit as \(h\) moves to the wrong end.</figcaption>
+      </figure>
+
+      <h3>Log loss</h3>
+      <p>The cost used instead treats the two labels separately:</p>
+      <div class="eq">\[ \text{Cost}\big(h_\theta(x), y\big) = \begin{cases} -\log h_\theta(x) & \text{if } y = 1 \\ -\log\big(1 - h_\theta(x)\big) & \text{if } y = 0 \end{cases} \]</div>
+      <ul>
+        <li>\(y = 1\): the cost is 0 when \(h_\theta(x) = 1\) and grows as \(h_\theta(x)\) moves towards 0.</li>
+        <li>\(y = 0\): the cost is 0 when \(h_\theta(x) = 0\) and grows as \(h_\theta(x)\) moves towards 1.</li>
+      </ul>
+      <p>Because of the log, the combined cost is convex, so gradient descent can always reach the global minimum. The two cases also fit in one line:</p>
+      <div class="eq">\[ \text{Cost}\big(h_\theta(x), y\big) = -\,y\log h_\theta(x) - (1 - y)\log\big(1 - h_\theta(x)\big) \]</div>
+      <p>Check it: with \(y = 1\) the second term has the factor \(1 - 1 = 0\) and vanishes, leaving \(-\log h_\theta(x)\). With \(y = 0\) the first term vanishes, leaving \(-\log(1 - h_\theta(x))\). Averaging over the training set gives the cost function of logistic regression.</p>
+      <div class="result">
+        <span class="lbl">Logistic regression cost (log loss)</span>
+        \[ J(\theta_1) = -\frac{1}{m}\sum_{i=1}^{m}\Big[\,y^{(i)}\log h_\theta(x^{(i)}) + \big(1 - y^{(i)}\big)\log\big(1 - h_\theta(x^{(i)})\big)\Big], \qquad h_\theta(x) = \frac{1}{1 + e^{-\theta_1 x}} \]
+      </div>
+      <p class="note">He writes the factor in front as \(\frac{1}{2m}\), carried over from linear regression; the usual form has \(\frac1m\). A constant factor does not move the minimum. He also says the cost function and loss function are almost the same thing. Not in the video: the loss is usually the error on one example and the cost its average over the training set.</p>
+    </section>
+
+    <section id="convergence">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7075s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:57:55</a>
+        <h2>The convergence algorithm</h2>
+      </div>
+      <p>Training is the same gradient descent loop as for linear regression, run on the log-loss cost.</p>
+      <ol class="algo">
+        <li class="algo-title">Gradient descent for logistic regression</li>
+        <li>Start from some value of \(\theta\) and pick a learning rate \(\alpha\).</li>
+        <li>Repeat until convergence: \(\theta_j := \theta_j - \alpha\,\frac{\partial J(\theta)}{\partial \theta_j}\), for every \(j\) (here only \(\theta_1\)).</li>
+        <li>\(J\) is the log loss above, with \(h_\theta(x) = 1/(1 + e^{-\theta^\top x})\).</li>
+      </ol>
+      <p class="note">Not in the video: the derivative works out to \(\frac{\partial J}{\partial \theta_j} = \frac1m\sum_i \big(h_\theta(x^{(i)}) - y^{(i)}\big)\,x_j^{(i)}\). It has the same form as linear regression's gradient, though \(h_\theta\) is now the sigmoid.</p>
+      <p>Asked whether this cost is the log-likelihood from probability, he says yes.</p>
+      <p class="note">Not in the video: if \(P(y = 1 \mid x) = h_\theta(x)\), then \(J\) is the negative average log-likelihood of the labels, so minimizing log loss is maximum likelihood estimation. See Part 15 (<a href="part-15.html#likelihood">part-15.html</a>) for the derivation and the gradient.</p>
+    </section>
+
+    <section id="confusion">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7125s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:58:45</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7307s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:01:47 accuracy</a>
+        </div>
+        <h2>The confusion matrix and accuracy</h2>
+      </div>
+      <p>Performance metrics for classification start from a small binary example: seven rows with actual labels \(y\) and the model's predictions \(\hat y\).</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Row</th><th class="num">1</th><th class="num">2</th><th class="num">3</th><th class="num">4</th><th class="num">5</th><th class="num">6</th><th class="num">7</th></tr></thead>
+          <tbody>
+            <tr><td>Actual \(y\)</td><td class="num">0</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num">1</td></tr>
+            <tr><td>Predicted \(\hat y\)</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">0</td></tr>
+            <tr><td>Outcome</td><td class="num">FP</td><td class="num">TP</td><td class="num">TN</td><td class="num">TP</td><td class="num">TP</td><td class="num">FP</td><td class="num">FN</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Count every (actual, predicted) pair into a 2 × 2 table, the <dfn>confusion matrix</dfn>. Krish puts the actual values across the top and the predictions down the side.</p>
+      <ul>
+        <li><b>True positive (TP):</b> actual 1, predicted 1.</li>
+        <li><b>True negative (TN):</b> actual 0, predicted 0.</li>
+        <li><b>False positive (FP):</b> actual 0, predicted 1.</li>
+        <li><b>False negative (FN):</b> actual 1, predicted 0.</li>
+      </ul>
+      <p class="note">Slip: at first he calls the (0, 0) cell a false negative. It is the true negative, as his accuracy formula then uses.</p>
+      <p>The correct predictions sit on the diagonal, so</p>
+      <div class="eq">\[ \text{Accuracy} = \frac{TP + TN}{TP + FP + FN + TN} = \frac{3 + 1}{3 + 2 + 1 + 1} = \frac47 \approx 57\% \]</div>
+      <p>The aim of a good model is to keep both false positives and false negatives low.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 290" role="img" aria-label="Confusion matrix for the seven-point example. Actual values across the top, predictions down the side. True positives 3, false positives 2, false negatives 1, true negatives 1. Precision reads along the predicted-1 row, 3 out of 5. Recall reads down the actual-1 column, 3 out of 4. Accuracy is the diagonal, 4 out of 7.">
+          <text class="d-row" x="270" y="26" text-anchor="middle">Actual</text>
+          <text class="d-t" x="210.0" y="52" text-anchor="middle">1</text><text class="d-t" x="330.0" y="52" text-anchor="middle">0</text>
+          <text class="d-row" x="40" y="144" text-anchor="middle" transform="rotate(-90 40 140)">Predicted</text>
+          <text class="d-t" x="136" y="107.0" text-anchor="end">1</text><text class="d-t" x="136" y="183.0" text-anchor="end">0</text>
+          <rect class="d-box-acc" x="150" y="64" width="120" height="76" rx="4"/>
+          <text class="d-al" x="160" y="82">TP</text>
+          <text class="d-h" x="210.0" y="112.0" text-anchor="middle" style="font-size:26px">3</text>
+          <rect class="d-box" x="270" y="64" width="120" height="76" rx="4"/>
+          <text class="d-al" x="280" y="82">FP</text>
+          <text class="d-h" x="330.0" y="112.0" text-anchor="middle" style="font-size:26px">2</text>
+          <rect class="d-box" x="150" y="140" width="120" height="76" rx="4"/>
+          <text class="d-al" x="160" y="158">FN</text>
+          <text class="d-h" x="210.0" y="188.0" text-anchor="middle" style="font-size:26px">1</text>
+          <rect class="d-box-acc" x="270" y="140" width="120" height="76" rx="4"/>
+          <text class="d-al" x="280" y="158">TN</text>
+          <text class="d-h" x="330.0" y="188.0" text-anchor="middle" style="font-size:26px">1</text>
+          <path class="d-ln" d="M402 68 h6 V136 h-6"/>
+          <text class="d-t" x="418" y="90">Precision: the predicted-1 row</text>
+          <text class="d-s" x="418" y="108">TP / (TP + FP) = 3 / 5 = 0.60</text>
+          <text class="d-t" x="418" y="166">Accuracy: the diagonal</text>
+          <text class="d-s" x="418" y="184">(TP + TN) / all = 4 / 7 ≈ 0.57</text>
+          <path class="d-ln" d="M154 228 v6 H266 v-6"/>
+          <text class="d-t" x="150" y="258">Recall: the actual-1 column</text>
+          <text class="d-s" x="150" y="276">TP / (TP + FN) = 3 / 4 = 0.75</text>
+          </svg>
+        </div>
+        <figcaption><b>His seven-point example as a confusion matrix.</b> Accuracy reads along the diagonal. Precision and recall, defined two sections on, read along one row and one column; their values here are worked out for these notes.</figcaption>
+      </figure>
+      <p class="note">Not in the video: scikit-learn's <code>confusion_matrix</code> uses the other orientation, actual labels on the rows and predictions on the columns, class 0 first. For this example it prints <code>[[1, 2], [1, 3]]</code>, that is \([[TN, FP], [FN, TP]]\).</p>
+    </section>
+
+    <section id="imbalance">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7372s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:02:52</a>
+        <h2>Imbalanced data: when accuracy misleads</h2>
+      </div>
+      <p>Suppose the output column has 900 zeros and 100 ones. That is <dfn>imbalanced data</dfn>, which he also calls biased data. A 600 / 400 split is close enough to balanced for most algorithms. A strong imbalance, on the other hand, affects most of the algorithms in the video.</p>
+      <p>Now take a model that ignores its input and always predicts 0. It is right on all 900 zeros:</p>
+      <div class="eq">\[ \text{Accuracy} = \frac{900}{1000} = 90\% \]</div>
+      <p>That looks like a good score from a model that never finds a single positive. So accuracy alone cannot be trusted. Oversampling the smaller class can help in some cases; the main remedy is to choose performance metrics that look at the errors directly: precision, recall and the F-score.</p>
+    </section>
+
+    <section id="precision-recall">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7500s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:05:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7610s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:06:50 spam and cancer</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7715s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:08:35 stock market</a>
+        </div>
+        <h2>Precision and recall</h2>
+      </div>
+      <div class="result">
+        <span class="lbl">Definitions</span>
+        \[ \text{Recall} = \frac{TP}{TP + FN}, \qquad \text{Precision} = \frac{TP}{TP + FP} \]
+      </div>
+      <p><dfn>Recall</dfn> asks: of all the actual positives, how many did the model predict as positive? It is about false negatives, which should be reduced. Recall is also called the <b>true positive rate</b> or <b>sensitivity</b>.</p>
+      <p><dfn>Precision</dfn> asks: of all the predicted positives, how many are actually positive? It is about false positives.</p>
+
+      <h3>Which one matters?</h3>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Problem</th><th>Metric</th><th>Error to reduce</th><th>Reason</th></tr></thead>
+          <tbody>
+            <tr><td>Spam detection</td><td>Precision</td><td>False positives</td><td>He picks precision, which gives false positives priority. Not in the video: a false positive is a genuine mail sent to the spam folder, where it may never be read.</td></tr>
+            <tr><td>Does a patient have cancer?</td><td>Recall</td><td>False negatives</td><td>Telling a patient who has cancer that they do not is the dangerous case. A false alarm leads to further tests, which will clear it up.</td></tr>
+            <tr><td>Will the stock market crash tomorrow?</td><td>Depends on who the model is for</td><td>Both</td><td>People want to be warned so they can sell, while for companies a false alarm is very bad. When both kinds of error matter, use the F-score.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="f-beta">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7780s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:09:40</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7861s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:11:01 β = 0.5 and β = 2</a>
+        </div>
+        <h2>The F-beta score</h2>
+      </div>
+      <p>Krish deliberately says <i>F-score</i> rather than F1 score, because the general version has a parameter \(\beta\) that decides the balance between precision \(P\) and recall \(R\):</p>
+      <div class="result">
+        <span class="lbl">F-beta score</span>
+        \[ F_\beta = \frac{(1 + \beta^2)\,P\,R}{\beta^2 P + R} \]
+      </div>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Choice of \(\beta\)</th><th>Use it when</th><th>Formula</th></tr></thead>
+          <tbody>
+            <tr><td>\(\beta = 1\)</td><td>False positives and false negatives matter equally</td><td>\(F_1 = 2PR/(P + R)\)</td></tr>
+            <tr><td>\(\beta &lt; 1\), e.g. 0.5</td><td>False positives matter more</td><td>\(F_{0.5} = 1.25\,PR/(0.25\,P + R)\)</td></tr>
+            <tr><td>\(\beta &gt; 1\), e.g. 2</td><td>False negatives matter more</td><td>\(F_2 = 5\,PR/(4P + R)\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>\(F_1\) is the <dfn>harmonic mean</dfn> of precision and recall, the same shape as \(2xy/(x + y)\). Substituting \(\beta = 1\), he first writes \(1 + 4\) for \(1 + \beta^2\) and then corrects it to \(1 + 1\).</p>
+      <p>For his seven-point example (\(P = 0.60\), \(R = 0.75\)) this gives \(F_1 \approx 0.67\), \(F_{0.5} = 0.625\) and \(F_2 \approx 0.71\). These values are worked out for these notes.</p>
+
+      <figure id="cm-fig">
+        <div class="controls">
+          <span>Load</span>
+          <button class="btn" type="button" data-cm="3,2,1,1">His 7-point example</button>
+          <button class="btn" type="button" data-cm="0,0,100,900">Always predict 0</button>
+          <button class="btn" type="button" data-cm="18,60,2,920">Cancer screen</button>
+        </div>
+        <div class="tbl-wrap">
+          <table class="mini">
+            <thead><tr><th></th><th class="num">Actual 1</th><th class="num">Actual 0</th></tr></thead>
+            <tbody>
+              <tr><td>Predicted 1</td>
+                <td class="num"><label for="cm-tp">TP</label> <input type="number" id="cm-tp" min="0" step="1" value="3" inputmode="numeric" style="width: 8ch; font: 500 15px var(--font-mono); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 7px; margin-left: 6px"></td>
+                <td class="num"><label for="cm-fp">FP</label> <input type="number" id="cm-fp" min="0" step="1" value="2" inputmode="numeric" style="width: 8ch; font: 500 15px var(--font-mono); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 7px; margin-left: 6px"></td></tr>
+              <tr><td>Predicted 0</td>
+                <td class="num"><label for="cm-fn">FN</label> <input type="number" id="cm-fn" min="0" step="1" value="1" inputmode="numeric" style="width: 8ch; font: 500 15px var(--font-mono); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 7px; margin-left: 6px"></td>
+                <td class="num"><label for="cm-tn">TN</label> <input type="number" id="cm-tn" min="0" step="1" value="1" inputmode="numeric" style="width: 8ch; font: 500 15px var(--font-mono); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 7px; margin-left: 6px"></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="controls">
+          <label for="cm-beta">β (log scale)</label>
+          <input type="range" id="cm-beta" min="-2" max="2" step="0.05" value="0">
+          <output id="cm-beta-out" for="cm-beta">1.00</output>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Accuracy</span><span class="v" id="cm-acc">–</span></div>
+          <div><span class="k">Precision</span><span class="v" id="cm-p">–</span></div>
+          <div><span class="k">Recall</span><span class="v" id="cm-r">–</span></div>
+          <div><span class="k">F1</span><span class="v" id="cm-f1">–</span></div>
+          <div><span class="k" id="cm-fb-k">Fβ (β = 1.00)</span><span class="v mine" id="cm-fb">–</span></div>
+        </div>
+        <div class="status" id="cm-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="cm-svg" viewBox="0 0 560 250" role="img" aria-label="F-beta plotted against beta on a log scale from 0.25 to 4, with dashed horizontal lines at precision and recall. The curve starts near precision for small beta and approaches recall for large beta; a dot marks the current beta."></svg></div>
+        <figcaption><b>A confusion-matrix calculator.</b> Type any counts or load a preset; the first preset is his seven-point example and the other two are illustrative. The chart shows \(F_\beta\) for the current counts as \(\beta\) varies: small \(\beta\) pulls it towards precision, large \(\beta\) towards recall, and \(\beta = 1\) gives \(F_1\). When precision or recall is undefined (a zero denominator) it is taken as 0, as scikit-learn does by default.</figcaption>
+      </figure>
+    </section>
+
+    <section id="next">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=7950s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:12:30</a>
+        <h2>What comes next</h2>
+      </div>
+      <p>The chapter ends with the plan for the next session: practicals for linear, ridge, lasso and logistic regression on simple examples, including hyperparameter tuning; then the Naive Bayes classifier, built on Bayes' theorem; then k-nearest neighbours. He then opens a Jupyter notebook for the regression practical.</p>
+      <p>This part has no code. The notebook work continues in <a href="krish-ml-03.html">Part 3</a>, and Naive Bayes and KNN follow in <a href="krish-ml-04.html">Part 4</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Overfitting</dt><dd>Good results on the training data, poor results on test data. Krish's labels: low bias, high variance.</dd></div>
+        <div><dt>Underfitting</dt><dd>Poor results on both training and test data. Krish labels it high bias, high variance.</dd></div>
+        <div><dt>Generalized model</dt><dd>Good on both training and test data: low bias, low variance. The goal.</dd></div>
+        <div><dt>Ridge regression (L2)</dt><dd>Adds \(\lambda\sum\theta_j^2\) to the squared-error cost, so steep slopes are penalized.</dd></div>
+        <div><dt>Lasso regression (L1)</dt><dd>Adds \(\lambda\sum|\theta_j|\); prevents overfitting and selects features by driving unhelpful coefficients to zero.</dd></div>
+        <div><dt>\(\lambda\) (lambda)</dt><dd>Hyperparameter that sets how strong the penalty is; chosen by cross-validation.</dd></div>
+        <div><dt>Cross-validation</dt><dd>Training and evaluating the model with several candidate \(\lambda\) values to pick the best one.</dd></div>
+        <div><dt>Multicollinearity</dt><dd>Features that are highly correlated with each other. Keep one of them; check with the variance inflation factor.</dd></div>
+        <div><dt>Sigmoid (logistic) function</dt><dd>\(g(z) = 1/(1 + e^{-z})\). Squashes any number into the range 0 to 1, with \(g(0) = 0.5\).</dd></div>
+        <div><dt>Log loss</dt><dd>\(-y\log h_\theta(x) - (1 - y)\log(1 - h_\theta(x))\): the convex cost of logistic regression.</dd></div>
+        <div><dt>Confusion matrix</dt><dd>The 2 × 2 table of true positives, false positives, false negatives and true negatives.</dd></div>
+        <div><dt>Precision</dt><dd>\(TP/(TP + FP)\): the share of predicted positives that are actually positive.</dd></div>
+        <div><dt>Recall</dt><dd>\(TP/(TP + FN)\): the share of actual positives that are found. Also sensitivity or true positive rate.</dd></div>
+        <div><dt>F-beta score</dt><dd>\((1 + \beta^2)PR/(\beta^2P + R)\). \(\beta = 1\) gives F1; \(\beta &lt; 1\) favours precision, \(\beta &gt; 1\) favours recall.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>A model scores 95% on its training data and 70% on test data. Which case is this, and how would Krish label its bias and variance?</span><span class="tog"></span></summary>
+          <p>Overfitting: it does well on the training data and badly on new data. In his terms that is low bias (training) and high variance (test). Ridge or lasso regularization is his remedy for a linear model.</p></details>
+        <details><summary><span class="q">Q2</span><span>Training points \((1, 2)\) and \((2, 4)\), a line through the origin and \(\lambda = 2\). Compute the ridge cost \(\sum(\hat y - y)^2 + \lambda\theta_1^2\) at \(\theta_1 = 2\) and at \(\theta_1 = 1.5\). Which slope does ridge prefer?</span><span class="tog"></span></summary>
+          <p>At \(\theta_1 = 2\) the errors are 0 and the penalty is \(2 \times 4 = 8\), so \(J = 8\). At \(\theta_1 = 1.5\) the errors are \((1.5 - 2)^2 + (3 - 4)^2 = 1.25\) and the penalty is \(2 \times 2.25 = 4.5\), so \(J = 5.75\). Ridge prefers the flatter line. The exact minimum is at \(\theta_1 = 10/(5 + 2) \approx 1.43\).</p></details>
+        <details><summary><span class="q">Q3</span><span>Why can lasso remove a feature completely while ridge only shrinks it?</span><span class="tog"></span></summary>
+          <p>Krish's answer: the absolute value does not grow like the square, and the coefficients of unhelpful features end up near zero, so those features are neglected. The geometric reason (not in the video): the L1 region is a diamond with corners on the axes, and the loss contours often first touch it at a corner, where a coefficient is exactly 0. The L2 disc has no corners. Put another way, the L1 penalty keeps pulling with the same strength \(\lambda\) all the way to zero, while the ridge pull \(2\lambda\theta_j\) fades as \(\theta_j\) gets small.</p></details>
+        <details><summary><span class="q">Q4</span><span>Give two reasons not to classify pass/fail with a linear regression line and a 0.5 cut-off.</span><span class="tog"></span></summary>
+          <p>First, a single outlier (a pass at 10 hours, say) tilts the line, moves its 0.5 crossing, and makes some true passes come out below 0.5. Second, the line's output goes above 1 and below 0, although the classes are coded 0 and 1. The sigmoid fixes both by squashing the output into the range 0 to 1.</p></details>
+        <details><summary><span class="q">Q5</span><span>A logistic model has \(z = -6 + 2 \times \text{hours}\). What does it predict for 2 hours and for 4 hours of study, and where is the decision boundary?</span><span class="tog"></span></summary>
+          <p>2 hours: \(z = -2\), \(g = 1/(1 + e^{2}) \approx 0.12 &lt; 0.5\), so fail. 4 hours: \(z = 2\), \(g = 1/(1 + e^{-2}) \approx 0.88\), so pass. The boundary is where \(z = 0\), at 3 hours.</p></details>
+        <details><summary><span class="q">Q6</span><span>With natural logs, what is the log loss of one example with \(y = 1\) when \(h_\theta(x) = 0.9\), and when \(h_\theta(x) = 0.1\)?</span><span class="tog"></span></summary>
+          <p>\(-\ln 0.9 \approx 0.105\) and \(-\ln 0.1 \approx 2.303\). A confident wrong prediction costs about 22 times as much as a confident right one, and the cost grows without limit as \(h_\theta(x) \to 0\).</p></details>
+        <details><summary><span class="q">Q7</span><span>A classifier has TP = 40, FP = 10, FN = 20, TN = 930. Compute accuracy, precision, recall and F1.</span><span class="tog"></span></summary>
+          <p>Accuracy \(= 970/1000 = 0.97\). Precision \(= 40/50 = 0.80\). Recall \(= 40/60 \approx 0.667\). \(F_1 = 2(0.80)(0.667)/(0.80 + 0.667) \approx 0.727\). The 97% accuracy hides that a third of the actual positives are missed.</p></details>
+        <details><summary><span class="q">Q8</span><span>Which metric, and which side of \(\beta = 1\), would you pick for cancer screening? For a spam filter?</span><span class="tog"></span></summary>
+          <p>Cancer screening: recall, because a missed cancer (false negative) is the dangerous error, so \(\beta &gt; 1\), for example \(F_2\). Spam filter: precision, because the error to avoid is the false positive, so \(\beta &lt; 1\), for example \(F_{0.5}\).</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="index.html#extra"><span class="dir">← All notes</span><span class="nm">Complete Machine Learning in 6 Hours</span></a><a class="next" href="krish-ml-03.html"><span class="dir">Part 3 →</span><span class="nm">Practical: linear, ridge and lasso regression</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the YouTube auto-generated captions of Krish Naik's video <i>Complete Machine Learning in 6 Hours</i>. Timestamp links open the video at that moment. Code is reconstructed from the audio. Charts marked synthetic use data generated for these notes. Not affiliated with Krish Naik or IIT Madras.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const SUB = ['₁', '₂', '₃', '₄', '₅'];
+
+  /* ---------- Ridge vs lasso: coefficients as lambda grows ---------- */
+  (() => {
+    const svg = document.getElementById('shrink-svg'); if (!svg) return;
+    let seed = 2024;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const m = 50, p = 5, TRUE = [3, -2, 1.5, 0, 0];
+    const X = [];
+    for (let i = 0; i < m; i++) X.push(Array.from({ length: p }, () => normal()));
+    for (let j = 0; j < p; j++) {
+      const mu = X.reduce((s, r) => s + r[j], 0) / m;
+      const sd = Math.sqrt(X.reduce((s, r) => s + (r[j] - mu) ** 2, 0) / m);
+      X.forEach(r => { r[j] = (r[j] - mu) / sd; });
+    }
+    let y = X.map(r => r.reduce((s, v, j) => s + v * TRUE[j], 0) + 1.5 * normal());
+    const ym = y.reduce((s, v) => s + v, 0) / m; y = y.map(v => v - ym);
+    const G = Array.from({ length: p }, (_, a) => Array.from({ length: p }, (_, b) => X.reduce((s, r) => s + r[a] * r[b], 0)));
+    const c = Array.from({ length: p }, (_, a) => X.reduce((s, r, i) => s + r[a] * y[i], 0));
+    const solve = (M, v) => {
+      const n = v.length, A = M.map((r, i) => [...r, v[i]]);
+      for (let k = 0; k < n; k++) {
+        let piv = k; for (let i = k + 1; i < n; i++) if (Math.abs(A[i][k]) > Math.abs(A[piv][k])) piv = i;
+        [A[k], A[piv]] = [A[piv], A[k]];
+        for (let i = k + 1; i < n; i++) { const f = A[i][k] / A[k][k]; for (let j = k; j <= n; j++) A[i][j] -= f * A[k][j]; }
+      }
+      const x = Array(n).fill(0);
+      for (let i = n - 1; i >= 0; i--) { let s = A[i][n]; for (let j = i + 1; j < n; j++) s -= A[i][j] * x[j]; x[i] = s / A[i][i]; }
+      return x;
+    };
+    /* ridge: (X'X + lambda I) theta = X'y ; lasso: coordinate descent on sum of squares + lambda * sum |theta| */
+    const ridge = lam => solve(G.map((r, i) => r.map((v, j) => v + (i === j ? lam : 0))), c);
+    const lasso = lam => {
+      const th = Array(p).fill(0);
+      for (let it = 0; it < 500; it++) {
+        let mx = 0;
+        for (let j = 0; j < p; j++) {
+          let rho = c[j]; for (let k = 0; k < p; k++) if (k !== j) rho -= G[j][k] * th[k];
+          const z = Math.abs(rho) <= lam / 2 ? 0 : (rho - Math.sign(rho) * lam / 2) / G[j][j];
+          mx = Math.max(mx, Math.abs(z - th[j])); th[j] = z;
+        }
+        if (mx < 1e-10) break;
+      }
+      return th;
+    };
+    const lamAll = 2 * Math.max(...c.map(Math.abs));
+
+    const top = 44, bot = 224, lo = -3, hi = 3;
+    const sy = v => top + (hi - v) * (bot - top) / (hi - lo);
+    const cx = j => 110 + j * 96;
+    for (let v = lo; v <= hi; v++) {
+      if (v !== 0) mk('line', { x1: 56, x2: 548, y1: sy(v), y2: sy(v), class: 'c-faint' }, svg);
+      mk('text', { x: 48, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+    }
+    mk('text', { x: 56, y: top - 22, class: 'c-title' }, svg).textContent = 'coefficient θⱼ';
+    const ols = ridge(0);
+    ols.forEach((v, j) => { mk('rect', { x: cx(j) - 31, y: Math.min(sy(0), sy(v)), width: 62, height: Math.abs(sy(v) - sy(0)), style: 'fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 3' }, svg); });
+    const rb = [], lb = [], lz = [];
+    for (let j = 0; j < p; j++) {
+      rb.push(mk('rect', { x: cx(j) - 25, width: 23, style: 'fill: var(--ink-2)' }, svg));
+      lb.push(mk('rect', { x: cx(j) + 2, width: 23, style: 'fill: var(--accent)' }, svg));
+      lz.push(mk('text', { x: cx(j) + 13.5, y: sy(0) - 6, 'text-anchor': 'middle', class: 'c-lbl' }, svg));
+      mk('text', { x: cx(j), y: bot + 26, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'x' + SUB[j];
+      mk('text', { x: cx(j), y: bot + 42, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = 'true ' + String(TRUE[j]).replace('-', '−');
+    }
+    mk('line', { x1: 56, x2: 548, y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    /* legend */
+    mk('rect', { x: 250, y: 10, width: 11, height: 11, style: 'fill: var(--ink-2)' }, svg);
+    mk('text', { x: 266, y: 20, class: 'c-note' }, svg).textContent = 'ridge';
+    mk('rect', { x: 312, y: 10, width: 11, height: 11, style: 'fill: var(--accent)' }, svg);
+    mk('text', { x: 328, y: 20, class: 'c-note' }, svg).textContent = 'lasso';
+    mk('rect', { x: 374, y: 10, width: 11, height: 11, style: 'fill: none; stroke: var(--muted); stroke-dasharray: 3 2' }, svg);
+    mk('text', { x: 390, y: 20, class: 'c-note' }, svg).textContent = 'λ = 0 (least squares)';
+
+    const slider = document.getElementById('shrink-lam'), out = document.getElementById('shrink-lam-out');
+    const l0 = document.getElementById('shrink-l0'), r0 = document.getElementById('shrink-r0'), rmin = document.getElementById('shrink-rmin');
+    const status = document.getElementById('shrink-status');
+    const bar = (el, v) => { el.setAttribute('y', Math.min(sy(0), sy(v))); el.setAttribute('height', Math.max(0, Math.abs(sy(v) - sy(0)))); };
+    const names = js => js.map(j => 'x' + SUB[j]);
+    const list = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+    const draw = lam => {
+      const r = ridge(lam), l = lasso(lam);
+      r.forEach((v, j) => bar(rb[j], v));
+      l.forEach((v, j) => { bar(lb[j], v); lz[j].textContent = v === 0 ? '0' : ''; });
+      const lzero = l.map((v, j) => v === 0 ? j : -1).filter(j => j >= 0);
+      const rzero = r.filter(v => Math.abs(v) < 1e-9).length;
+      out.textContent = Math.round(lam);
+      l0.textContent = lzero.length + ' of 5';
+      r0.textContent = rzero + ' of 5';
+      rmin.textContent = Math.min(...r.map(Math.abs)).toFixed(3);
+      if (lam === 0) status.textContent = 'λ = 0: both are plain least squares, and every feature is kept.';
+      else if (lzero.length === p) status.textContent = `Past λ ≈ ${Math.round(lamAll)} lasso has dropped every feature. Ridge still keeps all five, only smaller.`;
+      else if (lzero.length) status.textContent = `Lasso has set ${list(names(lzero))} to exactly 0, so ${lzero.length === 1 ? 'that feature is' : 'those features are'} dropped. Ridge keeps all five, only smaller.`;
+      else status.textContent = 'Both penalties shrink the coefficients; none is exactly 0 yet.';
+    };
+    let lam = parseFloat(slider.value), anim = 0;
+    draw(lam);
+    slider.addEventListener('input', () => { cancelAnimationFrame(anim); lam = parseFloat(slider.value); draw(lam); });
+    document.getElementById('shrink-play').addEventListener('click', () => {
+      cancelAnimationFrame(anim);
+      if (reduce) { lam = 300; slider.value = lam; draw(lam); return; }
+      const t0 = performance.now(), dur = 4000;
+      const step = now => { const k = Math.min(1, (now - t0) / dur); lam = Math.round(300 * k); slider.value = lam; draw(lam); if (k < 1) anim = requestAnimationFrame(step); };
+      anim = requestAnimationFrame(step);
+    });
+  })();
+
+  /* ---------- Confusion-matrix calculator with an F-beta curve ---------- */
+  (() => {
+    const svg = document.getElementById('cm-svg'); if (!svg) return;
+    const keys = ['tp', 'fp', 'fn', 'tn'];
+    const inp = keys.map(k => document.getElementById('cm-' + k));
+    const beta = document.getElementById('cm-beta'), bOut = document.getElementById('cm-beta-out');
+    const o = { acc: 'cm-acc', p: 'cm-p', r: 'cm-r', f1: 'cm-f1', fb: 'cm-fb', fbk: 'cm-fb-k', st: 'cm-status' };
+    for (const k in o) o[k] = document.getElementById(o[k]);
+    const L = 56, R = 430, T = 30, B = 200;
+    const sx = u => L + (u + 2) * (R - L) / 4;
+    const sy = v => B - v * (B - T);
+    for (const v of [0, 0.25, 0.5, 0.75, 1]) {
+      mk('line', { x1: L, x2: R, y1: sy(v), y2: sy(v), class: v === 0 ? 'c-axis' : 'c-faint' }, svg);
+      mk('text', { x: L - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v;
+    }
+    for (const b of [0.25, 0.5, 1, 2, 4]) {
+      const u = Math.log2(b);
+      mk('line', { x1: sx(u), x2: sx(u), y1: T, y2: B, class: 'c-faint' }, svg);
+      mk('text', { x: sx(u), y: B + 18, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = b;
+    }
+    mk('text', { x: R, y: B + 36, 'text-anchor': 'end', class: 'c-title' }, svg).textContent = 'β (log scale)';
+    mk('text', { x: L, y: T - 12, class: 'c-title' }, svg).textContent = 'score';
+    const pLine = mk('line', { x1: L, x2: R, class: 'c-line', style: 'stroke-dasharray: 6 4' }, svg);
+    const rLine = mk('line', { x1: L, x2: R, style: 'stroke: var(--ok); stroke-width: 1.6; stroke-dasharray: 6 4' }, svg);
+    const pLab = mk('text', { x: R + 8, class: 'c-note' }, svg);
+    const rLab = mk('text', { x: R + 8, class: 'c-note', style: 'fill: var(--ok)' }, svg);
+    const curve = mk('path', { class: 'c-user', style: 'fill: none' }, svg);
+    const dot = mk('circle', { r: 6, class: 'c-pt-hi' }, svg);
+    const fmt = v => v === null ? '–' : v.toFixed(3);
+    const fbeta = (P, Rc, b) => { const p = P || 0, r = Rc || 0, d = b * b * p + r; return d ? (1 + b * b) * p * r / d : 0; };
+    const draw = () => {
+      const [tp, fp, fn, tn] = inp.map(e => Math.max(0, Math.round(parseFloat(e.value) || 0)));
+      const n = tp + fp + fn + tn;
+      const P = tp + fp ? tp / (tp + fp) : null, Rc = tp + fn ? tp / (tp + fn) : null, acc = n ? (tp + tn) / n : null;
+      const u = parseFloat(beta.value), b = Math.pow(2, u);
+      bOut.textContent = b.toFixed(2);
+      o.fbk.textContent = 'Fβ (β = ' + b.toFixed(2) + ')';
+      o.acc.textContent = fmt(acc); o.p.textContent = fmt(P); o.r.textContent = fmt(Rc);
+      o.f1.textContent = n ? fbeta(P, Rc, 1).toFixed(3) : '–';
+      o.fb.textContent = n ? fbeta(P, Rc, b).toFixed(3) : '–';
+      let d = '';
+      for (let i = 0; i <= 80; i++) { const uu = -2 + i * 0.05; d += (i ? ' L' : 'M') + sx(uu).toFixed(1) + ' ' + sy(fbeta(P, Rc, Math.pow(2, uu))).toFixed(1); }
+      curve.setAttribute('d', n ? d : '');
+      const py = sy(P || 0), ry = sy(Rc || 0);
+      pLine.setAttribute('y1', py); pLine.setAttribute('y2', py);
+      rLine.setAttribute('y1', ry); rLine.setAttribute('y2', ry);
+      let pl = py + 4, rl = ry + 4;
+      if (Math.abs(pl - rl) < 14) { if (py <= ry) { pl = (py + ry) / 2 - 3; rl = pl + 14; } else { rl = (py + ry) / 2 - 3; pl = rl + 14; } }
+      pLab.setAttribute('y', pl); rLab.setAttribute('y', rl);
+      pLab.textContent = 'precision ' + (P === null ? '–' : P.toFixed(2));
+      rLab.textContent = 'recall ' + (Rc === null ? '–' : Rc.toFixed(2));
+      const fy = sy(fbeta(P, Rc, b));
+      dot.setAttribute('cx', sx(u)); dot.setAttribute('cy', fy);
+      let msg;
+      if (!n) msg = 'Enter some counts.';
+      else if (P === null) msg = `The model never predicts 1, so precision is undefined (taken as 0). Accuracy is ${(100 * acc).toFixed(0)}%, yet recall is 0: every actual positive is missed.`;
+      else if (acc >= 0.85 && Rc !== null && Rc < 0.5) msg = `Accuracy looks high at ${(100 * acc).toFixed(0)}%, but recall is only ${Rc.toFixed(2)}: most actual positives are missed.`;
+      else if (b < 0.97) msg = 'β < 1: Fβ leans towards precision, as when false positives cost more.';
+      else if (b > 1.03) msg = 'β > 1: Fβ leans towards recall, as when false negatives cost more.';
+      else msg = 'β = 1: F1, the harmonic mean of precision and recall.';
+      o.st.textContent = msg;
+    };
+    inp.forEach(e => e.addEventListener('input', draw));
+    beta.addEventListener('input', draw);
+    document.querySelectorAll('#cm-fig [data-cm]').forEach(btn => btn.addEventListener('click', () => {
+      btn.getAttribute('data-cm').split(',').forEach((v, i) => { inp[i].value = v; });
+      draw();
+    }));
+    draw();
+  })();
+})();
+</script>
+</body>
+</html>
