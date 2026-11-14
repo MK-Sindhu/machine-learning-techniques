@@ -1,0 +1,1187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ML in 6 Hours · Part 5 · Decision trees · MLT Notes</title>
+<meta name="description" content="Notes on Krish Naik's Complete Machine Learning in 6 Hours, Part 5: decision tree classification with entropy, Gini impurity and information gain, numerical features, decision tree regression, pruning, and a scikit-learn decision tree on the Iris data.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script src="theme.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html#extra">All notes</a><span class="sep">/</span><span>ML in 6 hours · Part 5 of 8</span><span class="sep">·</span><a href="krish-ml-04.html">← Part 4</a><span class="sep">·</span><a href="krish-ml-07.html">Part 7 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Krish Naik · Complete Machine Learning in 6 Hours</div>
+    <h1>Decision trees: classification, regression and a scikit-learn tree</h1>
+    <p class="lede">A decision tree splits the data one feature at a time until every leaf is pure; Krish shows how entropy or Gini impurity measures purity and how information gain picks the feature to split on. He then extends the idea to numerical features and regression targets, explains pruning, and fits and plots a tree on the Iris data.</p>
+    <div class="meta">
+      <span><b>Part 5</b> of 8</span>
+      <span>Teacher <b>Krish Naik</b></span>
+      <span>About <b>45 min</b> of video</span>
+      <span><b>3</b> chapters</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12227s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:23:47 · Decision tree classification</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14225s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:57:05 · Decision tree regression</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14577s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:02:57 · Classifier practical</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Classification</h4>
+      <ul>
+        <li><a href="#idea">Nested if-else as a tree</a></li>
+        <li><a href="#pure">Pure and impure splits</a></li>
+        <li><a href="#entropy">Entropy</a></li>
+        <li><a href="#info-gain">Information gain</a></li>
+        <li><a href="#gini">Gini impurity</a></li>
+        <li><a href="#gini-vs-entropy">Gini or entropy?</a></li>
+        <li><a href="#continuous">Numerical features</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Regression</h4>
+      <ul>
+        <li><a href="#regression">Splits by squared error</a></li>
+        <li><a href="#pruning">Overfitting and pruning</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Practical</h4>
+      <ul>
+        <li><a href="#practical-data">Imports and Iris</a></li>
+        <li><a href="#practical-fit">The classifier</a></li>
+        <li><a href="#practical-plot">Fit and plot</a></li>
+        <li><a href="#practical-read">Reading the tree</a></li>
+        <li><a href="#practical-tune">Tune and evaluate</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html#extra">All notes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li>A <dfn>decision tree</dfn> is a set of nested if-else questions drawn as nodes. Each internal node splits the records on one feature, and splitting stops at <b>pure</b> leaves, where every record has the same class.</li>
+        <li>Purity is measured by <b>entropy</b> \(H = -p_+\log_2 p_+ - p_-\log_2 p_-\) (0 when pure, 1 at 50/50) or <b>Gini impurity</b> \(1 - \sum p_i^2\) (0 when pure, 0.5 at 50/50). Gini has no logarithm, so it is faster, and it is scikit-learn's default.</li>
+        <li>The feature to split on is the one with the largest <b>information gain</b> \(H(S) - \sum_v \frac{|S_v|}{|S|} H(S_v)\). His worked split, 9/5 into 6/2 and 3/3, gains about 0.048.</li>
+        <li>For a <b>numerical feature</b>, sort the values, try "\(\le v\)" at every value, and keep the threshold with the highest gain.</li>
+        <li>A <b>regression tree</b> predicts the mean of the records in a leaf and chooses splits by mean squared error (or mean absolute error).</li>
+        <li>A fully grown tree overfits. <b>Post-pruning</b> cuts useless branches afterwards; <b>pre-pruning</b> limits <code>max_depth</code>, <code>max_leaf_nodes</code> and similar hyperparameters, tuned with <code>GridSearchCV</code>. The practical fits <code>DecisionTreeClassifier</code> on Iris and draws it with <code>tree.plot_tree</code>.</li>
+      </ul>
+    </div>
+
+    <!-- ============ CHAPTER 1: CLASSIFICATION ============ -->
+    <section id="idea">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12227s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:23:47</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12252s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:24:12 the data set</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12314s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:25:14 split on Outlook</a>
+        </div>
+        <h2>A decision tree is nested if-else, drawn as nodes</h2>
+      </div>
+      <p>Any problem a decision tree solves could be written as nested if-else conditions. The tree draws those conditions as nodes, so the logic can be seen. To show what maths sits behind each node, Krish works through one small data set.</p>
+      <p>The data set is the classic <b>play tennis</b> table. He notes that it is the kind of example used in the research papers by the people who came up with the algorithm. Four input features, Outlook, Temperature, Humidity and Wind, describe a day, and the output is whether the person plays tennis. It is a classification problem; regression trees come later.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Day</th><th>Outlook</th><th>Temperature</th><th>Humidity</th><th>Wind</th><th>Play tennis</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Sunny</td><td>Hot</td><td>High</td><td>Weak</td><td>No</td></tr>
+            <tr><td>2</td><td>Sunny</td><td>Hot</td><td>High</td><td>Strong</td><td>No</td></tr>
+            <tr><td>3</td><td>Overcast</td><td>Hot</td><td>High</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>4</td><td>Rain</td><td>Mild</td><td>High</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>5</td><td>Rain</td><td>Cool</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>6</td><td>Rain</td><td>Cool</td><td>Normal</td><td>Strong</td><td>No</td></tr>
+            <tr><td>7</td><td>Overcast</td><td>Cool</td><td>Normal</td><td>Strong</td><td>Yes</td></tr>
+            <tr><td>8</td><td>Sunny</td><td>Mild</td><td>High</td><td>Weak</td><td>No</td></tr>
+            <tr><td>9</td><td>Sunny</td><td>Cool</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>10</td><td>Rain</td><td>Mild</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>11</td><td>Sunny</td><td>Mild</td><td>Normal</td><td>Strong</td><td>Yes</td></tr>
+            <tr><td>12</td><td>Overcast</td><td>Mild</td><td>High</td><td>Strong</td><td>Yes</td></tr>
+            <tr><td>13</td><td>Overcast</td><td>Hot</td><td>Normal</td><td>Weak</td><td>Yes</td></tr>
+            <tr><td>14</td><td>Rain</td><td>Mild</td><td>High</td><td>Strong</td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">He shows the table on screen. The copy above is the standard 14-day version (from Quinlan's ID3 work); every count he reads off matches it.</p>
+      <p>Counting the output column gives <b>9 yes and 5 no</b>. He starts with Outlook as the first feature. For now the choice is arbitrary; how a tree chooses its feature is the subject of the information gain section. Outlook has three categories, Sunny, Overcast and Rain, so the root splits into three child nodes, one per category. Reading the rows of each category:</p>
+      <ul>
+        <li><b>Sunny</b>: 2 yes, 3 no.</li>
+        <li><b>Overcast</b>: 4 yes, 0 no.</li>
+        <li><b>Rain</b>: 3 yes, 2 no.</li>
+      </ul>
+      <p>The children's counts always add back up to the parent's: \(2 + 4 + 3 = 9\) yes and \(3 + 0 + 2 = 5\) no.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 244" role="img" aria-label="The root node Outlook holds 9 yes and 5 no. It splits into Sunny with 2 yes and 3 no, impure; Overcast with 4 yes and 0 no, a pure leaf that predicts yes; and Rain with 3 yes and 2 no, impure. The impure nodes are split again on another feature.">
+            <line class="d-ln" x1="340" y1="64" x2="110" y2="130"/>
+            <line class="d-ln" x1="340" y1="64" x2="340" y2="130"/>
+            <line class="d-ln" x1="340" y1="64" x2="570" y2="130"/>
+            <text class="d-al" x="214" y="88" text-anchor="end">Sunny</text>
+            <text class="d-al" x="348" y="102">Overcast</text>
+            <text class="d-al" x="466" y="88">Rain</text>
+            <rect class="d-box-acc" x="260" y="14" width="160" height="50" rx="8"/>
+            <text class="d-t" x="340" y="35" text-anchor="middle">Outlook</text>
+            <text class="d-s" x="340" y="54" text-anchor="middle">9 yes · 5 no</text>
+            <rect class="d-box" x="35" y="130" width="150" height="50" rx="8"/>
+            <text class="d-t" x="110" y="151" text-anchor="middle">2 yes · 3 no</text>
+            <text class="d-s" x="110" y="170" text-anchor="middle">impure</text>
+            <rect class="b-ok" x="265" y="130" width="150" height="50" rx="8"/>
+            <text class="d-t" x="340" y="151" text-anchor="middle">4 yes · 0 no</text>
+            <text class="d-s" x="340" y="170" text-anchor="middle">pure leaf: play = yes</text>
+            <rect class="d-box" x="495" y="130" width="150" height="50" rx="8"/>
+            <text class="d-t" x="570" y="151" text-anchor="middle">3 yes · 2 no</text>
+            <text class="d-s" x="570" y="170" text-anchor="middle">impure</text>
+            <line class="d-ln d-dash" x1="110" y1="180" x2="110" y2="204"/>
+            <rect class="d-off" x="30" y="204" width="160" height="28" rx="6"/>
+            <text class="d-s t-off" x="110" y="222" text-anchor="middle">split on another feature</text>
+            <line class="d-ln d-dash" x1="570" y1="180" x2="570" y2="204"/>
+            <rect class="d-off" x="490" y="204" width="160" height="28" rx="6"/>
+            <text class="d-s t-off" x="570" y="222" text-anchor="middle">split on another feature</text>
+            <text class="d-s" x="340" y="206" text-anchor="middle">no further split:</text>
+            <text class="d-s" x="340" y="222" text-anchor="middle">every overcast day is a yes</text>
+          </svg>
+        </div>
+        <figcaption><b>Splitting the play-tennis root on Outlook.</b> One child per category, and the counts in the children add up to the root's 9 yes and 5 no. Overcast is pure and becomes a leaf; Sunny and Rain are impure and must be split again.</figcaption>
+      </figure>
+    </section>
+
+    <section id="pure">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12532s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:28:52</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12634s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:30:34 keep splitting</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12668s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:31:08 two questions</a>
+        </div>
+        <h2>Pure and impure splits</h2>
+      </div>
+      <p>A node is <dfn>pure</dfn> when all its records have the same output: all yes and zero no, or zero yes and all no. Overcast, with 4 yes and 0 no, is pure. If day 15 is overcast, the tree already knows the answer is yes, so there is no reason to split this node further. A pure node is a <dfn>leaf node</dfn>.</p>
+      <p>Sunny, with 2 yes and 3 no, is <dfn>impure</dfn>. The tree takes another feature (he suggests Temperature, as an example) and splits the Sunny records again. Rain is treated the same way. Splitting continues until every branch ends in a pure leaf.</p>
+      <p>This raises two questions, and the rest of the chapter answers them.</p>
+      <ol>
+        <li><b>How do we measure purity?</b> By eye, counting yes and no is enough, but the algorithm needs a number. Two are used: <b>entropy</b> and <b>Gini impurity</b>. (He first calls it the Gini coefficient and corrects himself to Gini impurity.)</li>
+        <li><b>Which feature should be split first?</b> Why Outlook and not Wind? This is decided by <b>information gain</b>.</li>
+      </ol>
+      <p class="rule-of-thumb">Purity decides when a branch stops. Information gain decides which feature a node splits on.</p>
+    </section>
+
+    <section id="entropy">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12766s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:32:46</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12831s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:33:51 worked example</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13004s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:36:44 the entropy curve</a>
+        </div>
+        <h2>Entropy: a number for impurity</h2>
+      </div>
+      <p>He writes both purity formulas side by side, then works through entropy first.</p>
+      <div class="result">
+        <span class="lbl">Entropy of a sample S (two classes)</span>
+        \[ H(S) = -\,p_+ \log_2 p_+ \;-\; p_- \log_2 p_- \]
+        <p>\(p_+\) is the probability of yes in the node (the fraction of its records that are yes) and \(p_-\) the probability of no. Plus and minus stand for the two classes of a binary problem, such as yes/no or positive/negative.</p>
+      </div>
+      <p>His example: a root node on feature 1 holds 6 yes and 3 no. The feature has two categories, and the split sends 3 yes, 3 no to C1 and 3 yes, 0 no to C2. Again the children add up to the root: \(3 + 3 = 6\) yes, \(3 + 0 = 3\) no.</p>
+      <div class="eq">\[ \begin{aligned} H(C_2) &= -\tfrac33\log_2\tfrac33 - \tfrac03\log_2\tfrac03 = -1\cdot 0 - 0 = 0 \\ H(C_1) &= -\tfrac36\log_2\tfrac36 - \tfrac36\log_2\tfrac36 = \tfrac12 + \tfrac12 = 1 \end{aligned} \]</div>
+      <p class="note">\(\log_2 1 = 0\), and the \(0 \log_2 0\) term is taken as 0.</p>
+      <ul>
+        <li><b>C2 is a pure split, and its entropy is 0.</b> Whenever a node is pure, the entropy comes out as zero.</li>
+        <li><b>C1 has entropy 1.</b> With 3 yes and 3 no the chance of either answer is 50%, the most impure a two-class node can be.</li>
+      </ul>
+      <p>Plotting \(H\) against \(p_+\) gives the curve below. Because \(p_- = 1 - p_+\), one number fixes the node. At \(p_+ = 0.5\) the entropy is 1; at \(p_+ = 0\) or \(p_+ = 1\) the node is pure and the entropy is 0. In between it is somewhere from 0 to 1, read off the curve. So for two classes the entropy always lies between 0 and 1.</p>
+      <p>This is the <b>purity test</b> done at every split. If a child comes out impure, the tree takes another feature and divides that child further.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 304" role="img" aria-label="Entropy and Gini impurity plotted against p plus, the probability of yes. Entropy rises from 0 at p equals 0 to 1 at p equals one half and falls back to 0 at p equals 1. Gini follows the same shape but peaks at 0.5. Marked points: 3 yes 3 no has entropy 1; 2 yes 2 no has Gini 0.5; 6 yes 3 no has entropy 0.918 and Gini 0.444; 3 yes 0 no is pure with both 0.">
+            <line class="d-rule" x1="60" y1="50" x2="540" y2="50"/>
+            <line class="d-rule" x1="60" y1="155" x2="540" y2="155"/>
+            <line class="d-ln" x1="60" y1="260" x2="540" y2="260"/>
+            <line class="d-ln" x1="60" y1="260" x2="60" y2="40"/>
+            <text class="d-al" x="60" y="278" text-anchor="middle">0</text>
+            <text class="d-al" x="300" y="278" text-anchor="middle">0.5</text>
+            <text class="d-al" x="540" y="278" text-anchor="middle">1</text>
+            <text class="d-al" x="52" y="264" text-anchor="end">0</text>
+            <text class="d-al" x="52" y="159" text-anchor="end">0.5</text>
+            <text class="d-al" x="52" y="54" text-anchor="end">1</text>
+            <text class="d-s" x="300" y="298" text-anchor="middle">p₊, the probability of yes in the node</text>
+            <text class="d-s" x="18" y="150" text-anchor="middle" transform="rotate(-90 18 150)">impurity</text>
+            <path class="d-ln-acc" style="stroke-width:2.2" d="M60.0 260.0 L61.0 255.6 L62.4 250.5 L64.8 243.0 L67.2 236.4 L69.6 230.3 L79.2 209.1 L88.8 191.2 L98.4 175.5 L108.0 161.5 L117.6 148.8 L127.2 137.3 L136.8 126.8 L146.4 117.2 L156.0 108.4 L165.6 100.4 L175.2 93.0 L184.8 86.4 L194.4 80.4 L204.0 74.9 L213.6 70.1 L223.2 65.8 L232.8 62.0 L242.4 58.8 L252.0 56.1 L261.6 53.9 L271.2 52.2 L280.8 51.0 L290.4 50.2 L300.0 50.0 L309.6 50.2 L319.2 51.0 L328.8 52.2 L338.4 53.9 L348.0 56.1 L357.6 58.8 L367.2 62.0 L376.8 65.8 L386.4 70.1 L396.0 74.9 L405.6 80.4 L415.2 86.4 L424.8 93.0 L434.4 100.4 L444.0 108.4 L453.6 117.2 L463.2 126.8 L472.8 137.3 L482.4 148.8 L492.0 161.5 L501.6 175.5 L511.2 191.2 L520.8 209.1 L530.4 230.3 L532.8 236.4 L535.2 243.0 L537.6 250.5 L539.0 255.6 L540.0 260.0"/>
+            <path style="fill:none; stroke: var(--ok); stroke-width:2.2" d="M60.0 260.0 L61.0 259.2 L62.4 257.9 L64.8 255.8 L67.2 253.8 L69.6 251.8 L79.2 243.9 L88.8 236.3 L98.4 229.1 L108.0 222.2 L117.6 215.6 L127.2 209.4 L136.8 203.6 L146.4 198.0 L156.0 192.8 L165.6 187.9 L175.2 183.4 L184.8 179.2 L194.4 175.3 L204.0 171.8 L213.6 168.6 L223.2 165.8 L232.8 163.2 L242.4 161.0 L252.0 159.2 L261.6 157.7 L271.2 156.5 L280.8 155.7 L290.4 155.2 L300.0 155.0 L309.6 155.2 L319.2 155.7 L328.8 156.5 L338.4 157.7 L348.0 159.2 L357.6 161.0 L367.2 163.2 L376.8 165.8 L386.4 168.6 L396.0 171.8 L405.6 175.3 L415.2 179.2 L424.8 183.4 L434.4 187.9 L444.0 192.8 L453.6 198.0 L463.2 203.6 L472.8 209.4 L482.4 215.6 L492.0 222.2 L501.6 229.1 L511.2 236.3 L520.8 243.9 L530.4 251.8 L532.8 253.8 L535.2 255.8 L537.6 257.9 L539.0 259.2 L540.0 260.0"/>
+            <text class="d-t" x="128" y="118" text-anchor="end" style="fill: var(--accent)">entropy</text>
+            <text class="d-t" x="128" y="200" text-anchor="end" style="fill: var(--ok)">Gini</text>
+            <circle class="pt-tree" cx="300" cy="50" r="5"/>
+            <text class="d-s" x="312" y="40">3 yes, 3 no: H = 1</text>
+            <circle cx="300" cy="155" r="5" style="fill: var(--ok); stroke: var(--surface); stroke-width:1.5"/>
+            <text class="d-s" x="300" y="143" text-anchor="middle">2 yes, 2 no: Gini = 0.5</text>
+            <circle class="pt-tree" cx="380" cy="67.2" r="4.5"/>
+            <text class="d-s" x="392" y="60">6 yes, 3 no: H = 0.918</text>
+            <circle cx="380" cy="166.7" r="4.5" style="fill: var(--ok); stroke: var(--surface); stroke-width:1.5"/>
+            <text class="d-s" x="392" y="160">Gini = 0.444</text>
+            <circle class="pt-new" cx="540" cy="260" r="5"/>
+            <text class="d-s" x="550" y="246">3 yes, 0 no:</text>
+            <text class="d-s" x="550" y="260">pure, both 0</text>
+          </svg>
+        </div>
+        <figcaption><b>The impurity curves he draws.</b> Entropy (blue) first, at 3:36:44; the Gini curve (green) is added to the same axes at 3:51:10. Both are 0 for a pure node and largest at 50/50, where entropy reaches 1 and Gini only 0.5. The 6 yes, 3 no values are computed for these notes.</figcaption>
+      </figure>
+      <p class="note">Not in the video: for \(K\) classes the general form is \(H = -\sum_{i=1}^{K} p_i \log_2 p_i\), and its maximum is \(\log_2 K\), so the 0-to-1 range holds only for two classes. For the IIT Madras treatment of entropy as an impurity measure, see Part 13 (<a href="part-13.html#entropy">part-13.html</a>).</p>
+    </section>
+
+    <section id="info-gain">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13237s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:40:37</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13366s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:42:46 the formula</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13398s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:43:18 worked example</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13705s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:48:25 pick the larger gain</a>
+        </div>
+        <h2>Information gain: which feature to split on</h2>
+      </div>
+      <p>Now the second question. The data has features \(F_1, F_2, F_3, \dots\). Feature 1 might have two categories and feature 2 three. The same choice comes up again lower down, because every impure child needs another feature. How does the tree decide which feature to split on first? It computes the <dfn>information gain</dfn> of the split each feature would make.</p>
+      <div class="result">
+        <span class="lbl">Information gain of splitting sample S on feature F</span>
+        \[ \text{Gain}(S, F) = H(S) - \sum_{v \,\in\, \text{Values}(F)} \frac{|S_v|}{|S|}\, H(S_v) \]
+        <p>\(H(S)\) is the entropy of the node being split (the root, here). \(S_v\) is the child holding the records with category \(v\); \(|S_v|/|S|\) is the fraction of the records that went there, and \(H(S_v)\) is that child's entropy.</p>
+      </div>
+      <h3>His worked split</h3>
+      <p>Feature 1 splits a root of <b>9 yes, 5 no</b> (14 records) into C1 with <b>6 yes, 2 no</b> (8 records) and C2 with <b>3 yes, 3 no</b> (6 records).</p>
+      <ol class="algo">
+        <li class="algo-title">Gain(S, F1), step by step</li>
+        <li>Entropy of the root: \(H(S) = -\tfrac{9}{14}\log_2\tfrac{9}{14} - \tfrac{5}{14}\log_2\tfrac{5}{14} \approx 0.94\).</li>
+        <li>Entropy of C1: \(H(S_{C_1}) = -\tfrac68\log_2\tfrac68 - \tfrac28\log_2\tfrac28 \approx 0.81\).</li>
+        <li>Entropy of C2: 3 yes and 3 no, so \(H(S_{C_2}) = 1\).</li>
+        <li>Weights: C1 holds 8 of the 14 records and C2 holds 6, so the weights are \(\tfrac{8}{14}\) and \(\tfrac{6}{14}\).</li>
+        <li>\(\text{Gain}(S, F_1) = 0.94 - \tfrac{8}{14}(0.81) - \tfrac{6}{14}(1) = 0.9403 - 0.4636 - 0.4286 \approx 0.048\).</li>
+      </ol>
+      <p class="note">The captions give his final answer as 0.041; the arithmetic gives 0.048. The ranking argument below does not change.</p>
+      <p>Suppose the same calculation for feature 2 gives \(\text{Gain}(S, F_2) = 0.51\). Since \(\text{Gain}(S, F_2) > \text{Gain}(S, F_1)\), the tree <b>starts the split with feature 2</b>. In general it computes the gain of every candidate feature and takes the one with the highest information gain, at the root and again at every node below it.</p>
+      <ol class="algo">
+        <li class="algo-title">Growing a classification tree</li>
+        <li>At the current node, compute its entropy (or Gini impurity).</li>
+        <li>For every candidate feature, split the node's records by the feature's categories and compute the information gain.</li>
+        <li>Split on the feature with the largest gain: one child per category.</li>
+        <li>A pure child becomes a leaf. An impure child goes back to step 1 with only its own records.</li>
+      </ol>
+
+      <figure id="ig-fig">
+        <div class="controls">
+          <button class="btn" type="button" data-preset="wind">Wind (his split)</button>
+          <button class="btn" type="button" data-preset="outlook">Outlook</button>
+          <button class="btn" type="button" data-preset="humidity">Humidity</button>
+          <button class="btn" type="button" data-preset="temp">Temperature</button>
+          <button class="btn" type="button" data-preset="pure">3/3 and 3/0</button>
+        </div>
+        <div class="controls">
+          <label for="ig-c1y">Child 1 yes</label><input type="range" id="ig-c1y" min="0" max="12" step="1" value="6" style="width: min(150px, 100%)"><output id="ig-c1y-out" for="ig-c1y" style="min-width: 3ch">6</output>
+          <label for="ig-c1n">no</label><input type="range" id="ig-c1n" min="0" max="12" step="1" value="2" style="width: min(150px, 100%)"><output id="ig-c1n-out" for="ig-c1n" style="min-width: 3ch">2</output>
+        </div>
+        <div class="controls">
+          <label for="ig-c2y">Child 2 yes</label><input type="range" id="ig-c2y" min="0" max="12" step="1" value="3" style="width: min(150px, 100%)"><output id="ig-c2y-out" for="ig-c2y" style="min-width: 3ch">3</output>
+          <label for="ig-c2n">no</label><input type="range" id="ig-c2n" min="0" max="12" step="1" value="3" style="width: min(150px, 100%)"><output id="ig-c2n-out" for="ig-c2n" style="min-width: 3ch">3</output>
+        </div>
+        <div class="controls">
+          <label for="ig-c3y">Child 3 yes</label><input type="range" id="ig-c3y" min="0" max="12" step="1" value="0" style="width: min(150px, 100%)"><output id="ig-c3y-out" for="ig-c3y" style="min-width: 3ch">0</output>
+          <label for="ig-c3n">no</label><input type="range" id="ig-c3n" min="0" max="12" step="1" value="0" style="width: min(150px, 100%)"><output id="ig-c3n-out" for="ig-c3n" style="min-width: 3ch">0</output>
+        </div>
+        <div class="readouts">
+          <div><span class="k">H(root)</span><span class="v" id="ig-hs">–</span></div>
+          <div><span class="k">Σ (|Sᵥ|/|S|) H(Sᵥ)</span><span class="v" id="ig-hw">–</span></div>
+          <div><span class="k">Information gain</span><span class="v mine" id="ig-gain">–</span></div>
+          <div><span class="k">Gini(root)</span><span class="v" id="ig-gs">–</span></div>
+          <div><span class="k">Gini gain</span><span class="v" id="ig-ggain">–</span></div>
+        </div>
+        <p class="note mono" id="ig-sum" style="font-size: 13px; max-width: none"></p>
+        <div class="status" id="ig-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="ig-svg" viewBox="0 0 680 282" role="img" aria-label="Left: the root node and up to three child nodes with their yes and no counts, entropy, Gini impurity and weight; pure children are marked as leaves. Right: the entropy and Gini curves against the probability of yes, with each child marked on both curves. At the root's probability of yes, a bar shows the gap between the root's impurity and the weighted impurity of the children: the gain."></svg></div>
+        <figcaption><b>Information gain calculator.</b> Set the yes and no counts in each child; the root is their sum, and an empty child is ignored. It starts on his worked split. The presets load the four play-tennis features from the table above: Outlook gains the most (0.247), then Humidity (0.152), Wind (0.048) and Temperature (0.029). The right panel shows why the gain is never negative: the children's weighted impurity sits on or under the curve at the root's \(p_+\), and the bar is the gap. Gini gain ranks the four features in the same order.</figcaption>
+      </figure>
+      <p class="note">Not in the video: his feature-1 counts (9/5 into 6/2 and 3/3) are exactly the Wind column of the play-tennis table. Computing all four features shows why the classic tree puts <b>Outlook</b> at the root, the feature he started with.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Feature</th><th>Children (yes, no)</th><th class="num">Weighted child entropy</th><th class="num">Information gain</th></tr></thead>
+          <tbody>
+            <tr><td><b>Outlook</b></td><td>Sunny 2, 3 · Overcast 4, 0 · Rain 3, 2</td><td class="num">0.694</td><td class="num"><b>0.247</b></td></tr>
+            <tr><td>Humidity</td><td>High 3, 4 · Normal 6, 1</td><td class="num">0.788</td><td class="num">0.152</td></tr>
+            <tr><td>Wind</td><td>Weak 6, 2 · Strong 3, 3</td><td class="num">0.892</td><td class="num">0.048</td></tr>
+            <tr><td>Temperature</td><td>Hot 2, 2 · Mild 4, 2 · Cool 3, 1</td><td class="num">0.911</td><td class="num">0.029</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Computed for these notes from the table, with \(H(S) = 0.940\) for the root.</p>
+    </section>
+
+    <section id="gini">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13740s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:49:00</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13807s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:50:07 two yes, two no</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13870s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:51:10 on the same graph</a>
+        </div>
+        <h2>Gini impurity</h2>
+      </div>
+      <p>Entropy works, so why Gini? Gini impurity measures the same thing with simpler arithmetic.</p>
+      <div class="result">
+        <span class="lbl">Gini impurity</span>
+        \[ \text{Gini} = 1 - \sum_{i=1}^{n} p_i^2 \;\overset{\text{two classes}}{=}\; 1 - \big(p_+^2 + p_-^2\big) \]
+        <p>\(n\) is the number of output classes; here two, yes and no.</p>
+      </div>
+      <p>For a node with 2 yes and 2 no, both probabilities are \(\tfrac12\):</p>
+      <div class="eq">\[ \text{Gini} = 1 - \Big[\big(\tfrac12\big)^2 + \big(\tfrac12\big)^2\Big] = 1 - \big(\tfrac14 + \tfrac14\big) = \tfrac12 = 0.5 \]</div>
+      <p>This node is completely impure. For such a node entropy gives 1 and Gini gives 0.5. That is the difference between the two curves in the figure above: the Gini curve has the same shape, 0 at a pure node, but its peak at \(p_+ = 0.5\) is 0.5. Scikit-learn's decision tree classifier uses Gini impurity by default <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=12797s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:33:17</a>.</p>
+      <p>Later a viewer asks whether a Gini value can reach 1 <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14548s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:02:28</a>. His answer: no, it stays between 0 and 0.5.</p>
+      <p class="callout">Correction: that range holds for two classes. With \(K\) equally likely classes, Gini is \(1 - K\cdot\tfrac{1}{K^2} = 1 - \tfrac1K\), so 0.667 for three classes. The Iris tree in the practical shows exactly this value at its root, which puzzles him there.</p>
+      <p class="note">Not in the video: with Gini the split score is computed the same way as information gain, the parent's Gini minus the size-weighted Gini of the children. The calculator above shows both.</p>
+    </section>
+
+    <section id="gini-vs-entropy">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13900s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:51:40</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=13965s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:52:45 the log costs time</a>
+        </div>
+        <h2>Gini or entropy?</h2>
+      </div>
+      <p>His deciding factor is execution time. Decision trees are expensive to train: with 100 features the tree compares split after split and computes an information gain for each. Entropy needs a logarithm for every term, while Gini needs only squares. So entropy takes more time, and Gini is faster.</p>
+      <ul>
+        <li><b>Many features</b> (100 or 200): use Gini impurity.</li>
+        <li><b>A small set of features</b>: entropy is fine.</li>
+      </ul>
+      <p class="note">Not in the video: because the two curves have the same shape, they usually pick the same or very similar splits, so the choice rarely changes accuracy much.</p>
+    </section>
+
+    <section id="continuous">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14025s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:53:45</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14089s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:54:49 sort, then ≤ 1.3</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14188s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:56:28 keep the best</a>
+        </div>
+        <h2>Numerical features: try every threshold</h2>
+      </div>
+      <p>So far every feature was categorical, and a split meant one child per category. A numerical feature \(F_1\) has no categories, so the tree turns it into a yes/no question \(F_1 \le v\). His example values are 2.3, 1.3, 4, 5, 7 and 3.</p>
+      <ol class="algo">
+        <li class="algo-title">Choosing a threshold for a numerical feature</li>
+        <li>Sort the values: 1.3, 2.3, 3, 4, 5, 7.</li>
+        <li>Take the first value and ask \(F_1 \le 1.3\)? One record goes to the yes branch (a single record is already a leaf) and the rest to the no branch. Count the yes and no outputs on each side and compute the information gain.</li>
+        <li>Take the first two records: \(F_1 \le 2.3\)? Two records go to yes and the rest to no. Compute the gain again.</li>
+        <li>Continue with \(F_1 \le 3\), \(F_1 \le 4\), …, once for every record.</li>
+        <li>Keep the threshold with the highest information gain and split the node there.</li>
+      </ol>
+      <p>He does not give the output labels for these values, so the figure assigns illustrative ones and computes the gains.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 270" role="img" aria-label="The six sorted values 1.3, 2.3, 3, 4, 5 and 7 on a number line, labelled yes, yes, yes, no, yes, no. Dashed lines between neighbouring values mark the five candidate splits. Bars below show the information gain of each: 0.109 for at most 1.3, 0.252 for at most 2.3, 0.459 for at most 3, the best, 0.044 for at most 4 and 0.317 for at most 5.">
+            <text class="d-row" x="50" y="20">F1 sorted, each record with its output (illustrative)</text>
+            <line class="d-ln" x1="50" y1="64" x2="610" y2="64"/>
+            <line class="d-ln d-dash" x1="128.8" y1="38" x2="128.8" y2="98"/>
+            <line class="d-ln d-dash" x1="201.9" y1="38" x2="201.9" y2="98"/>
+            <line class="d-ln-acc d-dash" x1="275" y1="38" x2="275" y2="98"/>
+            <line class="d-ln d-dash" x1="361" y1="38" x2="361" y2="98"/>
+            <line class="d-ln d-dash" x1="490" y1="38" x2="490" y2="98"/>
+            <circle class="pt-tree" cx="85.8" cy="64" r="6"/><text class="d-s" x="85.8" y="46" text-anchor="middle">yes</text><text class="d-al" x="85.8" y="86" text-anchor="middle">1.3</text>
+            <circle class="pt-tree" cx="171.8" cy="64" r="6"/><text class="d-s" x="171.8" y="46" text-anchor="middle">yes</text><text class="d-al" x="171.8" y="86" text-anchor="middle">2.3</text>
+            <circle class="pt-tree" cx="232" cy="64" r="6"/><text class="d-s" x="232" y="46" text-anchor="middle">yes</text><text class="d-al" x="232" y="86" text-anchor="middle">3</text>
+            <circle class="pt-no" cx="318" cy="64" r="6"/><text class="d-s" x="318" y="46" text-anchor="middle">no</text><text class="d-al" x="318" y="86" text-anchor="middle">4</text>
+            <circle class="pt-tree" cx="404" cy="64" r="6"/><text class="d-s" x="404" y="46" text-anchor="middle">yes</text><text class="d-al" x="404" y="86" text-anchor="middle">5</text>
+            <circle class="pt-no" cx="576" cy="64" r="6"/><text class="d-s" x="576" y="46" text-anchor="middle">no</text><text class="d-al" x="576" y="86" text-anchor="middle">7</text>
+            <text class="d-row" x="610" y="112" text-anchor="end">information gain of each candidate split</text>
+            <line class="d-rule" x1="50" y1="236" x2="610" y2="236"/>
+            <rect class="d-box" x="108.8" y="209.8" width="40" height="26.2"/>
+            <rect class="d-box" x="181.9" y="175.5" width="40" height="60.5"/>
+            <rect class="d-box-acc" x="255" y="125.8" width="40" height="110.2"/>
+            <rect class="d-box" x="341" y="225.4" width="40" height="10.6"/>
+            <rect class="d-box" x="470" y="159.9" width="40" height="76.1"/>
+            <text class="d-s" x="128.8" y="203.8" text-anchor="middle">0.109</text>
+            <text class="d-s" x="201.9" y="169.5" text-anchor="middle">0.252</text>
+            <text class="d-s" x="275" y="119.8" text-anchor="middle" style="fill: var(--accent)">0.459</text>
+            <text class="d-s" x="361" y="219.4" text-anchor="middle">0.044</text>
+            <text class="d-s" x="490" y="153.9" text-anchor="middle">0.317</text>
+            <text class="d-s" x="302" y="142" style="fill: var(--accent)">best split</text>
+            <text class="d-al" x="128.8" y="252" text-anchor="middle">≤ 1.3</text>
+            <text class="d-al" x="201.9" y="252" text-anchor="middle">≤ 2.3</text>
+            <text class="d-al" x="275" y="252" text-anchor="middle">≤ 3</text>
+            <text class="d-al" x="361" y="252" text-anchor="middle">≤ 4</text>
+            <text class="d-al" x="490" y="252" text-anchor="middle">≤ 5</text>
+          </svg>
+        </div>
+        <figcaption><b>Scanning thresholds on one numerical feature.</b> His six values, sorted, with illustrative outputs (4 yes, 2 no, so \(H = 0.918\) at the node). Each "\(\le v\)" question is scored by information gain; \(F_1 \le 3\) wins because it leaves a pure yes side (3 yes, 0 no) and a mostly-no side (1 yes, 2 no). "\(\le 7\)" would send every record to one side, so it is not a split.</figcaption>
+      </figure>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Question</th><th>Yes side (yes, no)</th><th>No side (yes, no)</th><th class="num">Gain</th></tr></thead>
+          <tbody>
+            <tr><td>\(F_1 \le 1.3\)</td><td>1, 0</td><td>3, 2</td><td class="num">0.109</td></tr>
+            <tr><td>\(F_1 \le 2.3\)</td><td>2, 0</td><td>2, 2</td><td class="num">0.252</td></tr>
+            <tr><td>\(F_1 \le 3\)</td><td>3, 0</td><td>1, 2</td><td class="num"><b>0.459</b></td></tr>
+            <tr><td>\(F_1 \le 4\)</td><td>3, 1</td><td>1, 1</td><td class="num">0.044</td></tr>
+            <tr><td>\(F_1 \le 5\)</td><td>4, 1</td><td>0, 1</td><td class="num">0.317</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The best threshold of this feature then competes with the best splits of the other features, as before. This scan over every record of every feature is one reason training a tree is slow, as he noted in the Gini section.</p>
+      <p class="note">Not in the video: scikit-learn places each threshold halfway between neighbouring sorted values (2.65 instead of 2.3, for instance), which gives the same partition of the training records. With \(n\) distinct values there are \(n - 1\) useful thresholds.</p>
+    </section>
+
+    <!-- ============ CHAPTER 2: REGRESSION ============ -->
+    <section id="regression">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14225s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:57:05</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14254s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:57:34 mean and MSE</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14386s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:59:46 worked example</a>
+        </div>
+        <h2>Decision tree regression: split by mean squared error</h2>
+      </div>
+      <p>In a <dfn>decision tree regressor</dfn> the output is a continuous variable and can take any value. The tree still splits on features; what changes is what a node predicts and how a split is scored.</p>
+      <ul>
+        <li><b>A node predicts the mean</b> of the outputs of its records. Before any split, the mean of the whole output column is assigned to the root.</li>
+        <li><b>The cost function is mean squared error</b>, or mean absolute error, instead of entropy or Gini impurity.</li>
+      </ul>
+      <p>He recalls the mean squared error from linear regression (<a href="krish-ml-01.html">Part 1</a>), with \(\hat y\) now the node's mean:</p>
+      <div class="eq">\[ \hat y_\text{node} = \bar y = \frac1n \sum_{i \in \text{node}} y_i, \qquad \text{MSE}(\text{node}) = \frac1n \sum_{i \in \text{node}} \big(y_i - \bar y\big)^2 \]</div>
+      <p class="note">He writes it in his linear-regression form, \(\frac{1}{2m}\sum_{i=1}^{m}(\hat y_i - y_i)^2\). The constant in front does not change which split is best; these notes use \(\frac1n\).</p>
+      <p>The procedure: assign the mean and compute the MSE at the node. Split on a feature; some records go to each child, each child gets its own mean, and the MSE is computed again in each child. As the MSE falls, the nodes get closer to leaves. A new record follows its path down the tree, and the <b>mean value in the leaf it reaches is the prediction</b>.</p>
+      <div class="result">
+        <span class="lbl">Not in the video: the split score, written out</span>
+        \[ \Delta = \text{MSE}(S) - \sum_{v} \frac{|S_v|}{|S|}\, \text{MSE}(S_v) \]
+        <p>The same shape as information gain, with MSE in place of entropy. MSE around the mean is the variance of the node's outputs, so \(\Delta\) is also called <dfn>variance reduction</dfn>. The tree picks the split with the largest \(\Delta\).</p>
+      </div>
+      <h3>His example</h3>
+      <p>A viewer asks for a regression example, so he sketches one: feature F1 and outputs 20, 24, 26, 28, 30. The root gets their mean and an MSE (he names a rough placeholder value without computing it). After a split, two of the records go to one child, the means change and the MSE is calculated again. The numbers below are computed for these notes, with F1 given the illustrative values 1 to 5.</p>
+
+      <figure>
+        <div class="fig-split">
+          <svg class="dg" viewBox="0 0 260 236" role="img" aria-label="Five records with F1 from 1 to 5 and outputs 20, 24, 26, 28 and 30. A dashed line at the root mean 25.6. The split F1 at most 2.5 gives a left mean of 22 and a right mean of 28, drawn as two horizontal segments, with short residual lines from each point to its mean.">
+            <line class="d-rule" x1="40" y1="56" x2="250" y2="56"/>
+            <line class="d-rule" x1="40" y1="116" x2="250" y2="116"/>
+            <line class="d-rule" x1="40" y1="176" x2="250" y2="176"/>
+            <line class="d-ln" x1="40" y1="196" x2="250" y2="196"/>
+            <line class="d-ln" x1="40" y1="196" x2="40" y2="24"/>
+            <text class="d-al" x="34" y="180" text-anchor="end">20</text>
+            <text class="d-al" x="34" y="120" text-anchor="end">25</text>
+            <text class="d-al" x="34" y="60" text-anchor="end">30</text>
+            <text class="d-al" x="61" y="210" text-anchor="middle">1</text>
+            <text class="d-al" x="103" y="210" text-anchor="middle">2</text>
+            <text class="d-al" x="145" y="210" text-anchor="middle">3</text>
+            <text class="d-al" x="187" y="210" text-anchor="middle">4</text>
+            <text class="d-al" x="229" y="210" text-anchor="middle">5</text>
+            <text class="d-s" x="145" y="228" text-anchor="middle">F1 (illustrative values)</text>
+            <line class="d-ln d-dash" x1="40" y1="104.8" x2="250" y2="104.8"/>
+            <text class="d-s" x="246" y="118" text-anchor="end">root mean 25.6</text>
+            <line class="d-ln-acc d-dash" x1="124" y1="26" x2="124" y2="196"/>
+            <text class="d-s" x="128" y="36" style="fill: var(--accent)">F1 ≤ 2.5</text>
+            <line class="d-ln" style="stroke-width:1" x1="61" y1="172" x2="61" y2="148"/>
+            <line class="d-ln" style="stroke-width:1" x1="103" y1="124" x2="103" y2="148"/>
+            <line class="d-ln" style="stroke-width:1" x1="145" y1="100" x2="145" y2="76"/>
+            <line class="d-ln" style="stroke-width:1" x1="229" y1="52" x2="229" y2="76"/>
+            <line class="d-ln-acc" style="stroke-width:2.6" x1="40" y1="148" x2="124" y2="148"/>
+            <line class="d-ln-acc" style="stroke-width:2.6" x1="124" y1="76" x2="250" y2="76"/>
+            <text class="d-s" x="44" y="142" style="fill: var(--accent)">22</text>
+            <text class="d-s" x="130" y="70" style="fill: var(--accent)">28</text>
+            <circle class="pt-plain" cx="61" cy="172" r="4"/>
+            <circle class="pt-plain" cx="103" cy="124" r="4"/>
+            <circle class="pt-plain" cx="145" cy="100" r="4"/>
+            <circle class="pt-plain" cx="187" cy="76" r="4"/>
+            <circle class="pt-plain" cx="229" cy="52" r="4"/>
+          </svg>
+          <div class="tbl-wrap">
+            <table class="mini">
+              <thead><tr><th>Split</th><th class="num">Means</th><th class="num">MSE after</th><th class="num">Δ</th></tr></thead>
+              <tbody>
+                <tr><td style="white-space: nowrap">no split</td><td class="num">25.6</td><td class="num">11.84</td><td class="num">–</td></tr>
+                <tr><td style="white-space: nowrap">F1 ≤ 1.5</td><td class="num">20 | 27</td><td class="num">4.00</td><td class="num">7.84</td></tr>
+                <tr><td style="white-space: nowrap"><b>F1 ≤ 2.5</b></td><td class="num">22 | 28</td><td class="num">3.20</td><td class="num"><b>8.64</b></td></tr>
+                <tr><td style="white-space: nowrap">F1 ≤ 3.5</td><td class="num">23.33 | 29</td><td class="num">4.13</td><td class="num">7.71</td></tr>
+                <tr><td style="white-space: nowrap">F1 ≤ 4.5</td><td class="num">24.5 | 30</td><td class="num">7.00</td><td class="num">4.84</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <figcaption><b>His outputs 20, 24, 26, 28, 30 at one regression node.</b> The root predicts 25.6 with MSE 11.84. Splitting at F1 ≤ 2.5 sends 20 and 24 left (mean 22, MSE 4) and 26, 28, 30 right (mean 28, MSE 2.67), for a weighted MSE of \(\tfrac25 \cdot 4 + \tfrac35 \cdot 2.67 = 3.2\): the largest reduction Δ of the four candidate splits. The <i>Means</i> column gives the left and right child's mean.</figcaption>
+      </figure>
+
+      <figure id="reg-fig">
+        <div class="controls">
+          <label for="reg-t">Root split F1 ≤</label>
+          <input type="range" id="reg-t" min="0.3" max="9.7" step="0.05" value="3.00">
+          <output id="reg-t-out" for="reg-t">3.00</output>
+          <button class="btn" id="reg-best" type="button">Find the best root split</button>
+        </div>
+        <div class="controls">
+          <label for="reg-d">max_depth</label>
+          <input type="range" id="reg-d" min="1" max="8" step="1" value="1">
+          <output id="reg-d-out" for="reg-d">1</output>
+          <label class="check" for="reg-test"><input type="checkbox" id="reg-test" checked>show test points</label>
+        </div>
+        <div class="readouts">
+          <div><span class="k">MSE at the root</span><span class="v" id="reg-m0">–</span></div>
+          <div><span class="k">Weighted MSE after split</span><span class="v" id="reg-m1">–</span></div>
+          <div><span class="k">Reduction Δ</span><span class="v mine" id="reg-red">–</span></div>
+          <div><span class="k">Leaves</span><span class="v" id="reg-leaves">–</span></div>
+          <div><span class="k">Train MSE</span><span class="v" id="reg-tr">–</span></div>
+          <div><span class="k">Test MSE</span><span class="v" id="reg-te">–</span></div>
+        </div>
+        <div class="status" id="reg-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="reg-svg" viewBox="0 0 680 360" role="img" aria-label="Left: thirty synthetic training points and thirty test points of one feature F1 against a continuous output. The tree's prediction is a step function: the mean of the training outputs in each leaf. A dashed vertical line marks the root split. Right: training and test MSE against max_depth from 1 to 8, with the current depth marked."></svg></div>
+        <figcaption><b>Synthetic data, generated for these notes:</b> 30 training points (filled) and 30 test points (rings) from the same noisy curve. You choose the root question \(F_1 \le t\); with max_depth above 1 the rest of the tree is grown greedily below it, each node taking the split with the largest MSE reduction. Each flat step is a leaf predicting the mean of its training records. Raise max_depth and the training MSE heads to 0 while the test MSE stops improving: the overfitting that pruning, next, is meant to prevent.</figcaption>
+      </figure>
+      <p class="note">Not in the video: in scikit-learn this is <code>DecisionTreeRegressor</code>, whose default <code>criterion='squared_error'</code> is the MSE above; <code>criterion='absolute_error'</code> uses MAE, and its leaves then predict the median instead of the mean.</p>
+    </section>
+
+    <section id="pruning">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14354s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>3:59:14 grow to any depth?</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14452s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:00:52 overfitting</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14486s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:01:26 post-pruning</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14517s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:01:57 pre-pruning</a>
+        </div>
+        <h2>Overfitting, post-pruning and pre-pruning</h2>
+      </div>
+      <p>Before the regression example he poses a question: what happens if the tree is allowed to grow to any depth? The answer comes after it. A decision tree keeps dividing nodes to whatever level we allow, until the leaves are pure, so <b>a fully grown tree overfits</b>. It fits the training data, noise included. There are two ways to prevent it.</p>
+      <h3>Post-pruning</h3>
+      <p>Build the whole tree first, then look at it and cut the branches that are not needed. His example: a node holds 7 yes and 2 no and is split further. The node already says yes for most of its records (7 of 9 is about 78%, which he rounds up to more than 80%), so splitting it more adds little. Cut the branch there and make the node a leaf.</p>
+      <h3>Pre-pruning</h3>
+      <p>Decide the limits before the tree is grown, through hyperparameters: the <b>maximum depth</b>, the <b>maximum number of leaf nodes</b>, and similar settings. Try combinations with <code>GridSearchCV</code> and keep the best.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 720 292" role="img" aria-label="Left, post-pruning: a fully grown tree whose node with 7 yes and 2 no had been split into 6 yes 0 no and 1 yes 2 no; the branch is cut and the node becomes a leaf that predicts yes. Right, pre-pruning: a tree grown only to max_depth 2; nodes below the dashed depth limit are never grown.">
+            <text class="d-h" x="16" y="20">Post-pruning: grow, then cut</text>
+            <line class="d-ln" x1="171" y1="62" x2="87" y2="98"/>
+            <line class="d-ln" x1="171" y1="62" x2="255" y2="98"/>
+            <line class="d-ln-mut d-dash" x1="87" y1="126" x2="46" y2="162"/>
+            <line class="d-ln-mut d-dash" x1="87" y1="126" x2="128" y2="162"/>
+            <line class="d-ln" x1="255" y1="126" x2="214" y2="162"/>
+            <line class="d-ln" x1="255" y1="126" x2="296" y2="162"/>
+            <rect class="d-box" x="123" y="34" width="96" height="28" rx="6"/><text class="d-s" x="171" y="52" text-anchor="middle">10 yes · 6 no</text>
+            <rect class="d-box-acc" x="43" y="98" width="88" height="28" rx="6"/><text class="d-s" x="87" y="116" text-anchor="middle">7 yes · 2 no</text>
+            <rect class="d-box" x="211" y="98" width="88" height="28" rx="6"/><text class="d-s" x="255" y="116" text-anchor="middle">3 yes · 4 no</text>
+            <rect class="d-off" x="7" y="162" width="78" height="28" rx="6"/><text class="d-s t-off" x="46" y="180" text-anchor="middle">6 yes · 0 no</text>
+            <rect class="d-off" x="89" y="162" width="78" height="28" rx="6"/><text class="d-s t-off" x="128" y="180" text-anchor="middle">1 yes · 2 no</text>
+            <rect class="b-ok" x="175" y="162" width="78" height="28" rx="6"/><text class="d-s" x="214" y="180" text-anchor="middle">3 yes · 0 no</text>
+            <rect class="b-ok" x="257" y="162" width="78" height="28" rx="6"/><text class="d-s" x="296" y="180" text-anchor="middle">0 yes · 4 no</text>
+            <line class="d-ln-acc" style="stroke-width:2.4" x1="36" y1="144" x2="140" y2="144"/>
+            <text class="d-s" x="146" y="148" style="fill: var(--accent)">cut</text>
+            <text class="d-s" x="16" y="236">7 of 9 records at this node say yes (about 78%),</text>
+            <text class="d-s" x="16" y="252">so cut below it and make it a leaf that says yes.</text>
+
+            <line class="d-rule" x1="360" y1="10" x2="360" y2="282"/>
+
+            <text class="d-h" x="386" y="20">Pre-pruning: stop early</text>
+            <line class="d-ln" x1="541" y1="62" x2="457" y2="98"/>
+            <line class="d-ln" x1="541" y1="62" x2="625" y2="98"/>
+            <line class="d-ln" x1="457" y1="126" x2="416" y2="162"/>
+            <line class="d-ln" x1="457" y1="126" x2="498" y2="162"/>
+            <line class="d-ln" x1="625" y1="126" x2="584" y2="162"/>
+            <line class="d-ln" x1="625" y1="126" x2="666" y2="162"/>
+            <rect class="d-box" x="493" y="34" width="96" height="28" rx="6"/><text class="d-s" x="541" y="52" text-anchor="middle">depth 0</text>
+            <rect class="d-box" x="413" y="98" width="88" height="28" rx="6"/><text class="d-s" x="457" y="116" text-anchor="middle">depth 1</text>
+            <rect class="d-box" x="581" y="98" width="88" height="28" rx="6"/><text class="d-s" x="625" y="116" text-anchor="middle">depth 1</text>
+            <rect class="b-ok" x="377" y="162" width="78" height="28" rx="6"/><text class="d-s" x="416" y="180" text-anchor="middle">leaf</text>
+            <rect class="b-ok" x="459" y="162" width="78" height="28" rx="6"/><text class="d-s" x="498" y="180" text-anchor="middle">leaf</text>
+            <rect class="b-ok" x="545" y="162" width="78" height="28" rx="6"/><text class="d-s" x="584" y="180" text-anchor="middle">leaf</text>
+            <rect class="b-ok" x="627" y="162" width="78" height="28" rx="6"/><text class="d-s" x="666" y="180" text-anchor="middle">leaf</text>
+            <line class="d-ln-acc d-dash" x1="376" y1="200" x2="712" y2="200"/>
+            <text class="d-s" x="712" y="214" text-anchor="end" style="fill: var(--accent)">max_depth = 2</text>
+            <line class="d-ln-mut d-dash" x1="416" y1="190" x2="416" y2="216"/>
+            <rect class="d-off" x="377" y="216" width="78" height="24" rx="6"/><text class="d-s t-off" x="416" y="232" text-anchor="middle">not grown</text>
+            <line class="d-ln-mut d-dash" x1="584" y1="190" x2="584" y2="216"/>
+            <rect class="d-off" x="545" y="216" width="78" height="24" rx="6"/><text class="d-s t-off" x="584" y="232" text-anchor="middle">not grown</text>
+            <text class="d-s" x="386" y="264">Limits are set before fitting: max_depth,</text>
+            <text class="d-s" x="386" y="280">max_leaf_nodes, …, tuned with GridSearchCV.</text>
+          </svg>
+        </div>
+        <figcaption><b>Two ways to stop a tree overfitting</b> (illustrative counts). Post-pruning grows the full tree and then removes branches that add nothing, such as the split below his 7 yes, 2 no node. Pre-pruning never grows them, because hyperparameters cap the tree in advance.</figcaption>
+      </figure>
+      <p class="note">For the IIT Madras treatment of stopping rules and tree depth as a hyperparameter chosen by validation, see Part 13 (<a href="part-13.html#stopping">part-13.html</a>). Not in the video: scikit-learn's built-in post-pruning is cost-complexity pruning through <code>ccp_alpha</code>, used in the last practical section.</p>
+    </section>
+
+    <!-- ============ CHAPTER 3: PRACTICAL ============ -->
+    <section id="practical-data">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14577s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:02:57</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14616s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:03:36 load_iris</a>
+        </div>
+        <h2>Practical: imports and the Iris data</h2>
+      </div>
+      <p class="note">The code on this page is reconstructed from the video's audio.</p>
+      <p>As usual the notebook starts with the libraries, pandas and matplotlib. For data he takes a built-in scikit-learn data set, Iris, through <code>load_iris</code>.</p>
+      <pre class="codeblock"><code><span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+<span class="kw">from</span> sklearn.datasets <span class="kw">import</span> load_iris
+
+iris = load_iris()
+iris.data        <span class="cm"># 150 x 4 array of measurements in cm: the independent features</span>
+iris.target      <span class="cm"># 150 labels: 0 = setosa, 1 = versicolor, 2 = virginica</span></code></pre>
+      <p><code>iris.data</code> holds the four independent features of 150 flowers: sepal length, sepal width, petal length and petal width (he lists the petal ones first; in the array the sepal columns come first). <code>iris.target</code> holds the species, three classes with 50 flowers each.</p>
+    </section>
+
+    <section id="practical-fit">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14653s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:04:13</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14684s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:04:44 the parameters</a>
+        </div>
+        <h2>The classifier and its hyperparameters</h2>
+      </div>
+      <p>The classifier lives in <code>sklearn.tree</code>. His first import fails with a <code>ModuleNotFoundError</code> because he mistypes the package name; once corrected, it works. He creates the classifier with all defaults on purpose. That tree will overfit, and he wants to show pruning from it.</p>
+      <pre class="codeblock"><code><span class="kw">from</span> sklearn.tree <span class="kw">import</span> DecisionTreeClassifier
+
+<span class="cm"># all defaults: criterion='gini', splitter='best', max_depth=None, ...</span>
+classifier = DecisionTreeClassifier()</code></pre>
+      <p>He walks through the parameters in the signature and calls all of them hyperparameters.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Parameter</th><th>Default</th><th>What he says</th></tr></thead>
+          <tbody>
+            <tr><td><code>criterion</code></td><td><code>'gini'</code></td><td>The impurity measure: Gini by default, or <code>'entropy'</code>.</td></tr>
+            <tr><td><code>splitter</code></td><td><code>'best'</code></td><td>How a node is split: <code>'best'</code> or <code>'random'</code> (features chosen at random). Always go with best.</td></tr>
+            <tr><td><code>max_depth</code></td><td><code>None</code></td><td>A hyperparameter: how deep the tree may grow.</td></tr>
+            <tr><td><code>min_samples_leaf</code></td><td><code>1</code></td><td>A hyperparameter: the fewest records a leaf may hold.</td></tr>
+            <tr><td><code>max_features</code></td><td><code>None</code></td><td>A hyperparameter: how many features are considered when looking for a split.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Not in the video: <code>max_depth=None</code> lets the tree grow until every leaf is pure, and <code>max_features=None</code> means all features. Other pre-pruning knobs are <code>max_leaf_nodes</code> (named in the theory), <code>min_samples_split</code> and <code>min_impurity_decrease</code>. Recent versions also accept <code>criterion='log_loss'</code>, which is the same as entropy.</p>
+    </section>
+
+    <section id="practical-plot">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14716s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:05:16</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14754s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:05:54 plot_tree</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14786s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:06:26 fit first</a>
+        </div>
+        <h2>Fitting and plotting the tree</h2>
+      </div>
+      <p>He wants to see the tree, so he opens a large figure (15 by 10) and draws the classifier with filled colours. Getting there takes three fixes, which are worth knowing because they are common:</p>
+      <ol>
+        <li><code>tree</code> is not defined until it is imported: <code>from sklearn import tree</code>.</li>
+        <li><code>tree.plot</code> does not exist (an attribute error). The documentation shows the function is <code>tree.plot_tree</code>.</li>
+        <li>Plotting raises a <code>NotFittedError</code>: the classifier has to be trained first, on <code>iris.data</code> and <code>iris.target</code>.</li>
+      </ol>
+      <pre class="codeblock"><code><span class="kw">from</span> sklearn <span class="kw">import</span> tree
+
+<span class="cm"># fit first: plotting an unfitted tree raises NotFittedError</span>
+classifier.fit(iris.data, iris.target)
+
+plt.figure(figsize=(15, 10))
+<span class="cm"># plot_tree, not plot; filled=True colours each node by its majority class</span>
+tree.plot_tree(classifier, filled=True)
+plt.show()</code></pre>
+      <p class="note">Not in the video: pass <code>feature_names=iris.feature_names</code> and <code>class_names=iris.target_names</code> to <code>plot_tree</code> to see <code>petal length (cm) &lt;= 2.45</code> and a class name in each box instead of <code>x[2] &lt;= 2.45</code>.</p>
+    </section>
+
+    <section id="practical-read">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14823s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:07:03</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14857s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:07:37 is this split needed?</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14891s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:08:11 gini = 0.667?</a>
+        </div>
+        <h2>Reading the tree, and pruning it by eye</h2>
+      </div>
+      <p>Each box of the plot shows the split question, the Gini impurity, the number of samples and the class counts (<code>value</code>). The figure redraws the top four levels of the tree he gets.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 720 400" role="img" aria-label="The top of the default decision tree on the Iris data, in plot_tree's format. Root: x[2] at most 2.45, gini 0.667, 150 samples, value 50, 50, 50. True branch: a pure leaf of 50 setosa. False branch: x[3] at most 1.75, gini 0.5, 100 samples, value 0, 50, 50. Below it x[2] at most 4.95 with value 0, 49, 5 and x[2] at most 4.85 with value 0, 1, 45. The next level holds value 0, 47, 1; value 0, 2, 4; value 0, 1, 2; and a pure leaf of 43 virginica.">
+            <line class="d-ln" x1="232" y1="76" x2="100" y2="110"/>
+            <line class="d-ln" x1="232" y1="76" x2="345" y2="110"/>
+            <line class="d-ln" x1="345" y1="176" x2="170" y2="210"/>
+            <line class="d-ln" x1="345" y1="176" x2="520" y2="210"/>
+            <line class="d-ln" x1="170" y1="276" x2="95" y2="310"/>
+            <line class="d-ln" x1="170" y1="276" x2="250" y2="310"/>
+            <line class="d-ln" x1="520" y1="276" x2="445" y2="310"/>
+            <line class="d-ln" x1="520" y1="276" x2="615" y2="310"/>
+            <text class="d-al" x="156" y="86" text-anchor="end">True</text>
+            <text class="d-al" x="296" y="86">False</text>
+
+            <rect class="d-box" x="160" y="10" width="144" height="66" rx="6"/>
+            <text class="d-al" style="fill: var(--ink)" x="232" y="26" text-anchor="middle">x[2] &lt;= 2.45</text>
+            <text class="d-al" style="fill: var(--ink)" x="232" y="41" text-anchor="middle">gini = 0.667</text>
+            <text class="d-al" style="fill: var(--ink)" x="232" y="56" text-anchor="middle">samples = 150</text>
+            <text class="d-al" style="fill: var(--ink)" x="232" y="71" text-anchor="middle">value = [50, 50, 50]</text>
+            <text class="d-s" x="316" y="34" style="fill: var(--accent)">0.667 is above 0.5 because</text>
+            <text class="d-s" x="316" y="49" style="fill: var(--accent)">there are three classes</text>
+
+            <rect x="28" y="110" width="144" height="52" rx="6" style="fill: var(--accent-soft); stroke: var(--accent); stroke-width:1.5"/>
+            <text class="d-al" style="fill: var(--ink)" x="100" y="126" text-anchor="middle">gini = 0.0</text>
+            <text class="d-al" style="fill: var(--ink)" x="100" y="141" text-anchor="middle">samples = 50</text>
+            <text class="d-al" style="fill: var(--ink)" x="100" y="156" text-anchor="middle">value = [50, 0, 0]</text>
+
+            <rect class="d-box" x="273" y="110" width="144" height="66" rx="6"/>
+            <text class="d-al" style="fill: var(--ink)" x="345" y="126" text-anchor="middle">x[3] &lt;= 1.75</text>
+            <text class="d-al" style="fill: var(--ink)" x="345" y="141" text-anchor="middle">gini = 0.5</text>
+            <text class="d-al" style="fill: var(--ink)" x="345" y="156" text-anchor="middle">samples = 100</text>
+            <text class="d-al" style="fill: var(--ink)" x="345" y="171" text-anchor="middle">value = [0, 50, 50]</text>
+
+            <rect x="98" y="210" width="144" height="66" rx="6" style="fill: var(--ok-soft); stroke: var(--ok); stroke-width:1.5"/>
+            <text class="d-al" style="fill: var(--ink)" x="170" y="226" text-anchor="middle">x[2] &lt;= 4.95</text>
+            <text class="d-al" style="fill: var(--ink)" x="170" y="241" text-anchor="middle">gini = 0.168</text>
+            <text class="d-al" style="fill: var(--ink)" x="170" y="256" text-anchor="middle">samples = 54</text>
+            <text class="d-al" style="fill: var(--ink)" x="170" y="271" text-anchor="middle">value = [0, 49, 5]</text>
+
+            <rect x="448" y="210" width="144" height="66" rx="6" style="fill: var(--mark); fill-opacity:.5; stroke: var(--ink-2); stroke-width:1.5"/>
+            <text class="d-al" style="fill: var(--ink)" x="520" y="226" text-anchor="middle">x[2] &lt;= 4.85</text>
+            <text class="d-al" style="fill: var(--ink)" x="520" y="241" text-anchor="middle">gini = 0.043</text>
+            <text class="d-al" style="fill: var(--ink)" x="520" y="256" text-anchor="middle">samples = 46</text>
+            <text class="d-al" style="fill: var(--ink)" x="520" y="271" text-anchor="middle">value = [0, 1, 45]</text>
+
+            <rect x="23" y="310" width="144" height="66" rx="6" style="fill: var(--ok-soft); stroke: var(--ok); stroke-width:1.5"/>
+            <text class="d-al" style="fill: var(--ink)" x="95" y="326" text-anchor="middle">x[3] &lt;= 1.65</text>
+            <text class="d-al" style="fill: var(--ink)" x="95" y="341" text-anchor="middle">gini = 0.041</text>
+            <text class="d-al" style="fill: var(--ink)" x="95" y="356" text-anchor="middle">samples = 48</text>
+            <text class="d-al" style="fill: var(--ink)" x="95" y="371" text-anchor="middle">value = [0, 47, 1]</text>
+
+            <rect x="178" y="310" width="144" height="66" rx="6" style="fill: var(--mark); fill-opacity:.5; stroke: var(--ink-2); stroke-width:1.5"/>
+            <text class="d-al" style="fill: var(--ink)" x="250" y="326" text-anchor="middle">x[3] &lt;= 1.55</text>
+            <text class="d-al" style="fill: var(--ink)" x="250" y="341" text-anchor="middle">gini = 0.444</text>
+            <text class="d-al" style="fill: var(--ink)" x="250" y="356" text-anchor="middle">samples = 6</text>
+            <text class="d-al" style="fill: var(--ink)" x="250" y="371" text-anchor="middle">value = [0, 2, 4]</text>
+
+            <rect x="373" y="310" width="144" height="66" rx="6" style="fill: var(--mark); fill-opacity:.5; stroke: var(--ink-2); stroke-width:1.5"/>
+            <text class="d-al" style="fill: var(--ink)" x="445" y="326" text-anchor="middle">x[1] &lt;= 3.1</text>
+            <text class="d-al" style="fill: var(--ink)" x="445" y="341" text-anchor="middle">gini = 0.444</text>
+            <text class="d-al" style="fill: var(--ink)" x="445" y="356" text-anchor="middle">samples = 3</text>
+            <text class="d-al" style="fill: var(--ink)" x="445" y="371" text-anchor="middle">value = [0, 1, 2]</text>
+
+            <rect x="543" y="310" width="144" height="52" rx="6" style="fill: var(--mark); fill-opacity:.5; stroke: var(--ink-2); stroke-width:1.5"/>
+            <text class="d-al" style="fill: var(--ink)" x="615" y="326" text-anchor="middle">gini = 0.0</text>
+            <text class="d-al" style="fill: var(--ink)" x="615" y="341" text-anchor="middle">samples = 43</text>
+            <text class="d-al" style="fill: var(--ink)" x="615" y="356" text-anchor="middle">value = [0, 0, 43]</text>
+
+            <text class="d-al" x="95" y="392" text-anchor="middle">⋯</text>
+            <text class="d-al" x="250" y="392" text-anchor="middle">⋯</text>
+            <text class="d-al" x="445" y="392" text-anchor="middle">⋯</text>
+
+            <rect x="8" y="211" width="12" height="12" rx="2" style="fill: var(--accent-soft); stroke: var(--accent)"/><text class="d-s" x="26" y="221">setosa</text>
+            <rect x="8" y="231" width="12" height="12" rx="2" style="fill: var(--ok-soft); stroke: var(--ok)"/><text class="d-s" x="26" y="241">versicolor</text>
+            <rect x="8" y="251" width="12" height="12" rx="2" style="fill: var(--mark); fill-opacity:.5; stroke: var(--ink-2)"/><text class="d-s" x="26" y="261">virginica</text>
+          </svg>
+        </div>
+        <figcaption><b>The default tree on all 150 Iris flowers</b>, top four levels, as <code>plot_tree</code> labels it (x[0] sepal length, x[1] sepal width, x[2] petal length, x[3] petal width). Box colours show the majority class. Reproduced for these notes with scikit-learn 1.6.1; the full tree has depth 5 and 9 leaves, and "⋯" marks the splits below. Some splits tie: the root can appear as <code>x[3] &lt;= 0.8</code> and the 3-sample node as <code>x[0] &lt;= 5.95</code>, depending on the run, with the same counts.</figcaption>
+      </figure>
+
+      <p>What he points out:</p>
+      <ul>
+        <li><b>The left branch of the root is a leaf.</b> One feature alone separates 50 flowers into a pure node. He calls it versicolor; it is setosa, class 0, as <code>value = [50, 0, 0]</code> shows.</li>
+        <li><b>The right branch holds the other two classes 50/50</b>, so it is split again on another feature, and then again (the petal length &le; 4.95 box).</li>
+        <li><b>Post-pruning by eye.</b> At the box with <code>value = [0, 47, 1]</code> he asks whether any more splitting is needed. It is not: the node is almost pure, and the split below it only isolates one flower. The same holds after the [0, 1, 45] box. Looking at the drawn tree like this, you can decide the level at which to stop.</li>
+      </ul>
+      <p>He is surprised that the root shows <code>gini = 0.667</code>, since he expects Gini never to exceed 0.5, and says he will look into it. Everywhere else in the tree the value is below 0.5.</p>
+      <p class="callout">The explanation: Iris has three classes. With 50 of each at the root, \(\text{Gini} = 1 - 3\cdot\big(\tfrac13\big)^2 = \tfrac23 \approx 0.667\). The 0-to-0.5 range is for two classes only. Every node below the root contains at most two of the three classes, so its Gini stays at or below 0.5.</p>
+      <p>To recap the plotting: import <code>tree</code> from <code>sklearn</code>, then call <code>tree.plot_tree(classifier, filled=True)</code> on the fitted classifier. Here the session moves on to ensemble techniques: bagging, boosting, random forest and AdaBoost <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14921s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:08:41</a>, covered in Part 6 (<a href="krish-ml-06.html">krish-ml-06.html</a>). For the IIT Madras treatment of ensembles, see Part 17 (<a href="part-17.html">part-17.html</a>).</p>
+    </section>
+
+    <section id="practical-tune">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14517s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:01:57 pre-pruning, in theory</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=14684s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>4:04:44 the hyperparameters</a>
+        </div>
+        <h2>Not in the video: tuning and evaluating the tree</h2>
+      </div>
+      <p>The practical fits the tree on all 150 flowers and never measures accuracy. Pre-pruning with <code>GridSearchCV</code> is described only in the theory. This section adds the standard next steps, so the practical can be finished in code. The outputs in the comments come from running this code with scikit-learn 1.6.1 for these notes.</p>
+      <h3>Hold out a test set and see the overfit</h3>
+      <pre class="codeblock"><code><span class="kw">from</span> sklearn.model_selection <span class="kw">import</span> train_test_split, GridSearchCV
+<span class="kw">from</span> sklearn.metrics <span class="kw">import</span> accuracy_score, confusion_matrix, classification_report
+
+X_train, X_test, y_train, y_test = train_test_split(
+    iris.data, iris.target, test_size=0.33, random_state=42)
+
+full = DecisionTreeClassifier(random_state=0).fit(X_train, y_train)
+full.get_depth(), full.get_n_leaves()                       <span class="cm"># (6, 10)</span>
+full.score(X_train, y_train), full.score(X_test, y_test)    <span class="cm"># (1.0, 0.96)</span></code></pre>
+      <p>The unpruned tree classifies every training flower correctly (accuracy 1.0) and 96% of the 50 test flowers.</p>
+      <h3>Pre-pruning: grid search over the hyperparameters</h3>
+      <pre class="codeblock"><code>params = {
+    'criterion': ['gini', 'entropy'],
+    'max_depth': [1, 2, 3, 4, 5, None],
+    'max_leaf_nodes': [None, 3, 4, 5, 6],
+}
+grid = GridSearchCV(DecisionTreeClassifier(random_state=0), params, cv=5, scoring='accuracy')
+grid.fit(X_train, y_train)
+grid.best_params_    <span class="cm"># {'criterion': 'gini', 'max_depth': 3, 'max_leaf_nodes': None}</span>
+grid.best_score_     <span class="cm"># 0.93  (mean accuracy over the 5 validation folds)</span>
+
+y_pred = grid.predict(X_test)        <span class="cm"># uses the best tree, refitted on all of X_train</span>
+accuracy_score(y_test, y_pred)       <span class="cm"># 0.98</span>
+confusion_matrix(y_test, y_pred)     <span class="cm"># [[19  0  0]</span>
+                                     <span class="cm">#  [ 0 15  0]</span>
+                                     <span class="cm">#  [ 0  1 15]]</span>
+print(classification_report(y_test, y_pred, target_names=iris.target_names))</code></pre>
+      <p>The search settles on a depth-3 tree with 5 leaves. It misclassifies one virginica as versicolor and scores 0.98 on the test set. Several settings tie at 0.93 in cross-validation; <code>GridSearchCV</code> keeps the first. With only 50 test flowers, one flower is 2 points of accuracy, so read small differences with care.</p>
+      <h3>Post-pruning: cost-complexity pruning</h3>
+      <p>Scikit-learn automates post-pruning. <code>cost_complexity_pruning_path</code> lists the values of <code>ccp_alpha</code> at which branches of the full tree get cut; a larger alpha prunes more.</p>
+      <pre class="codeblock"><code>path = DecisionTreeClassifier(random_state=0).cost_complexity_pruning_path(X_train, y_train)
+path.ccp_alphas      <span class="cm"># [0.     0.0094 0.0097 0.0338 0.254  0.3209]</span>
+
+<span class="kw">for</span> a <span class="kw">in</span> path.ccp_alphas:
+    m = DecisionTreeClassifier(random_state=0, ccp_alpha=a).fit(X_train, y_train)
+    print(round(a, 4), m.get_n_leaves(), m.score(X_train, y_train), m.score(X_test, y_test))</code></pre>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">ccp_alpha</th><th class="num">Leaves</th><th class="num">Train accuracy</th><th class="num">Test accuracy</th></tr></thead>
+          <tbody>
+            <tr><td class="num">0</td><td class="num">10</td><td class="num">1.00</td><td class="num">0.96</td></tr>
+            <tr><td class="num">0.0094</td><td class="num">6</td><td class="num">0.98</td><td class="num">0.98</td></tr>
+            <tr><td class="num">0.0097</td><td class="num">4</td><td class="num">0.97</td><td class="num">0.98</td></tr>
+            <tr><td class="num">0.0338</td><td class="num">3</td><td class="num">0.95</td><td class="num">0.98</td></tr>
+            <tr><td class="num">0.254</td><td class="num">2</td><td class="num">0.66</td><td class="num">0.68</td></tr>
+            <tr><td class="num">0.3209</td><td class="num">1</td><td class="num">0.35</td><td class="num">0.30</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Cutting the full tree from 10 leaves to 3 loses a little training accuracy and none on the test set. Pruning further removes splits that matter. In practice <code>ccp_alpha</code> is chosen by cross-validation, like any other hyperparameter.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>Decision tree</dt><dd>Nested if-else questions drawn as nodes; each internal node splits on one feature and each leaf gives the answer.</dd></div>
+        <div><dt>Root node</dt><dd>The first split, holding the whole training set (9 yes, 5 no in the play-tennis data).</dd></div>
+        <div><dt>Leaf node</dt><dd>A node that is not split further. It predicts its majority class, or its mean in regression.</dd></div>
+        <div><dt>Pure and impure split</dt><dd>Pure: every record in the node has the same output, such as 4 yes, 0 no. Impure: mixed, so the node is split again.</dd></div>
+        <div><dt>Entropy</dt><dd>\(H(S) = -p_+\log_2 p_+ - p_-\log_2 p_-\): 0 for a pure node, 1 for a 50/50 node.</dd></div>
+        <div><dt>Gini impurity</dt><dd>\(1 - \sum p_i^2\): 0 for a pure node, 0.5 at 50/50 with two classes (\(1 - 1/K\) with \(K\) classes). Scikit-learn's default.</dd></div>
+        <div><dt>Information gain</dt><dd>\(H(S) - \sum_v \frac{|S_v|}{|S|}H(S_v)\): how much a split lowers entropy. The feature with the largest gain is chosen.</dd></div>
+        <div><dt>Threshold split</dt><dd>For a numerical feature, the question \(F \le v\); every sorted value is tried and the best gain wins.</dd></div>
+        <div><dt>Decision tree regressor</dt><dd>A tree with a continuous output: each leaf predicts the mean of its records, and splits are scored by MSE or MAE.</dd></div>
+        <div><dt>Variance reduction</dt><dd>The drop from the parent's MSE to the size-weighted MSE of its children; the regression analogue of information gain.</dd></div>
+        <div><dt>Post-pruning</dt><dd>Grow the full tree, then cut branches that add nothing (by eye in the video; <code>ccp_alpha</code> in scikit-learn).</dd></div>
+        <div><dt>Pre-pruning</dt><dd>Limit growth in advance with <code>max_depth</code>, <code>max_leaf_nodes</code>, <code>min_samples_leaf</code>…, tuned with <code>GridSearchCV</code>.</dd></div>
+        <div><dt><code>plot_tree</code></dt><dd><code>sklearn.tree.plot_tree(model, filled=True)</code> draws a fitted tree with each node's split, impurity, samples and class counts.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>What is the entropy of a node with 4 yes and 4 no? And of a node with 4 yes and 0 no?</span><span class="tog"></span></summary>
+          <p>4 yes, 4 no: \(p_+ = p_- = \tfrac12\), so \(H = -\tfrac12\log_2\tfrac12 - \tfrac12\log_2\tfrac12 = 1\), the most impure two-class node. 4 yes, 0 no: \(H = -1\cdot\log_2 1 - 0 = 0\), a pure leaf.</p></details>
+        <details><summary><span class="q">Q2</span><span>A node has 3 yes and 1 no. Compute its Gini impurity and its entropy.</span><span class="tog"></span></summary>
+          <p>\(p_+ = 0.75\), \(p_- = 0.25\). Gini \(= 1 - (0.5625 + 0.0625) = 0.375\). Entropy \(= -0.75\log_2 0.75 - 0.25\log_2 0.25 = 0.311 + 0.5 \approx 0.811\). Both are between their pure value (0) and their 50/50 peak (0.5 and 1).</p></details>
+        <details><summary><span class="q">Q3</span><span>Compute the information gain of splitting the play-tennis root (9 yes, 5 no) on Outlook.</span><span class="tog"></span></summary>
+          <p>\(H(S) = 0.940\). Sunny (2, 3) and Rain (3, 2) each have entropy 0.971 and hold 5 of 14 records; Overcast (4, 0) has entropy 0. Weighted child entropy \(= \tfrac{5}{14}(0.971) + \tfrac{4}{14}(0) + \tfrac{5}{14}(0.971) = 0.694\), so the gain is \(0.940 - 0.694 = 0.247\), the largest of the four features.</p></details>
+        <details><summary><span class="q">Q4</span><span>When does he recommend Gini impurity over entropy, and why?</span><span class="tog"></span></summary>
+          <p>When there are many features (100 or 200). Training compares a great many candidate splits, and entropy needs a logarithm in every term while Gini needs only squares, so Gini is faster. With few features entropy is fine.</p></details>
+        <details><summary><span class="q">Q5</span><span>In one node a numerical feature takes the values 9, 2, 5, 8, 5. Which thresholds does his procedure try, and how many different splits do they give?</span><span class="tog"></span></summary>
+          <p>Sort: 2, 5, 5, 8, 9. The questions are \(\le 2\), \(\le 5\), \(\le 8\) and \(\le 9\) (the repeated 5 gives the same question twice). \(\le 9\) sends every record to the yes side, so only 3 are real splits: one fewer than the number of distinct values. Each is scored by information gain and the best is kept.</p></details>
+        <details><summary><span class="q">Q6</span><span>A regression-tree leaf holds the outputs 10, 12 and 14. What does it predict for a new record that reaches it, and what is its MSE?</span><span class="tog"></span></summary>
+          <p>It predicts the mean, 12. MSE \(= \tfrac13\big[(10-12)^2 + 0^2 + (14-12)^2\big] = \tfrac83 \approx 2.67\).</p></details>
+        <details><summary><span class="q">Q7</span><span>The Iris tree's root shows gini = 0.667, yet he says Gini lies between 0 and 0.5. Who is right?</span><span class="tog"></span></summary>
+          <p>Both, in their own setting. The 0 to 0.5 range is for two classes. The Iris root has three classes with 50 flowers each, so \(\text{Gini} = 1 - 3(\tfrac13)^2 = \tfrac23\). In general the maximum is \(1 - 1/K\) for \(K\) classes.</p></details>
+        <details><summary><span class="q">Q8</span><span>What is the difference between pre-pruning and post-pruning, and how is each done in scikit-learn?</span><span class="tog"></span></summary>
+          <p>Pre-pruning limits the tree before it grows: set <code>max_depth</code>, <code>max_leaf_nodes</code>, <code>min_samples_leaf</code> and similar, choosing them with <code>GridSearchCV</code>. Post-pruning grows the full tree first and then removes branches that add little. The video does it by inspecting <code>plot_tree</code> (cutting below the [0, 47, 1] node, for example); scikit-learn's tool for it is <code>ccp_alpha</code>.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="krish-ml-04.html"><span class="dir">← Part 4</span><span class="nm">Naive Bayes and KNN</span></a><a class="next" href="krish-ml-07.html"><span class="dir">Part 7 →</span><span class="nm">Clustering: K-means, hierarchical, silhouette, DBSCAN</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the YouTube auto-generated captions of Krish Naik's video <i>Complete Machine Learning in 6 Hours</i>. Timestamp links open the video at that moment. Code is reconstructed from the audio. Charts marked synthetic use data generated for these notes. Not affiliated with Krish Naik or IIT Madras.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tween = (from, to, set) => { const t0 = performance.now(), dur = reduce ? 0 : 420; const step = () => { const k = dur ? Math.max(0, Math.min(1, (performance.now() - t0) / dur)) : 1; set(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); };
+  const clear = g => { while (g.firstChild) g.removeChild(g.firstChild); };
+
+  /* ---------- Information gain calculator ---------- */
+  (() => {
+    const svg = document.getElementById('ig-svg'); if (!svg) return;
+    const keys = ['c1y', 'c1n', 'c2y', 'c2n', 'c3y', 'c3n'];
+    const sl = {}, out = {};
+    keys.forEach(k => { sl[k] = document.getElementById('ig-' + k); out[k] = document.getElementById('ig-' + k + '-out'); });
+    const presets = {
+      wind: { v: [6, 2, 3, 3, 0, 0], names: ['Weak', 'Strong', ''], note: 'His worked split. It is also the Wind column of the play-tennis table.' },
+      outlook: { v: [2, 3, 4, 0, 3, 2], names: ['Sunny', 'Overcast', 'Rain'], note: 'Outlook: the largest gain of the four features, so it becomes the root.' },
+      humidity: { v: [3, 4, 6, 1, 0, 0], names: ['High', 'Normal', ''], note: 'Humidity: second best, 0.152.' },
+      temp: { v: [2, 2, 4, 2, 3, 1], names: ['Hot', 'Mild', 'Cool'], note: 'Temperature: the smallest gain of the four.' },
+      pure: { v: [3, 3, 3, 0, 0, 0], names: ['C1', 'C2', ''], note: 'His entropy example: root 6 yes, 3 no.' }
+    };
+    const btns = [...document.querySelectorAll('#ig-fig [data-preset]')];
+    let names = ['Weak', 'Strong', ''], note = presets.wind.note, active = 'wind';
+    const H = (a, b) => { const n = a + b; if (!n) return 0; let h = 0; [a, b].forEach(c => { if (c) { const p = c / n; h -= p * Math.log2(p); } }); return h; };
+    const G = (a, b) => { const n = a + b; if (!n) return 0; const p = a / n, q = b / n; return 1 - p * p - q * q; };
+    const f3 = v => v.toFixed(3);
+
+    /* static chart: axes and both curves */
+    const px = p => 390 + 260 * p, py = v => 238 - 180 * v;
+    const gGrid = mk('g', { class: 'c-grid' }, svg);
+    [0, 0.5, 1].forEach(v => { mk('line', { x1: px(0), x2: px(1), y1: py(v), y2: py(v) }, gGrid); mk('text', { x: px(0) - 8, y: py(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = v; mk('text', { x: px(v), y: py(0) + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = v; });
+    mk('line', { x1: px(0), x2: px(1), y1: py(0), y2: py(0), class: 'c-axis' }, svg);
+    mk('line', { x1: px(0), x2: px(0), y1: py(0), y2: py(1) - 6, class: 'c-axis' }, svg);
+    mk('text', { x: px(0.5), y: 274, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'p₊ in the node';
+    let dH = '', dG = '';
+    for (let i = 0; i <= 100; i++) { const p = i / 100; dH += (i ? ' L' : 'M') + px(p).toFixed(1) + ' ' + py(H(p, 1 - p)).toFixed(1); dG += (i ? ' L' : 'M') + px(p).toFixed(1) + ' ' + py(G(p, 1 - p)).toFixed(1); }
+    mk('path', { d: dH, class: 'c-user', fill: 'none', style: 'stroke-width: 2' }, svg);
+    mk('path', { d: dG, fill: 'none', style: 'stroke: var(--ok); stroke-width: 2' }, svg);
+    mk('line', { x1: 392, x2: 412, y1: 22, y2: 22, class: 'c-user', style: 'stroke-width: 2' }, svg);
+    mk('text', { x: 418, y: 26, class: 'c-note' }, svg).textContent = 'entropy';
+    mk('line', { x1: 482, x2: 502, y1: 22, y2: 22, style: 'stroke: var(--ok); stroke-width: 2' }, svg);
+    mk('text', { x: 508, y: 26, class: 'c-note' }, svg).textContent = 'Gini';
+    mk('circle', { cx: 552, cy: 22, r: 5, class: 'c-pt-hi' }, svg);
+    mk('text', { x: 562, y: 26, class: 'c-note' }, svg).textContent = 'root';
+    mk('line', { x1: 612, x2: 612, y1: 14, y2: 30, style: 'stroke: var(--accent); stroke-width: 3; stroke-linecap: round' }, svg);
+    mk('text', { x: 620, y: 26, class: 'c-note' }, svg).textContent = 'gain';
+    const gTree = mk('g', {}, svg), gDyn = mk('g', {}, svg);
+
+    const readouts = { hs: 'ig-hs', hw: 'ig-hw', gain: 'ig-gain', gs: 'ig-gs', gg: 'ig-ggain' };
+    for (const k in readouts) readouts[k] = document.getElementById(readouts[k]);
+    const sumEl = document.getElementById('ig-sum'), status = document.getElementById('ig-status');
+
+    const draw = () => {
+      const v = keys.map(k => parseInt(sl[k].value, 10));
+      keys.forEach((k, i) => { out[k].textContent = v[i]; });
+      const kids = [0, 1, 2].map(i => ({ y: v[2 * i], n: v[2 * i + 1], name: names[i] || 'Child ' + (i + 1) })).filter(c => c.y + c.n > 0);
+      const Y = kids.reduce((s, c) => s + c.y, 0), N = kids.reduce((s, c) => s + c.n, 0), T = Y + N;
+      clear(gTree); clear(gDyn);
+      if (!T) {
+        for (const k in readouts) readouts[k].textContent = '–';
+        sumEl.textContent = ''; status.textContent = 'Add some records to the children.';
+        return;
+      }
+      kids.forEach(c => { c.t = c.y + c.n; c.p = c.y / c.t; c.h = H(c.y, c.n); c.g = G(c.y, c.n); c.w = c.t / T; });
+      const hs = H(Y, N), gs = G(Y, N);
+      const hw = kids.reduce((s, c) => s + c.w * c.h, 0), gw = kids.reduce((s, c) => s + c.w * c.g, 0);
+      const gain = hs - hw, ggain = gs - gw;
+      readouts.hs.textContent = f3(hs); readouts.hw.textContent = f3(hw); readouts.gain.textContent = f3(Math.max(0, gain));
+      readouts.gs.textContent = f3(gs); readouts.gg.textContent = f3(Math.max(0, ggain));
+      sumEl.textContent = 'Gain = ' + f3(hs) + kids.map(c => ' − (' + c.t + '/' + T + ')(' + f3(c.h) + ')').join('') + ' = ' + f3(Math.max(0, gain));
+
+      /* tree, left panel */
+      const xs = kids.length === 1 ? [165] : kids.length === 2 ? [92, 238] : [57, 165, 273];
+      mk('rect', { x: 85, y: 16, width: 160, height: 54, rx: 8, style: 'fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6' }, gTree);
+      mk('text', { x: 165, y: 38, 'text-anchor': 'middle', class: 'c-note', style: 'font-weight: 600; font-size: 13px' }, gTree).textContent = 'Root: ' + Y + ' yes · ' + N + ' no';
+      mk('text', { x: 165, y: 58, 'text-anchor': 'middle', class: 'c-tick', style: 'fill: var(--ink-2)' }, gTree).textContent = 'H ' + f3(hs) + ' · Gini ' + f3(gs);
+      kids.forEach((c, i) => {
+        const cx = xs[i], pure = c.y === 0 || c.n === 0;
+        mk('line', { x1: 165, y1: 70, x2: cx, y2: 128, class: 'c-line', style: 'stroke-width: 1.3' }, gTree);
+        mk('rect', { x: cx - 50, y: 128, width: 100, height: 78, rx: 8, style: pure ? 'fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.5' : 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.2' }, gTree);
+        mk('text', { x: cx, y: 147, 'text-anchor': 'middle', class: 'c-note', style: 'font-weight: 600; font-size: 12.5px' }, gTree).textContent = c.name;
+        mk('text', { x: cx, y: 164, 'text-anchor': 'middle', class: 'c-note' }, gTree).textContent = c.y + ' yes · ' + c.n + ' no';
+        mk('text', { x: cx, y: 181, 'text-anchor': 'middle', class: 'c-tick', style: 'fill: var(--ink-2)' }, gTree).textContent = 'H ' + f3(c.h);
+        mk('text', { x: cx, y: 197, 'text-anchor': 'middle', class: 'c-tick', style: 'fill: var(--ink-2)' }, gTree).textContent = 'Gini ' + f3(c.g);
+        mk('text', { x: cx, y: 222, 'text-anchor': 'middle', class: 'c-tick' }, gTree).textContent = 'weight ' + c.t + '/' + T;
+        if (pure) mk('text', { x: cx, y: 238, 'text-anchor': 'middle', class: 'c-note', style: 'fill: var(--ok); font-weight: 600' }, gTree).textContent = 'pure leaf';
+      });
+
+      /* curves, right panel */
+      const rp = Y / T;
+      const order = kids.map((c, i) => i).sort((a, b) => kids[a].p - kids[b].p);
+      let lastX = -99, lift = 0;
+      order.forEach(i => {
+        const c = kids[i], x = px(c.p);
+        mk('circle', { cx: x, cy: py(c.g), r: 4, style: 'fill: var(--ok); stroke: var(--surface); stroke-width: 1.5' }, gDyn);
+        mk('circle', { cx: x, cy: py(c.h), r: 5, style: 'fill: var(--accent); stroke: var(--surface); stroke-width: 1.5' }, gDyn);
+        lift = Math.abs(x - lastX) < 44 ? lift + 14 : 0; lastX = x;
+        let right = c.p >= 0.5;
+        if (c.p > 0.9) right = false; else if (c.p < 0.1) right = true;
+        mk('text', { x: x + (right ? 9 : -9), y: py(c.h) - 6 - lift, 'text-anchor': right ? 'start' : 'end', class: 'c-lbl' }, gDyn).textContent = c.name;
+      });
+      const rx = px(rp);
+      if (gain > 0.0005) mk('line', { x1: rx, x2: rx, y1: py(hw), y2: py(hs), style: 'stroke: var(--accent); stroke-width: 3; stroke-linecap: round' }, gDyn);
+      if (ggain > 0.0005) mk('line', { x1: rx + 8, x2: rx + 8, y1: py(gw), y2: py(gs), style: 'stroke: var(--ok); stroke-width: 3; stroke-linecap: round' }, gDyn);
+      mk('circle', { cx: rx, cy: py(hw), r: 3.5, style: 'fill: var(--ink-2); stroke: var(--surface); stroke-width: 1.2' }, gDyn);
+      mk('circle', { cx: rx + 8, cy: py(gw), r: 3.5, style: 'fill: var(--ink-2); stroke: var(--surface); stroke-width: 1.2' }, gDyn);
+      mk('circle', { cx: rx, cy: py(hs), r: 6, class: 'c-pt-hi' }, gDyn);
+      mk('circle', { cx: rx + 8, cy: py(gs), r: 5, class: 'c-pt-hi' }, gDyn);
+
+      /* status */
+      const pureKids = kids.filter(c => c.y === 0 || c.n === 0);
+      let msg = '';
+      if (kids.length < 2) msg = 'Only one child has records, so nothing is separated and the gain is 0.';
+      else if (pureKids.length === kids.length) msg = 'Every child is pure: the gain equals H(root), the most any split can earn.';
+      else if (pureKids.length) msg = pureKids.map(c => c.name).join(' and ') + (pureKids.length > 1 ? ' are' : ' is') + ' pure (entropy 0, Gini 0), so it stops there as a leaf.';
+      status.textContent = [note, msg].filter(Boolean).join(' ');
+    };
+
+    const setPreset = name => {
+      const p = presets[name];
+      keys.forEach((k, i) => { sl[k].value = p.v[i]; });
+      names = p.names.slice(); note = p.note; active = name;
+      btns.forEach(b => { const on = b.dataset.preset === name; b.classList.toggle('solid', on); b.setAttribute('aria-pressed', String(on)); });
+      draw();
+    };
+    btns.forEach(b => b.addEventListener('click', () => setPreset(b.dataset.preset)));
+    keys.forEach(k => sl[k].addEventListener('input', () => {
+      if (active) { active = null; names = ['', '', '']; note = ''; btns.forEach(b => { b.classList.remove('solid'); b.setAttribute('aria-pressed', 'false'); }); }
+      draw();
+    }));
+    setPreset('wind');
+  })();
+
+  /* ---------- Regression tree on one feature ---------- */
+  (() => {
+    const svg = document.getElementById('reg-svg'); if (!svg) return;
+    let seed = 5150;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const truth = x => 22 + 7 * Math.sin(0.75 * x) + 0.6 * x;
+    const gen = n => { const a = []; for (let i = 0; i < n; i++) { const x = 0.2 + 9.6 * rand(); a.push([x, truth(x) + 2 * normal()]); } return a.sort((p, q) => p[0] - q[0]); };
+    const train = gen(30), test = gen(30);
+    const mean = a => a.reduce((s, p) => s + p[1], 0) / a.length;
+    const sse = a => { if (!a.length) return 0; const m = mean(a); return a.reduce((s, p) => s + (p[1] - m) ** 2, 0); };
+    const bestSplit = a => {
+      const tot = sse(a); let best = null;
+      for (let i = 1; i < a.length; i++) {
+        if (a[i][0] === a[i - 1][0]) continue;
+        const s = sse(a.slice(0, i)) + sse(a.slice(i));
+        if (!best || s < best.s) best = { s, t: (a[i - 1][0] + a[i][0]) / 2 };
+      }
+      return best && best.s < tot - 1e-9 ? best : null;
+    };
+    const grow = (a, depth, maxD, forced) => {
+      const node = { m: mean(a) };
+      if (depth >= maxD || a.length < 2) return node;
+      const sp = forced != null ? { t: forced } : bestSplit(a);
+      if (!sp) return node;
+      const L = a.filter(p => p[0] <= sp.t), R = a.filter(p => p[0] > sp.t);
+      if (!L.length || !R.length) return node;
+      node.t = sp.t; node.l = grow(L, depth + 1, maxD); node.r = grow(R, depth + 1, maxD);
+      return node;
+    };
+    const predict = (nd, x) => nd.t == null ? nd.m : predict(x <= nd.t ? nd.l : nd.r, x);
+    const leaves = (nd, lo, hi, acc) => { if (nd.t == null) acc.push([lo, hi, nd.m]); else { leaves(nd.l, lo, nd.t, acc); leaves(nd.r, nd.t, hi, acc); } return acc; };
+    const splits = (nd, acc) => { if (nd.t != null) { acc.push(nd.t); splits(nd.l, acc); splits(nd.r, acc); } return acc; };
+    const mse = (nd, a) => a.reduce((s, p) => s + (p[1] - predict(nd, p[0])) ** 2, 0) / a.length;
+    const rootMSE = sse(train) / train.length, rootMean = mean(train);
+    const bs = bestSplit(train), tBest = bs.t, bestW = bs.s / train.length;
+
+    /* main plot */
+    const sx = x => 50 + x * 42, sy = y => 300 - (y - 10) * 270 / 28;
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let x = 0; x <= 10; x += 2) { mk('line', { x1: sx(x), x2: sx(x), y1: sy(10), y2: sy(38) }, g); mk('text', { x: sx(x), y: sy(10) + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = x; }
+    for (let y = 10; y <= 30; y += 10) { mk('line', { x1: sx(0), x2: sx(10), y1: sy(y), y2: sy(y) }, g); mk('text', { x: sx(0) - 8, y: sy(y) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = y; }
+    mk('line', { x1: sx(0), x2: sx(10), y1: sy(10), y2: sy(10), class: 'c-axis' }, svg);
+    mk('line', { x1: sx(0), x2: sx(0), y1: sy(10), y2: sy(38), class: 'c-axis' }, svg);
+    mk('text', { x: sx(5), y: 330, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'F1';
+    mk('text', { x: 14, y: sy(24), 'text-anchor': 'middle', class: 'c-title', transform: `rotate(-90 14 ${sy(24)})` }, svg).textContent = 'output y';
+    mk('line', { x1: sx(0), x2: sx(10), y1: sy(rootMean), y2: sy(rootMean), style: 'stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 3 4' }, svg);
+    mk('circle', { cx: 56, cy: 350, r: 3.8, style: 'fill: var(--ink-2); stroke: var(--surface); stroke-width: 1.5' }, svg);
+    mk('text', { x: 64, y: 354, class: 'c-note' }, svg).textContent = 'train';
+    mk('circle', { cx: 112, cy: 350, r: 3.6, style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3' }, svg);
+    mk('text', { x: 120, y: 354, class: 'c-note' }, svg).textContent = 'test';
+    mk('line', { x1: 160, x2: 180, y1: 350, y2: 350, class: 'c-user' }, svg);
+    mk('text', { x: 186, y: 354, class: 'c-note' }, svg).textContent = 'tree prediction (leaf means)';
+    mk('line', { x1: 360, x2: 380, y1: 350, y2: 350, style: 'stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 3 4' }, svg);
+    mk('text', { x: 386, y: 354, class: 'c-note' }, svg).textContent = 'root mean ' + rootMean.toFixed(1);
+    const gSplit = mk('g', {}, svg);
+    const gRes = mk('g', { class: 'c-resid' }, svg);
+    const res = train.map(() => mk('line', {}, gRes));
+    const step = mk('path', { fill: 'none', class: 'c-user' }, svg);
+    const rootLine = mk('line', { y1: sy(38), y2: sy(10), class: 'c-err' }, svg);
+    const rootLbl = mk('text', { y: sy(38) + 14, class: 'c-lbl' }, svg);
+    const gTest = mk('g', {}, svg);
+    test.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.6, style: 'fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3' }, gTest));
+    const gTrain = mk('g', { class: 'c-dots' }, svg);
+    train.forEach(p => mk('circle', { cx: sx(p[0]), cy: sy(p[1]), r: 3.8 }, gTrain));
+
+    /* inset: MSE against max_depth */
+    const ix = d => 528 + (d - 1) * 18, ih = 190;
+    mk('text', { x: 520, y: 40, class: 'c-title' }, svg).textContent = 'MSE vs max_depth';
+    const gIn = mk('g', {}, svg);
+
+    const tS = document.getElementById('reg-t'), tO = document.getElementById('reg-t-out');
+    const dS = document.getElementById('reg-d'), dO = document.getElementById('reg-d-out');
+    const testBox = document.getElementById('reg-test');
+    const el = id => document.getElementById(id);
+    const status = el('reg-status');
+    let t = parseFloat(tS.value), depth = parseInt(dS.value, 10);
+
+    const draw = () => {
+      tO.textContent = t.toFixed(2); dO.textContent = depth;
+      const L = train.filter(p => p[0] <= t), R = train.filter(p => p[0] > t);
+      const valid = L.length > 0 && R.length > 0;
+      const w = valid ? (sse(L) + sse(R)) / train.length : rootMSE;
+      el('reg-m0').textContent = rootMSE.toFixed(2);
+      el('reg-m1').textContent = w.toFixed(2);
+      el('reg-red').textContent = (rootMSE - w).toFixed(2);
+      const tree = grow(train, 0, depth, t);
+      const lv = leaves(tree, 0, 10, []);
+      el('reg-leaves').textContent = lv.length;
+      const trM = mse(tree, train), teM = mse(tree, test);
+      el('reg-tr').textContent = trM.toFixed(2); el('reg-te').textContent = teM.toFixed(2);
+      let d = '';
+      lv.forEach((s, i) => { d += (i ? ' L' : 'M') + sx(s[0]).toFixed(1) + ' ' + sy(s[2]).toFixed(1) + ' L' + sx(s[1]).toFixed(1) + ' ' + sy(s[2]).toFixed(1); });
+      step.setAttribute('d', d);
+      train.forEach((p, i) => { const q = predict(tree, p[0]); res[i].setAttribute('x1', sx(p[0])); res[i].setAttribute('x2', sx(p[0])); res[i].setAttribute('y1', sy(p[1])); res[i].setAttribute('y2', sy(q)); });
+      clear(gSplit);
+      splits(tree, []).slice(1).forEach(s => mk('line', { x1: sx(s), x2: sx(s), y1: sy(38), y2: sy(10), class: 'c-faint' }, gSplit));
+      rootLine.setAttribute('x1', sx(t)); rootLine.setAttribute('x2', sx(t));
+      const right = t > 7.2;
+      rootLbl.setAttribute('x', sx(t) + (right ? -6 : 6)); rootLbl.setAttribute('text-anchor', right ? 'end' : 'start');
+      rootLbl.textContent = 'F1 ≤ ' + t.toFixed(2);
+
+      /* inset */
+      clear(gIn);
+      const curve = [];
+      for (let k = 1; k <= 8; k++) { const tr = grow(train, 0, k, t); curve.push([k, mse(tr, train), mse(tr, test)]); }
+      const top = Math.ceil(Math.max(rootMSE, ...curve.map(c => c[2])) / 5) * 5;
+      const iy = v => ih - v / top * 130;
+      mk('line', { x1: ix(1), x2: ix(8), y1: iy(0), y2: iy(0), class: 'c-axis' }, gIn);
+      mk('line', { x1: ix(1), x2: ix(1), y1: iy(0), y2: iy(top), class: 'c-axis' }, gIn);
+      [1, 4, 8].forEach(k => { mk('text', { x: ix(k), y: iy(0) + 14, 'text-anchor': 'middle', class: 'c-tick' }, gIn).textContent = k; });
+      mk('text', { x: ix(1) - 5, y: iy(0) + 4, 'text-anchor': 'end', class: 'c-tick' }, gIn).textContent = 0;
+      mk('text', { x: ix(1) - 5, y: iy(top) + 4, 'text-anchor': 'end', class: 'c-tick' }, gIn).textContent = top;
+      mk('line', { x1: ix(depth), x2: ix(depth), y1: iy(0), y2: iy(top), style: 'stroke: var(--rule); stroke-width: 6' }, gIn);
+      mk('path', { d: curve.map((c, i) => (i ? 'L' : 'M') + ix(c[0]) + ' ' + iy(c[1]).toFixed(1)).join(' '), fill: 'none', class: 'c-user', style: 'stroke-width: 2' }, gIn);
+      mk('path', { d: curve.map((c, i) => (i ? 'L' : 'M') + ix(c[0]) + ' ' + iy(c[2]).toFixed(1)).join(' '), fill: 'none', style: 'stroke: var(--ink-2); stroke-width: 2; stroke-dasharray: 5 3' }, gIn);
+      curve.forEach(c => { mk('circle', { cx: ix(c[0]), cy: iy(c[1]), r: c[0] === depth ? 4.5 : 2.5, style: 'fill: var(--accent)' }, gIn); mk('circle', { cx: ix(c[0]), cy: iy(c[2]), r: c[0] === depth ? 4.5 : 2.5, style: 'fill: var(--ink-2)' }, gIn); });
+      mk('text', { x: ix(4.5), y: iy(0) + 30, 'text-anchor': 'middle', class: 'c-tick' }, gIn).textContent = 'max_depth';
+      mk('line', { x1: 524, x2: 540, y1: 250, y2: 250, class: 'c-user', style: 'stroke-width: 2' }, gIn);
+      mk('text', { x: 545, y: 254, class: 'c-note' }, gIn).textContent = 'train';
+      mk('line', { x1: 590, x2: 606, y1: 250, y2: 250, style: 'stroke: var(--ink-2); stroke-width: 2; stroke-dasharray: 5 3' }, gIn);
+      mk('text', { x: 611, y: 254, class: 'c-note' }, gIn).textContent = 'test';
+      const bestD = curve.reduce((b, c) => c[2] < b[2] ? c : b)[0];
+
+      let msg = '';
+      if (!valid) msg = 'Every training point is on one side, so this question does not split anything.';
+      else if (depth > bestD + 1 && trM < teM) msg = 'With this root, test MSE is lowest at max_depth = ' + bestD + '. Deeper trees keep lowering the train MSE but not the test MSE: they are fitting noise.';
+      else if (Math.abs(w - bestW) < 1e-9 && depth === 1) msg = 'Best root split: no single question F1 ≤ t lowers the MSE more.';
+      status.textContent = msg;
+    };
+    draw();
+    tS.addEventListener('input', () => { t = parseFloat(tS.value); draw(); });
+    dS.addEventListener('input', () => { depth = parseInt(dS.value, 10); draw(); });
+    testBox.addEventListener('change', () => { gTest.style.display = testBox.checked ? '' : 'none'; });
+    el('reg-best').addEventListener('click', () => tween(t, tBest, v => { t = v; tS.value = v.toFixed(2); draw(); }));
+  })();
+})();
+</script>
+</body>
+</html>
