@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ML in 6 hours · Part 1 · Introduction and linear regression</title>
+<meta name="description" content="Notes on Krish Naik's Complete Machine Learning in 6 Hours, part 1 (0:00–1:07:14): AI vs ML vs DL vs data science, problem types, and linear regression with its cost function, gradient descent, R² and adjusted R².">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%232647C9%22/%3E%3Cpath d=%22M7 23 L13 9 L16 17 L19 9 L25 23%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22 stroke-linejoin=%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="notes.css">
+<script src="theme.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner gutter">
+    <!-- PARTNAV:START --><nav class="partnav" aria-label="Parts"><a href="index.html#extra">All notes</a><span class="sep">/</span><span>ML in 6 hours · Part 1 of 8</span><span class="sep">·</span><a href="krish-ml-02.html">Part 2 →</a></nav><!-- PARTNAV:END -->
+    <div class="eyebrow">Krish Naik · Complete Machine Learning in 6 Hours</div>
+    <h1>Machine learning basics and linear regression</h1>
+    <p class="lede">The video opens by placing AI, machine learning, deep learning and data science relative to each other, and by sorting ML problems into regression, classification, clustering and dimensionality reduction. Most of this part then builds linear regression from the ground up: the hypothesis, the squared-error cost, the gradient descent update, and R² and adjusted R² for judging the fit.</p>
+    <div class="meta">
+      <span><b>Part 1</b> of 8</span>
+      <span>Teacher <b>Krish Naik</b></span>
+      <span>About <b>67 min</b> of video</span>
+      <span><b>5</b> chapters</span>
+    </div>
+    <div class="watch">
+      <a class="btn solid" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=0s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>0:00 · Introduction</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=85s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:25 · AI vs ML vs DL vs DS</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=476s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:56 · ML and DL problems</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=545s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>9:05 · Regression and classification</a>
+      <a class="btn" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1094s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:14 · Linear regression</a>
+    </div>
+  </div>
+</header>
+
+<div class="page gutter">
+  <nav class="toc" aria-label="Contents">
+    <div>
+      <h4>Introduction</h4>
+      <ul>
+        <li><a href="#intro">What the session covers</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>AI vs ML vs DL vs DS</h4>
+      <ul>
+        <li><a href="#ai-ml-dl">AI, ML and DL</a></li>
+        <li><a href="#data-science">Where data science fits</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>ML and DL problems</h4>
+      <ul>
+        <li><a href="#problem-types">Two families of problems</a></li>
+        <li><a href="#supervised-example">Age and weight</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Regression and classification</h4>
+      <ul>
+        <li><a href="#features">Independent and dependent</a></li>
+        <li><a href="#regression">Regression</a></li>
+        <li><a href="#classification">Classification</a></li>
+        <li><a href="#unsupervised">Clustering, dim. reduction</a></li>
+        <li><a href="#roadmap">The algorithms ahead</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Linear regression</h4>
+      <ul>
+        <li><a href="#lr-goal">The best fit line</a></li>
+        <li><a href="#hypothesis">Hypothesis, intercept, slope</a></li>
+        <li><a href="#cost">The cost function</a></li>
+        <li><a href="#worked-example">Worked example</a></li>
+        <li><a href="#convergence">Convergence algorithm</a></li>
+        <li><a href="#learning-rate">Learning rate</a></li>
+        <li><a href="#local-minima">Local minima</a></li>
+        <li><a href="#gd-algorithm">Updates for θ₀ and θ₁</a></li>
+        <li><a href="#r-squared">R²</a></li>
+        <li><a href="#adjusted-r2">Adjusted R²</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Revision</h4>
+      <ul>
+        <li><a href="#terms">Key terms</a></li>
+        <li><a href="#test">Test yourself</a></li>
+        <li><a href="index.html#extra">All notes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="glance" id="glance">
+      <h2>At a glance</h2>
+      <ul>
+        <li><b>AI</b> is the umbrella: applications that do a task without human intervention. <b>Machine learning</b> is the subset that uses statistical tools to analyze data and predict; <b>deep learning</b> is the subset of ML built on multi-layered neural networks. <b>Data science</b> draws on all three.</li>
+        <li>Supervised ML has a dependent (output) feature. A continuous output makes it <b>regression</b>; a fixed set of categories makes it <b>classification</b>. Unsupervised ML has no output and covers <b>clustering</b> and <b>dimensionality reduction</b>.</li>
+        <li>Linear regression fits the line \(h_\theta(x) = \theta_0 + \theta_1 x\) by minimizing the squared-error cost \(J(\theta_0,\theta_1) = \frac{1}{2m}\sum_i \big(h_\theta(x_i) - y_i\big)^2\).</li>
+        <li>The <b>convergence algorithm</b> (gradient descent) repeats \(\theta_j := \theta_j - \alpha\,\partial J/\partial\theta_j\). The sign of the slope sets the direction and the learning rate \(\alpha\) sets the step size. The squared-error cost has no local minima to get stuck in.</li>
+        <li>\(R^2 = 1 - SS_{\text{res}}/SS_{\text{tot}}\) measures the fit but never falls when a feature is added, even a useless one. <b>Adjusted R²</b> charges for each extra predictor, so it drops when a new feature does not help.</li>
+      </ul>
+    </div>
+
+    <!-- ============ INTRODUCTION ============ -->
+    <section id="intro">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=6s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>0:06</a>
+        <h2>What the session covers</h2>
+      </div>
+      <p>Krish frames the session around data science interviews. In his experience, the candidates who get hired are the ones who can explain an algorithm properly, step by step. So the emphasis throughout is on the intuition and the maths behind each algorithm.</p>
+      <p>The agenda he sets <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=40s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>0:40</a> has five items:</p>
+      <ol>
+        <li>AI vs ML vs DL vs data science.</li>
+        <li>Supervised vs unsupervised machine learning.</li>
+        <li>Linear regression, with its maths and geometric intuition.</li>
+        <li>R² and adjusted R².</li>
+        <li>Ridge and Lasso regression.</li>
+      </ol>
+      <p>The first four are on this page. Ridge and Lasso open <a href="krish-ml-02.html">Part 2</a>.</p>
+    </section>
+
+    <!-- ============ AI vs ML vs DL vs DS ============ -->
+    <section id="ai-ml-dl">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=85s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:25</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=166s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>2:46 examples</a>
+        </div>
+        <h2>AI, ML and DL: circles inside circles</h2>
+      </div>
+      <p>Picture the whole field as one universe and call it <dfn>artificial intelligence</dfn>. Whatever the job title (machine learning developer, deep learning developer, computer vision developer, data scientist, AI engineer), the end product is an AI application. Krish defines one as an application that does its task without human intervention: nobody has to monitor it, and it makes its own decisions.</p>
+      <ul>
+        <li><b>Netflix.</b> Watch action movies for a while and its recommendation module suggests more action movies; the same happens with comedies. It learns your behaviour without asking you anything.</li>
+        <li><b>Amazon.in.</b> Buy an iPhone and it may recommend headphones.</li>
+        <li><b>YouTube ads.</b> The ads a viewer sees are chosen by an AI engine. He calls this a business-driven use of AI.</li>
+        <li><b>Self-driving cars</b> such as Tesla's, where an AI application built into the car drives it based on the road.</li>
+      </ul>
+      <p>Product-based companies often have a role called AI engineer, and its goal is exactly this: building AI applications.</p>
+
+      <h3>Machine learning <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=301s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:01</a></h3>
+      <p><dfn>Machine learning</dfn> is a subset of AI. It provides statistical tools to analyze data, to visualize it, and to make predictions or forecasts. The equations inside ML algorithms are statistical techniques, because any work with data needs statistics.</p>
+
+      <h3>Deep learning <a class="ts" style="vertical-align: 3px; margin-left: 6px;" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=355s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>5:55</a></h3>
+      <p><dfn>Deep learning</dfn> is a subset of ML. It grew out of a question scientists asked in the 1950s and 60s: can a machine learn the way a human does? The plan is to mimic the human brain, and the tool is a <b>multi-layered neural network</b>. Krish credits deep learning with solving very complex use cases.</p>
+    </section>
+
+    <section id="data-science">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=426s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:06</a>
+        <h2>Where data science fits</h2>
+      </div>
+      <p>A data scientist cannot choose to work in only one of these circles. A business use case may call for machine learning, deep learning, or plain data analysis. At Panasonic, Krish was asked at different times to analyze and visualize data in Power BI, to build an ML project and to build a DL project. So data science is part of all three, and its final goal is still an AI application.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 720 300" role="img" aria-label="Three nested ovals: artificial intelligence contains machine learning, which contains deep learning. A dashed oval labelled data science overlaps all three. Notes on the right describe each one.">
+            <ellipse class="d-ln" cx="210" cy="152" rx="195" ry="138"/>
+            <ellipse class="d-ln" cx="225" cy="180" rx="140" ry="100"/>
+            <ellipse class="d-box-acc" cx="235" cy="212" rx="80" ry="58"/>
+            <ellipse class="d-ln-acc d-dash" cx="326" cy="172" rx="56" ry="70"/>
+            <text class="d-t" x="180" y="58" text-anchor="middle">Artificial intelligence</text>
+            <text class="d-t" x="190" y="118" text-anchor="middle">Machine learning</text>
+            <text class="d-t" x="215" y="222" text-anchor="middle">Deep learning</text>
+            <text class="d-t" x="332" y="163" text-anchor="middle" style="fill: var(--accent)">Data</text>
+            <text class="d-t" x="332" y="179" text-anchor="middle" style="fill: var(--accent)">science</text>
+
+            <text class="d-t" x="440" y="40">Artificial intelligence</text>
+            <text class="d-s" x="440" y="57">Applications that do their task and make</text>
+            <text class="d-s" x="440" y="72">decisions with no human intervention:</text>
+            <text class="d-s" x="440" y="87">Netflix and Amazon recommendations,</text>
+            <text class="d-s" x="440" y="102">YouTube ads, self-driving cars</text>
+            <text class="d-t" x="440" y="134">Machine learning ⊂ AI</text>
+            <text class="d-s" x="440" y="151">Statistical tools to analyze and visualize</text>
+            <text class="d-s" x="440" y="166">data, and to predict or forecast</text>
+            <text class="d-t" x="440" y="198">Deep learning ⊂ ML</text>
+            <text class="d-s" x="440" y="215">Multi-layered neural networks that try</text>
+            <text class="d-s" x="440" y="230">to mimic how the human brain learns</text>
+            <text class="d-t" x="440" y="262" style="fill: var(--accent)">Data science</text>
+            <text class="d-s" x="440" y="279">Uses any of the three for a business problem</text>
+          </svg>
+        </div>
+        <figcaption><b>How the four terms relate.</b> Deep learning sits inside machine learning, which sits inside AI. Data science cuts across all three: a data scientist may analyze data, build an ML model or build a DL model, depending on the problem.</figcaption>
+      </figure>
+      <p class="note">For the IIT Madras view of what machine learning is, see <a href="part-01.html">Part 1 (part-01.html)</a>.</p>
+    </section>
+
+    <!-- ============ ML AND DL PROBLEMS ============ -->
+    <section id="problem-types">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=476s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>7:56</a>
+        <h2>Two main families of problems</h2>
+      </div>
+      <p>Most business problems solved with machine learning or deep learning fall into two families.</p>
+      <ul>
+        <li><dfn>Supervised machine learning</dfn> has an output to predict. Its two big problem types are <b>regression</b> and <b>classification</b>.</li>
+        <li><dfn>Unsupervised machine learning</dfn> has no output. Its two problem types are <b>clustering</b> and <b>dimensionality reduction</b>.</li>
+      </ul>
+      <p>He names a third kind, <dfn>reinforcement learning</dfn>, and sets it aside; it is not covered here.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 720 280" role="img" aria-label="Tree of machine learning problems. Supervised splits into regression (a continuous output, such as age to weight) and classification (fixed categories, such as pass or fail). Unsupervised splits into clustering (find similar groups) and dimensionality reduction (1000 features to 100). Reinforcement learning is shown dashed, not covered.">
+            <defs><marker id="kml01-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <rect class="d-box-acc" x="235" y="8" width="190" height="32" rx="8"/>
+            <text class="d-t" x="330" y="29" text-anchor="middle">Machine learning problems</text>
+            <path class="d-ln" d="M330 40 V56 M170 56 H657 M170 56 V72 M500 56 V72 M657 56 V72"/>
+            <rect class="d-box" x="105" y="72" width="130" height="40" rx="7"/>
+            <text class="d-t" x="170" y="89" text-anchor="middle">Supervised</text>
+            <text class="d-al" x="170" y="104" text-anchor="middle">output is known</text>
+            <rect class="d-box" x="435" y="72" width="130" height="40" rx="7"/>
+            <text class="d-t" x="500" y="89" text-anchor="middle">Unsupervised</text>
+            <text class="d-al" x="500" y="104" text-anchor="middle">no output feature</text>
+            <rect class="d-off" x="600" y="72" width="114" height="40" rx="7"/>
+            <text class="d-t t-off" x="657" y="89" text-anchor="middle">Reinforcement</text>
+            <text class="d-al" x="657" y="104" text-anchor="middle">not covered</text>
+            <path class="d-ln" d="M170 112 V126 M85 126 H255 M85 126 V140 M255 126 V140 M500 112 V126 M410 126 H590 M410 126 V140 M590 126 V140"/>
+            <rect class="d-box" x="15" y="140" width="140" height="28" rx="6"/>
+            <text class="d-t" x="85" y="159" text-anchor="middle">Regression</text>
+            <rect class="d-box" x="185" y="140" width="140" height="28" rx="6"/>
+            <text class="d-t" x="255" y="159" text-anchor="middle">Classification</text>
+            <rect class="d-box" x="340" y="140" width="140" height="28" rx="6"/>
+            <text class="d-t" x="410" y="159" text-anchor="middle">Clustering</text>
+            <rect class="d-box" x="505" y="140" width="170" height="28" rx="6"/>
+            <text class="d-t" x="590" y="159" text-anchor="middle">Dimensionality reduction</text>
+
+            <!-- regression glyph -->
+            <path class="d-rule" d="M40 180 V236 H130" style="fill: none"/>
+            <line class="d-ln-acc" x1="46" y1="232" x2="128" y2="188"/>
+            <circle class="pt-plain" cx="52" cy="229" r="3"/><circle class="pt-plain" cx="63" cy="222" r="3"/><circle class="pt-plain" cx="75" cy="224" r="3"/><circle class="pt-plain" cx="87" cy="210" r="3"/><circle class="pt-plain" cx="99" cy="208" r="3"/><circle class="pt-plain" cx="111" cy="198" r="3"/><circle class="pt-plain" cx="122" cy="192" r="3"/>
+            <!-- classification glyph -->
+            <path class="d-rule" d="M210 180 V236 H300" style="fill: none"/>
+            <circle class="pt-tree" cx="262" cy="192" r="3.5"/><circle class="pt-tree" cx="276" cy="200" r="3.5"/><circle class="pt-tree" cx="288" cy="188" r="3.5"/><circle class="pt-tree" cx="272" cy="212" r="3.5"/><circle class="pt-tree" cx="292" cy="206" r="3.5"/>
+            <circle class="pt-no" cx="222" cy="228" r="3.5"/><circle class="pt-no" cx="234" cy="220" r="3.5"/><circle class="pt-no" cx="228" cy="208" r="3.5"/><circle class="pt-no" cx="246" cy="230" r="3.5"/><circle class="pt-no" cx="242" cy="214" r="3.5"/>
+            <!-- clustering glyph -->
+            <path class="d-rule" d="M365 180 V236 H455" style="fill: none"/>
+            <circle class="d-ln d-dash" cx="383" cy="196" r="12"/><circle class="d-ln d-dash" cx="425" cy="222" r="12"/><circle class="d-ln d-dash" cx="440" cy="192" r="11"/>
+            <circle class="pt-plain" cx="378" cy="192" r="2.6"/><circle class="pt-plain" cx="387" cy="193" r="2.6"/><circle class="pt-plain" cx="380" cy="201" r="2.6"/><circle class="pt-plain" cx="388" cy="200" r="2.6"/>
+            <circle class="pt-plain" cx="420" cy="219" r="2.6"/><circle class="pt-plain" cx="429" cy="218" r="2.6"/><circle class="pt-plain" cx="423" cy="227" r="2.6"/><circle class="pt-plain" cx="431" cy="225" r="2.6"/>
+            <circle class="pt-plain" cx="436" cy="189" r="2.6"/><circle class="pt-plain" cx="444" cy="190" r="2.6"/><circle class="pt-plain" cx="439" cy="197" r="2.6"/>
+            <!-- dimensionality reduction glyph -->
+            <rect class="d-box" x="540" y="182" width="40" height="50"/>
+            <path class="d-ln-mut" d="M544 182 V232 M548 182 V232 M552 182 V232 M556 182 V232 M560 182 V232 M564 182 V232 M568 182 V232 M572 182 V232 M576 182 V232"/>
+            <line class="d-ln" x1="586" y1="207" x2="604" y2="207" marker-end="url(#kml01-ah)"/>
+            <rect class="d-box-acc" x="610" y="182" width="14" height="50"/>
+            <path class="d-ln-mut" d="M614.7 182 V232 M619.3 182 V232"/>
+
+            <text class="d-s" x="85" y="254" text-anchor="middle">continuous output</text>
+            <text class="d-s" x="85" y="269" text-anchor="middle">age → weight</text>
+            <text class="d-s" x="255" y="254" text-anchor="middle">fixed categories</text>
+            <text class="d-s" x="255" y="269" text-anchor="middle">pass or fail</text>
+            <text class="d-s" x="410" y="254" text-anchor="middle">find similar groups</text>
+            <text class="d-s" x="410" y="269" text-anchor="middle">customer segments</text>
+            <text class="d-s" x="590" y="254" text-anchor="middle">fewer features</text>
+            <text class="d-s" x="590" y="269" text-anchor="middle">1000 → 100, e.g. PCA</text>
+          </svg>
+        </div>
+        <figcaption><b>The problem types used in this video.</b> Supervised problems have a dependent feature and split by its type: a continuous number (regression) or one of a fixed set of categories (classification). Unsupervised problems have no output feature. The small pictures are schematic.</figcaption>
+      </figure>
+      <p class="note">For the IIT Madras treatment of the learning paradigms, see <a href="part-01.html#paradigms">Part 1 (part-01.html)</a>.</p>
+    </section>
+
+    <section id="supervised-example">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=522s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>8:42</a>
+        <h2>A supervised data set: age and weight</h2>
+      </div>
+      <p>Take a data set with two columns, age and weight, with rows such as age 24 and weight 62. The task is to train a model on this data so that, given a new age, it returns a weight. A trained model of this kind is also called a <dfn>hypothesis</dfn>, a word that comes back with linear regression.</p>
+    </section>
+
+    <!-- ============ REGRESSION AND CLASSIFICATION ============ -->
+    <section id="features">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=586s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>9:46</a>
+        <h2>Independent and dependent features</h2>
+      </div>
+      <p>Every supervised data set has two kinds of columns.</p>
+      <ul>
+        <li><dfn>Independent features</dfn> are the inputs the model is trained on. Here that is age.</li>
+        <li>The <dfn>dependent feature</dfn> is the output the model must predict. Here that is weight. It is called dependent because its value changes as the inputs increase or decrease.</li>
+      </ul>
+      <p class="rule-of-thumb">A supervised problem has one dependent feature and any number of independent features.</p>
+    </section>
+
+    <section id="regression">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=650s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>10:50</a>
+        <h2>Regression: the output is continuous</h2>
+      </div>
+      <p>Keep the age and weight example. Weight is a <b>continuous variable</b>, and whenever the output is continuous the problem is a <dfn>regression</dfn> problem.</p>
+      <p>To solve it with linear regression, plot the data as a scatter plot and draw a straight line through it, \(y = mx + c\). For a new age, the point on the line above it is the predicted weight.</p>
+    </section>
+
+    <section id="classification">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=746s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>12:26</a>
+        <h2>Classification: the output is a category</h2>
+      </div>
+      <p>Now take a data set whose independent features are a student's study hours, play hours and sleeping hours, and whose dependent feature is pass or fail. The output can take only a fixed number of categories, which makes this a <dfn>classification</dfn> problem.</p>
+      <ul>
+        <li>Two categories, such as pass and fail: <b>binary classification</b>.</li>
+        <li>More than two categories: <b>multiclass classification</b>.</li>
+      </ul>
+      <p class="note">For the IIT Madras treatment, where the set of possible labels decides the problem type, see <a href="part-10.html#label-types">Part 10 (part-10.html)</a>.</p>
+    </section>
+
+    <section id="unsupervised">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=812s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>13:32</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=972s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:12 dimensionality reduction</a>
+        </div>
+        <h2>Unsupervised learning: clustering and dimensionality reduction</h2>
+      </div>
+      <p>In unsupervised ML there is no output variable and no dependent feature. The question becomes what can be learnt from the inputs alone.</p>
+
+      <h3>Clustering and customer segmentation</h3>
+      <p>Take a data set of customers' salary and age. <dfn>Clustering</dfn> finds groups of similar people. Krish sketches three clusters: young people who already earn a very good salary, older people with good salaries, and a middle-class group whose salary does not rise much with age. Each cluster says something about the people in it.</p>
+      <p>The use he gives is <dfn>customer segmentation</dfn>. Suppose a company launches one product for rich customers and another for middle-class customers. With the clusters in hand, it can send each product's ads only to the matching group. Regression or classification models can then be built on top of the segments.</p>
+      <p class="callout">Clustering is not classification. It is a grouping method, and there is no output feature to predict.</p>
+
+      <h3>Dimensionality reduction</h3>
+      <p><dfn>Dimensionality reduction</dfn> takes data with many features, say 1000, and converts it to far fewer, say 100. PCA is one such algorithm, and he names LDA as another to cover later.</p>
+
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Data set</th><th>Independent features</th><th>Dependent feature</th><th>Problem</th></tr></thead>
+          <tbody>
+            <tr><td>Age and weight</td><td>age</td><td>weight, a continuous number</td><td>regression</td></tr>
+            <tr><td>Exam results</td><td>study, play and sleep hours</td><td>pass or fail, one of 2 categories</td><td>binary classification</td></tr>
+            <tr><td>Customers</td><td>salary, age</td><td>none</td><td>clustering (unsupervised)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">For the IIT Madras treatment, see <a href="part-03.html">Part 3 (part-03.html)</a> for PCA and <a href="part-06.html">Part 6 (part-06.html)</a> for K-means clustering.</p>
+    </section>
+
+    <section id="roadmap">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1004s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>16:44</a>
+        <h2>The algorithms ahead</h2>
+      </div>
+      <p>Krish lists the algorithms the video will cover, adding SVM and KNN at the end as he remembers them. The right-hand column points to the part of these notes where each one is taught.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Family</th><th>Algorithms as listed</th><th>In these notes</th></tr></thead>
+          <tbody>
+            <tr><td>Supervised</td><td>Linear regression</td><td>this part; practical in <a href="krish-ml-03.html">Part 3</a></td></tr>
+            <tr><td>Supervised</td><td>Ridge and Lasso, logistic regression</td><td><a href="krish-ml-02.html">Part 2</a></td></tr>
+            <tr><td>Supervised</td><td>Decision trees (classification and regression)</td><td><a href="krish-ml-05.html">Part 5</a></td></tr>
+            <tr><td>Supervised</td><td>AdaBoost, random forest</td><td><a href="krish-ml-06.html">Part 6</a></td></tr>
+            <tr><td>Supervised</td><td>Gradient boosting, XGBoost, SVM</td><td>XGBoost and SVM in <a href="krish-ml-08.html">Part 8</a></td></tr>
+            <tr><td>Supervised</td><td>Naive Bayes, KNN</td><td><a href="krish-ml-04.html">Part 4</a></td></tr>
+            <tr><td>Unsupervised</td><td>K-means, DBSCAN, hierarchical clustering</td><td><a href="krish-ml-07.html">Part 7</a></td></tr>
+            <tr><td>Unsupervised</td><td>PCA, LDA</td><td>no chapter of their own</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Correction: in the spoken list <i>K nearest neighbour clustering</i> appears under unsupervised algorithms. KNN is a supervised method for classification and regression, and the video teaches it that way later (see <a href="krish-ml-04.html">Part 4</a>).</p>
+    </section>
+
+    <!-- ============ LINEAR REGRESSION ============ -->
+    <section id="lr-goal">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1094s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>18:14</a>
+        <h2>Linear regression: find the best fit line</h2>
+      </div>
+      <p>Take two features, \(x\) (age) and \(y\) (weight), and a scatter of training points. Linear regression trains a model on this training data set. The model is a hypothesis: it takes a new age and returns a predicted weight. Performance metrics then check whether the model is doing well.</p>
+      <p>The model is a <dfn>best fit line</dfn> through the points, so \(y\) is treated as a linear function of \(x\). Why a straight line and not a curve is a question he leaves to the later algorithms.</p>
+    </section>
+
+    <section id="hypothesis">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1201s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>20:01</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1294s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>21:34 intercept and slope</a>
+        </div>
+        <h2>The hypothesis \(h_\theta(x) = \theta_0 + \theta_1 x\)</h2>
+      </div>
+      <p>The same straight line goes by many notations: \(y = mx + c\), \(y = \beta_0 + \beta_1 x\), or \(h_\theta(x) = \theta_0 + \theta_1 x\). Krish uses the last one, which comes from Andrew Ng's course, and credits Ng for the way he teaches this algorithm.</p>
+      <div class="eq">\[ h_\theta(x_i) = \theta_0 + \theta_1 x_i \]</div>
+      <ul>
+        <li>\(\theta_0\) is the <dfn>intercept</dfn>. At \(x = 0\), \(h_\theta(x) = \theta_0\), so it is the point where the line meets the y-axis.</li>
+        <li>\(\theta_1\) is the <dfn>slope</dfn>, also called the <dfn>coefficient</dfn>: how much the line moves along the y-axis for a one-unit move along the x-axis.</li>
+        <li>\(x_i\) are the data points.</li>
+      </ul>
+      <p>The aim <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1391s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>23:11</a> is a line for which the distance between each actual point and its predicted point on the line is small, so that the sum of these distances is minimal. Only then can we call it the best fit line.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 640 290" role="img" aria-label="Five data points and a line h of x equals theta zero plus theta one x. The intercept theta zero is where the line meets the y-axis. A small triangle shows the slope theta one: one unit across, theta one up. Dashed vertical segments join each point to its predicted point on the line.">
+            <path class="d-ln" d="M60 24 V260 H432" style="fill: none"/>
+            <text class="d-al" x="68" y="30">y (weight)</text>
+            <text class="d-al" x="432" y="278" text-anchor="end">x (age)</text>
+            <text class="d-al" x="52" y="274" text-anchor="end">0</text>
+            <line class="d-ln-acc" x1="60" y1="221.7" x2="420" y2="60.7" style="stroke-width: 2.2"/>
+            <text class="d-t" x="245" y="72" text-anchor="middle" style="fill: var(--accent)">hθ(x) = θ₀ + θ₁x</text>
+            <path class="d-ln d-dash" d="M111.4 179.5 V198.7 M162.9 198.7 V175.7 M214.3 129.7 V152.7 M265.7 148.8 V129.7 M317.1 83.7 V106.7"/>
+            <circle class="pt-no" cx="111.4" cy="198.7" r="4"/><circle class="pt-no" cx="162.9" cy="175.7" r="4"/><circle class="pt-no" cx="214.3" cy="152.7" r="4"/><circle class="pt-no" cx="265.7" cy="129.7" r="4"/><circle class="pt-no" cx="317.1" cy="106.7" r="4"/>
+            <circle class="pt-plain" cx="111.4" cy="179.5" r="4.5"/><circle class="pt-plain" cx="162.9" cy="198.7" r="4.5"/><circle class="pt-plain" cx="214.3" cy="129.7" r="4.5"/><circle class="pt-plain" cx="265.7" cy="148.8" r="4.5"/><circle class="pt-plain" cx="317.1" cy="83.7" r="4.5"/>
+            <circle class="pt-new" cx="60" cy="221.7" r="5"/>
+            <text class="d-s" x="70" y="242">θ₀ (intercept)</text>
+            <path class="d-ln" d="M358.3 88.3 H409.7 V65.3" style="fill: none"/>
+            <text class="d-al" x="384" y="102" text-anchor="middle">1 unit</text>
+            <text class="d-t" x="415" y="81">θ₁</text>
+
+            <circle class="pt-plain" cx="466" cy="60" r="4.5"/><text class="d-s" x="478" y="64">actual point (xᵢ, yᵢ)</text>
+            <circle class="pt-no" cx="466" cy="86" r="4"/><text class="d-s" x="478" y="90">predicted point hθ(xᵢ)</text>
+            <line class="d-ln d-dash" x1="466" y1="104" x2="466" y2="120"/><text class="d-s" x="478" y="116">error hθ(xᵢ) − yᵢ</text>
+            <circle class="pt-new" cx="466" cy="140" r="5"/><text class="d-s" x="478" y="144">intercept θ₀, the value at x = 0</text>
+            <path class="d-ln" d="M459 170 H473 V160" style="fill: none"/><text class="d-s" x="478" y="170">slope θ₁ per unit of x</text>
+            <text class="d-s" x="460" y="204">Best fit line: the θ₀ and θ₁</text>
+            <text class="d-s" x="460" y="219">that make the errors, squared</text>
+            <text class="d-s" x="460" y="234">and summed over all points,</text>
+            <text class="d-s" x="460" y="249">as small as possible</text>
+          </svg>
+        </div>
+        <figcaption><b>Anatomy of the hypothesis</b> (illustrative points). The intercept \(\theta_0\) fixes where the line crosses the y-axis and the slope \(\theta_1\) fixes its tilt. Each dashed segment is the gap between an actual point and the line's prediction at the same \(x\). Linear regression looks for the line that makes these gaps smallest overall.</figcaption>
+      </figure>
+    </section>
+
+    <section id="cost">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1462s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>24:22</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1657s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>27:37 J(θ₀, θ₁)</a>
+        </div>
+        <h2>The cost function</h2>
+      </div>
+      <p>One way to find the best line would be to draw many lines and keep the one with the smallest total distance. There is no telling how many lines that takes, or how to know when the best one has been found. A better plan is to start from one line and move step by step toward the best one. That needs a <dfn>cost function</dfn>, one number that says how bad the current line is.</p>
+      <p>For each point, the gap between prediction and truth is \(h_\theta(x_i) - y_i\). Square it, add over all \(m\) points, and divide by \(2m\):</p>
+      <div class="result">
+        <span class="lbl">Cost function (squared error function)</span>
+        \[ J(\theta_0, \theta_1) = \frac{1}{2m}\sum_{i=1}^{m}\big(h_\theta(x_i) - y_i\big)^2 \qquad\text{Goal: } \min_{\theta_0,\,\theta_1} J(\theta_0, \theta_1) \]
+        <p>Keep changing \(\theta_0\) and \(\theta_1\) until \(J\) is as small as it can be; that line is the best fit line.</p>
+      </div>
+      <p>Each piece of the formula has a reason <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1724s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>28:44</a>.</p>
+      <ul>
+        <li><b>The square</b> stops negative errors from cancelling positive ones.</li>
+        <li><b>Dividing by \(m\)</b> turns the sum into an average over the data points.</li>
+        <li><b>The extra \(\tfrac12\)</b> is for mathematical convenience. The derivative of \(x^2\) is \(2x\) (in general, of \(x^n\) it is \(n x^{n-1}\)), so when \(\theta_0\) and \(\theta_1\) are updated using derivatives, the 2 cancels the \(\tfrac12\).</li>
+      </ul>
+      <p>He calls the whole expression the <dfn>squared error function</dfn>.</p>
+      <p class="note">Not in the video: without the \(\tfrac12\), \(J\) is the mean squared error (MSE). Scaling by \(\tfrac12\) changes the value of \(J\) but not which \(\theta_0, \theta_1\) minimize it. For the IIT Madras treatment, which writes the same objective as a plain sum of squared errors, see <a href="part-10.html#squared-error">Part 10 (part-10.html)</a>.</p>
+    </section>
+
+    <section id="worked-example">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1852s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>30:52</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=1920s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>32:00 three points</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2381s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>39:41 the curve</a>
+        </div>
+        <h2>Worked example: try three slopes</h2>
+      </div>
+      <p>To see the shape of \(J\), simplify first. Set \(\theta_0 = 0\), so the line passes through the origin and \(h_\theta(x) = \theta_1 x\). The cost now depends on \(\theta_1\) alone. The data are three points, \((1, 1)\), \((2, 2)\) and \((3, 3)\), so \(m = 3\) and \(\tfrac{1}{2m} = \tfrac16\).</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th class="num">θ₁</th><th>Predictions at x = 1, 2, 3</th><th>Squared errors</th><th class="num">J(θ₁)</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td>1, 2, 3</td><td>0, 0, 0</td><td class="num">0</td></tr>
+            <tr><td class="num">0.5</td><td>0.5, 1, 1.5</td><td>0.25, 1, 2.25</td><td class="num">3.5 / 6 ≈ 0.58</td></tr>
+            <tr><td class="num">0</td><td>0, 0, 0</td><td>1, 4, 9</td><td class="num">14 / 6 ≈ 2.33</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li><b>\(\theta_1 = 1\).</b> The line passes through all three points, so each predicted point is the data point itself and \(J(1) = 0\).</li>
+        <li><b>\(\theta_1 = 0.5\)</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2122s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>35:22</a>. The line is flatter and every prediction falls short, so \(J(0.5) \approx 0.58\) (worked out below).</li>
+        <li><b>\(\theta_1 = 0\)</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2281s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>38:01</a>. The line is the x-axis and \(J(0) = \tfrac16(1 + 4 + 9) \approx 2.33\).</li>
+      </ul>
+      <div class="eq">\[ J(0.5) = \frac16\Big[(0.5-1)^2 + (1-2)^2 + (1.5-3)^2\Big] = \frac{0.25 + 1 + 2.25}{6} \approx 0.58 \]</div>
+      <p>Plot each \((\theta_1, J)\) pair, add a point for \(\theta_1 = 2\), and join them. The result is a U-shaped curve of the cost against \(\theta_1\). Its lowest point is the <dfn>global minimum</dfn>, at \(\theta_1 = 1\): the slope of the best fit line, where the predicted points are closest to the real ones.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 290" role="img" aria-label="Left: the points (1,1), (2,2) and (3,3) with three lines through the origin, slopes 1, 0.5 and 0. Right: the cost J against theta one, a U-shaped curve with points at theta one equal to 0 (cost 2.33), 0.5 (cost 0.58) and 1 (cost 0, the global minimum), plus mirror points at 1.5 and 2.">
+            <text class="d-h" x="50" y="16">Three trial lines through the origin</text>
+            <path class="d-rule" d="M50 26 V250 H292" style="fill: none"/>
+            <path class="d-rule" d="M50 187.1 H290 M50 124.3 H290 M50 61.4 H290 M118.6 26 V250 M187.1 26 V250 M255.7 26 V250" style="stroke-dasharray: 2 4"/>
+            <text class="d-al" x="118.6" y="266" text-anchor="middle">1</text><text class="d-al" x="187.1" y="266" text-anchor="middle">2</text><text class="d-al" x="255.7" y="266" text-anchor="middle">3</text>
+            <text class="d-al" x="42" y="191" text-anchor="end">1</text><text class="d-al" x="42" y="128" text-anchor="end">2</text><text class="d-al" x="42" y="65" text-anchor="end">3</text>
+            <text class="d-al" x="42" y="254" text-anchor="end">0</text>
+            <text class="d-al" x="292" y="282" text-anchor="end">x</text>
+            <text class="d-al" x="56" y="34">y</text>
+            <line class="d-ln d-dash" x1="50" y1="250" x2="290" y2="250" style="stroke-width: 2"/>
+            <line class="d-ln" x1="50" y1="250" x2="290" y2="140"/>
+            <line class="d-ln-acc" x1="50" y1="250" x2="290" y2="30" style="stroke-width: 2.2"/>
+            <circle class="pt-no" cx="118.6" cy="218.6" r="3.8"/><circle class="pt-no" cx="187.1" cy="187.1" r="3.8"/><circle class="pt-no" cx="255.7" cy="155.7" r="3.8"/>
+            <circle class="pt-plain" cx="118.6" cy="187.1" r="5"/><circle class="pt-plain" cx="187.1" cy="124.3" r="5"/><circle class="pt-plain" cx="255.7" cy="61.4" r="5"/>
+            <text class="d-s" x="296" y="36" style="fill: var(--accent)">θ₁ = 1</text>
+            <text class="d-s" x="296" y="144">θ₁ = 0.5</text>
+            <text class="d-s" x="296" y="247">θ₁ = 0</text>
+
+            <text class="d-h" x="400" y="16">Cost J(θ₁) against θ₁</text>
+            <path class="d-rule" d="M400 26 V250 H642" style="fill: none"/>
+            <path class="d-rule" d="M400 176.7 H640 M400 103.3 H640 M400 30 H640" style="stroke-dasharray: 2 4"/>
+            <text class="d-al" x="410.9" y="266" text-anchor="middle">0</text><text class="d-al" x="465.5" y="266" text-anchor="middle">0.5</text><text class="d-al" x="520" y="266" text-anchor="middle">1</text><text class="d-al" x="574.5" y="266" text-anchor="middle">1.5</text><text class="d-al" x="629.1" y="266" text-anchor="middle">2</text>
+            <text class="d-al" x="392" y="254" text-anchor="end">0</text><text class="d-al" x="392" y="181" text-anchor="end">1</text><text class="d-al" x="392" y="107" text-anchor="end">2</text><text class="d-al" x="392" y="34" text-anchor="end">3</text>
+            <text class="d-al" x="642" y="282" text-anchor="end">θ₁</text>
+            <line class="d-ln-mut d-dash" x1="520" y1="50" x2="520" y2="250"/>
+            <path class="d-ln" d="M400.0 43.0 L402.7 52.3 L405.5 61.3 L408.2 70.2 L410.9 78.9 L413.6 87.3 L416.4 95.6 L419.1 103.6 L421.8 111.4 L424.5 119.0 L427.3 126.4 L430.0 133.5 L432.7 140.5 L435.5 147.2 L438.2 153.8 L440.9 160.1 L443.6 166.2 L446.4 172.0 L449.1 177.7 L451.8 183.2 L454.5 188.4 L457.3 193.4 L460.0 198.2 L462.7 202.8 L465.5 207.2 L468.2 211.4 L470.9 215.3 L473.6 219.1 L476.4 222.6 L479.1 225.9 L481.8 229.0 L484.5 231.9 L487.3 234.6 L490.0 237.1 L492.7 239.3 L495.5 241.3 L498.2 243.2 L500.9 244.8 L503.6 246.2 L506.4 247.3 L509.1 248.3 L511.8 249.0 L514.5 249.6 L517.3 249.9 L520.0 250.0 L522.7 249.9 L525.5 249.6 L528.2 249.0 L530.9 248.3 L533.6 247.3 L536.4 246.2 L539.1 244.8 L541.8 243.2 L544.5 241.3 L547.3 239.3 L550.0 237.1 L552.7 234.6 L555.5 231.9 L558.2 229.0 L560.9 225.9 L563.6 222.6 L566.4 219.1 L569.1 215.3 L571.8 211.4 L574.5 207.2 L577.3 202.8 L580.0 198.2 L582.7 193.4 L585.5 188.4 L588.2 183.2 L590.9 177.7 L593.6 172.0 L596.4 166.2 L599.1 160.1 L601.8 153.8 L604.5 147.2 L607.3 140.5 L610.0 133.5 L612.7 126.4 L615.5 119.0 L618.2 111.4 L620.9 103.6 L623.6 95.6 L626.4 87.3 L629.1 78.9 L631.8 70.2 L634.5 61.4 L637.3 52.3 L640.0 43.0"/>
+            <circle class="pt-no" cx="574.5" cy="207.2" r="4.5"/><circle class="pt-no" cx="629.1" cy="78.9" r="4.5"/>
+            <circle class="pt-tree" cx="410.9" cy="78.9" r="5"/><circle class="pt-tree" cx="465.5" cy="207.2" r="5"/><circle class="pt-tree" cx="520" cy="250" r="5"/>
+            <text class="d-s" x="420" y="72">2.33</text>
+            <text class="d-s" x="456" y="222" text-anchor="end">0.58</text>
+            <text class="d-s" x="528" y="44">global minimum:</text>
+            <text class="d-s" x="528" y="59">J = 0 at θ₁ = 1</text>
+          </svg>
+        </div>
+        <figcaption><b>Building the cost curve from three trials.</b> Left: the data (dark dots) and the three lines; rings mark the predictions of the \(\theta_1 = 0.5\) line. Right: each trial gives one point on \(J(\theta_1)\) (filled). The hollow points at \(\theta_1 = 1.5\) and \(2\) were computed for these notes and mirror those at \(0.5\) and \(0\). The bottom of the U, \(\theta_1 = 1\), is the best fit line.</figcaption>
+      </figure>
+      <p class="callout">A naming slip to watch for: in the video this U-shaped curve is itself called <i>gradient descent</i>. The curve is the cost function \(J(\theta_1)\). Gradient descent is the procedure that walks down it, described next.</p>
+      <p class="note">Not in the video: for this data \(J(\theta_1) = \tfrac16(\theta_1 - 1)^2(1^2 + 2^2 + 3^2) = \tfrac73(\theta_1 - 1)^2\), an exact parabola. That is why \(\theta_1 = 0.5\) and \(1.5\) give the same cost, and so do \(0\) and \(2\).</p>
+    </section>
+
+    <section id="convergence">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2482s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>41:22</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2577s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>42:57 why it works</a>
+        </div>
+        <h2>The convergence algorithm</h2>
+      </div>
+      <p>Trying values of \(\theta_1\) by hand is guesswork. What we want is to start from one point on the curve and keep updating \(\theta_1\) until it reaches the global minimum. The rule that does this is the <dfn>convergence algorithm</dfn>:</p>
+      <div class="result">
+        <span class="lbl">Convergence algorithm (gradient descent)</span>
+        \[ \text{repeat until convergence:}\qquad \theta_j := \theta_j - \alpha\,\frac{\partial}{\partial\theta_j}\, J(\theta_0, \theta_1) \]
+        <p>\(:=\) means the left side is replaced by the right side. \(\alpha\) is the learning rate. The derivative is the slope of the cost curve at the current point.</p>
+      </div>
+      <p class="note">On the board the derivative is read out the other way round, as the derivative of \(\theta_j\) with respect to \(J\). It is the derivative of \(J\) with respect to \(\theta_j\), as written above.</p>
+
+      <h3>Why the update heads for the minimum</h3>
+      <p>Draw the tangent to the cost curve at the current \(\theta_1\). Krish's quick test for its sign: if the right-hand end of the tangent points upward, the slope is positive.</p>
+      <ul>
+        <li><b>Right of the minimum</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2640s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>44:00</a>, the slope is positive. \(\theta_1 := \theta_1 - \alpha \times (\text{positive})\) makes \(\theta_1\) smaller, so it moves left, toward the minimum.</li>
+        <li><b>Left of the minimum</b> <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2736s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>45:36</a>, the slope is negative. Minus times minus is plus, so \(\theta_1 := \theta_1 + \alpha \times \lvert\text{slope}\rvert\) and \(\theta_1\) moves right, toward the minimum.</li>
+      </ul>
+      <p>Either way, after enough iterations \(\theta_1\) reaches the global minimum.</p>
+
+      <figure id="slope-fig">
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 272" role="img" aria-label="Left: a U-shaped cost curve with a tangent on each side of the minimum. On the right the slope is positive and theta one moves left; on the left the slope is negative and theta one moves right. Right: a curve with a deep global minimum on the left and a shallower local minimum on the right. Gradient descent iterates started on the right settle in the local minimum, where the tangent is flat.">
+            <defs><marker id="kml01-ah-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-ah-acc" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+            <text class="d-h" x="30" y="18">The sign of the slope sets the direction</text>
+            <path class="d-rule" d="M60 40 V210 H312" style="fill: none"/>
+            <text class="d-al" x="66" y="50">J(θ₁)</text>
+            <text class="d-al" x="312" y="224" text-anchor="end">θ₁</text>
+            <path class="d-ln" d="M70.4 81.4 L75.6 92.9 L80.8 103.8 L86.0 114.1 L91.2 123.9 L96.5 133.2 L101.7 142.0 L106.9 150.2 L112.1 157.9 L117.3 165.1 L122.5 171.8 L127.7 177.9 L132.9 183.4 L138.1 188.5 L143.3 193.0 L148.5 197.0 L153.8 200.4 L159.0 203.4 L164.2 205.8 L169.4 207.6 L174.6 208.9 L179.8 209.7 L185.0 210.0 L190.2 209.7 L195.4 208.9 L200.6 207.6 L205.8 205.8 L211.0 203.4 L216.2 200.4 L221.5 197.0 L226.7 193.0 L231.9 188.5 L237.1 183.4 L242.3 177.9 L247.5 171.8 L252.7 165.1 L257.9 157.9 L263.1 150.2 L268.3 142.0 L273.5 133.2 L278.8 123.9 L284.0 114.1 L289.2 103.8 L294.4 92.9 L299.6 81.4"/>
+            <line class="d-ln-acc" x1="237.1" y1="193" x2="299.6" y2="91"/>
+            <line class="d-ln-acc" x1="70.4" y1="91" x2="132.9" y2="193"/>
+            <circle class="pt-no" cx="185" cy="210" r="4.5"/>
+            <circle class="pt-tree" cx="268.3" cy="142" r="5"/>
+            <circle class="pt-tree" cx="101.7" cy="142" r="5"/>
+            <text class="d-s" x="294" y="72" text-anchor="end">slope &gt; 0</text>
+            <text class="d-s" x="76" y="72">slope &lt; 0</text>
+            <line class="d-ln-acc" x1="268.3" y1="228" x2="226.7" y2="228" marker-end="url(#kml01-ah-acc)"/>
+            <line class="d-ln-acc" x1="101.7" y1="228" x2="143.3" y2="228" marker-end="url(#kml01-ah-acc)"/>
+            <text class="d-s" x="247" y="246" text-anchor="middle">θ₁ − α·(positive)</text>
+            <text class="d-s" x="247" y="261" text-anchor="middle">θ₁ moves left</text>
+            <text class="d-s" x="122" y="246" text-anchor="middle">θ₁ − α·(negative)</text>
+            <text class="d-s" x="122" y="261" text-anchor="middle">θ₁ moves right</text>
+
+            <line class="d-rule" x1="352" y1="8" x2="352" y2="264"/>
+
+            <text class="d-h" x="370" y="18">If the cost had a local minimum</text>
+            <path class="d-rule" d="M370 40 V210 H652" style="fill: none"/>
+            <text class="d-al" x="652" y="224" text-anchor="end">θ₁</text>
+            <path class="d-ln" d="M370.0 121.1 L374.0 137.2 L378.0 151.2 L382.0 163.0 L386.0 172.9 L390.0 181.1 L394.0 187.6 L398.0 192.6 L402.0 196.2 L406.0 198.4 L410.0 199.6 L414.0 199.6 L418.0 198.7 L422.0 197.0 L426.0 194.5 L430.0 191.3 L434.0 187.6 L438.0 183.3 L442.0 178.7 L446.0 173.8 L450.0 168.6 L454.0 163.2 L458.0 157.8 L462.0 152.2 L466.0 146.7 L470.0 141.3 L474.0 136.0 L478.0 130.8 L482.0 125.9 L486.0 121.2 L490.0 116.8 L494.0 112.7 L498.0 109.0 L502.0 105.6 L506.0 102.6 L510.0 100.0 L514.0 97.8 L518.0 96.1 L522.0 94.7 L526.0 93.8 L530.0 93.4 L534.0 93.3 L538.0 93.6 L542.0 94.4 L546.0 95.4 L550.0 96.9 L554.0 98.6 L558.0 100.7 L562.0 102.9 L566.0 105.4 L570.0 108.1 L574.0 110.9 L578.0 113.7 L582.0 116.6 L586.0 119.4 L590.0 122.1 L594.0 124.6 L598.0 126.9 L602.0 128.9 L606.0 130.4 L610.0 131.5 L614.0 132.0 L618.0 131.9 L622.0 131.0 L626.0 129.2 L630.0 126.5 L634.0 122.7 L638.0 117.8 L642.0 111.5 L646.0 103.9 L650.0 94.8"/>
+            <line class="d-ln-acc" x1="588" y1="132.1" x2="642" y2="132.1"/>
+            <circle class="pt-no" cx="412.3" cy="199.7" r="4.5"/>
+            <circle class="pt-tree" cx="643.3" cy="109.2" r="3.4"/><circle class="pt-tree" cx="630.9" cy="125.8" r="3.4"/><circle class="pt-tree" cx="625" cy="129.7" r="3.4"/><circle class="pt-tree" cx="621.7" cy="131.1" r="3.4"/><circle class="pt-tree" cx="619.6" cy="131.6" r="3.4"/>
+            <text class="d-al" x="638" y="98" text-anchor="end">start</text>
+            <text class="d-s" x="645" y="154" text-anchor="end">local minimum: slope = 0,</text>
+            <text class="d-s" x="645" y="168" text-anchor="end">so the update stops here</text>
+            <text class="d-s" x="372" y="228">global minimum,</text>
+            <text class="d-s" x="372" y="243">out of reach from this start</text>
+          </svg>
+        </div>
+        <figcaption><b>Direction and a trap</b> (schematic curves). Left: on either side of the minimum, subtracting \(\alpha\) times the slope moves \(\theta_1\) toward the bottom. Right: on a cost with a second, shallower dip, iterates started on the right (dots) slide into the local minimum and stop, because the slope there is zero. The squared-error cost of linear regression has only the single bowl on the left.</figcaption>
+      </figure>
+    </section>
+
+    <section id="learning-rate">
+      <div class="sec-head">
+        <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2780s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>46:20</a>
+        <h2>The learning rate \(\alpha\)</h2>
+      </div>
+      <p>The learning rate sets the speed at which \(\theta_1\) travels toward the global minimum, that is, the size of each step.</p>
+      <ul>
+        <li><b>A small value</b> takes small steps toward the minimum. This is the usual choice; he mentions values such as 0.1 as a starting point.</li>
+        <li><b>A very large value</b> makes \(\theta_1\) jump from one side of the curve to the other, and it may never reach the global minimum.</li>
+        <li><b>A very, very small value</b> takes tiny steps, so reaching the minimum takes forever and the model keeps on training.</li>
+      </ul>
+      <p class="rule-of-thumb">Choose a small learning rate, but not so small that training never finishes.</p>
+
+      <figure id="gd-fig">
+        <div class="controls">
+          <span style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; flex-shrink: 0; max-width: 100%"><label for="gd-alpha">Learning rate \(\alpha\)</label>
+          <input type="range" style="width: 200px; max-width: 100%" id="gd-alpha" min="0.01" max="0.47" step="0.01" value="0.05">
+          <output id="gd-alpha-out" for="gd-alpha">0.05</output></span>
+          <span style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; flex-shrink: 0; max-width: 100%"><label for="gd-start">Start \(\theta_1\)</label>
+          <input type="range" style="width: 200px; max-width: 100%" id="gd-start" min="-0.5" max="2.5" step="0.1" value="0">
+          <output id="gd-start-out" for="gd-start">0.0</output></span>
+          <button class="btn" id="gd-step" type="button">One step</button>
+          <button class="btn" id="gd-run" type="button">Run 10 steps</button>
+          <button class="btn" id="gd-reset" type="button">Reset</button>
+        </div>
+        <div class="readouts">
+          <div><span class="k">Step t</span><span class="v" id="gd-t">–</span></div>
+          <div><span class="k">θ₁</span><span class="v" id="gd-th">–</span></div>
+          <div><span class="k">Slope dJ/dθ₁</span><span class="v" id="gd-sl">–</span></div>
+          <div><span class="k">Cost J(θ₁)</span><span class="v mine" id="gd-j">–</span></div>
+        </div>
+        <div class="status" id="gd-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="gd-svg" viewBox="0 0 760 384" role="img" aria-label="Left: the three points (1,1), (2,2), (3,3), the best line y equals x (dashed) and the current line y equals theta one times x with its errors. Right: the cost J of theta one as a parabola with its minimum at 1, the gradient descent iterates marked on it and joined in order, and the tangent at the current point."></svg></div>
+        <figcaption><b>Gradient descent on the worked example</b> (the three points from the video, with \(\theta_0 = 0\)). Each step applies \(\theta_1 := \theta_1 - \alpha\, dJ/d\theta_1\). The green tangent shows the slope at the current point: its sign decides the direction of the next step and \(\alpha\) its length. Small \(\alpha\) creeps down one side, larger \(\alpha\) jumps back and forth across \(\theta_1 = 1\), and above about 0.43 the jumps grow. Moving a slider replays the same number of steps with the new setting.</figcaption>
+      </figure>
+      <p class="callout">Not in the video: where the limit of 0.43 comes from. For this data \(dJ/d\theta_1 = \tfrac{14}{3}(\theta_1 - 1)\), so one step turns the distance to the minimum, \(\theta_1 - 1\), into \((1 - \tfrac{14}{3}\alpha)(\theta_1 - 1)\). The distance shrinks only while \(\lvert 1 - \tfrac{14}{3}\alpha\rvert &lt; 1\), that is \(0 &lt; \alpha &lt; \tfrac37 \approx 0.43\). For \(\alpha\) between \(\tfrac{3}{14} \approx 0.21\) and \(\tfrac37\) the factor is negative, so each step lands on the other side of the minimum, a little closer each time.</p>
+    </section>
+
+    <section id="local-minima">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2832s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>47:12</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2898s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>48:18 deep learning</a>
+        </div>
+        <h2>What about local minima?</h2>
+      </div>
+      <p>Suppose the cost curve had a dip that is not its lowest point, a <dfn>local minimum</dfn>. The slope there is zero, so the update reads \(\theta_1 := \theta_1 - \alpha \times 0 = \theta_1\) and \(\theta_1\) stops changing. Gradient descent would be stuck, as in the right panel of the <a href="#slope-fig">figure above</a>.</p>
+      <p>This does not happen in linear regression. With the squared-error cost the curve always has the single-bowl shape of the worked example, so its only minimum is the global one. Deep learning is different. The cost of an artificial neural network (ANN) has many local minima, and that is one reason optimizers such as RMSprop and Adam exist.</p>
+      <p class="rule-of-thumb">Interview answer: linear regression's cost function has no local minima. Local minima are a deep learning problem, handled by optimizers such as RMSprop and Adam.</p>
+      <p>When does convergence stop <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=2964s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>49:24</a>? When \(\theta\) reaches the region near the bottom, where \(J\) is very small.</p>
+      <p class="note">Not in the video: in practice the loop stops once \(J\) changes by less than a small tolerance between iterations, or after a fixed number of iterations. The squared-error cost is convex, which is the formal reason it has no minimum other than the global one. For the IIT Madras treatment, see <a href="part-10.html#gradient-descent">Part 10 (part-10.html)</a>.</p>
+    </section>
+
+    <section id="gd-algorithm">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=3028s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>50:28</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=3224s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>53:44 final updates</a>
+        </div>
+        <h2>Gradient descent for \(\theta_0\) and \(\theta_1\)</h2>
+      </div>
+      <p>Now bring \(\theta_0\) back. The same rule applies to each parameter, \(j = 0\) and \(j = 1\), so what remains is to work out the two derivatives of</p>
+      <div class="eq">\[ J(\theta_0, \theta_1) = \frac{1}{2m}\sum_{i=1}^{m}\big(\theta_0 + \theta_1 x_i - y_i\big)^2 \]</div>
+      <p>Differentiate the square: the power 2 comes down and cancels the \(\tfrac12\). Then multiply by the derivative of what is inside the bracket. With respect to \(\theta_0\) that inner derivative is 1. With respect to \(\theta_1\) it is \(x_i\), because \(\theta_1 x_i\) is the only term that contains \(\theta_1\).</p>
+      <div class="eq">\[ \frac{\partial J}{\partial\theta_0} = \frac1m\sum_{i=1}^{m}\big(h_\theta(x_i) - y_i\big), \qquad \frac{\partial J}{\partial\theta_1} = \frac1m\sum_{i=1}^{m}\big(h_\theta(x_i) - y_i\big)\,x_i \]</div>
+      <p>The square is gone from both. (On the board it is first left in and then corrected.)</p>
+      <ol class="algo">
+        <li class="algo-title">Gradient descent for linear regression with one feature</li>
+        <li>Pick a learning rate \(\alpha\), for example 0.1, and starting values for \(\theta_0\) and \(\theta_1\).</li>
+        <li>Compute every prediction \(h_\theta(x_i) = \theta_0 + \theta_1 x_i\) and its error \(h_\theta(x_i) - y_i\).</li>
+        <li>Update \(\theta_0 := \theta_0 - \alpha\,\frac1m\sum_{i=1}^m \big(h_\theta(x_i) - y_i\big)\).</li>
+        <li>Update \(\theta_1 := \theta_1 - \alpha\,\frac1m\sum_{i=1}^m \big(h_\theta(x_i) - y_i\big)\,x_i\).</li>
+        <li>Repeat from step 2 until convergence, when \(J\) stops falling.</li>
+      </ol>
+      <p class="note">Not in the video: both updates should use the errors computed from the old \(\theta_0\) and \(\theta_1\) (a simultaneous update). Updating \(\theta_0\) first and then using the new value inside the \(\theta_1\) update is a common bug.</p>
+      <p>With several features \(x_1, x_2, x_3, x_4, \dots\) <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=3291s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>54:51</a>, the cost depends on more parameters. Krish pictures it as a 3-D bowl, and gradient descent as coming down a mountain to its lowest point. Strictly, \(J(\theta_0, \theta_1)\) with a single feature is already a 3-D bowl over the \((\theta_0, \theta_1)\) plane; each extra feature adds a dimension, and the bowl stays convex.</p>
+      <p class="note">For the IIT Madras treatment, with the vector form \(\mathbf{w}_{t+1} = \mathbf{w}_t - \eta_t\nabla f(\mathbf{w}_t)\) and stochastic gradient descent, see <a href="part-10.html#gd-regression">Part 10 (part-10.html)</a>. The code version of this algorithm is in <a href="krish-ml-03.html">Part 3</a>.</p>
+    </section>
+
+    <section id="r-squared">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=3357s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>55:57</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=3518s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>58:38 negative R²</a>
+        </div>
+        <h2>R²: how good is the fit?</h2>
+      </div>
+      <p>With a fitted line in hand, a <dfn>performance metric</dfn> checks how good the model is. For linear regression he discusses two, R² and adjusted R².</p>
+      <div class="result">
+        <span class="lbl">R² (R squared)</span>
+        \[ R^2 = 1 - \frac{SS_{\text{res}}}{SS_{\text{tot}}} = 1 - \frac{\sum_i \big(y_i - \hat y_i\big)^2}{\sum_i \big(y_i - \bar y\big)^2} \]
+        <p>\(\hat y_i = h_\theta(x_i)\) is the prediction for point \(i\) and \(\bar y\) is the mean of \(y\).</p>
+      </div>
+      <ul>
+        <li>\(SS_{\text{res}}\), the <dfn>sum of squared residuals</dfn>, adds the squared vertical distances from each point to its predicted point on the best fit line.</li>
+        <li>\(SS_{\text{tot}}\), the <dfn>total sum of squares</dfn>, adds the squared distances from each point to the horizontal line at the mean \(\bar y\).</li>
+      </ul>
+      <p>For a good line the residuals are much smaller than the distances to the mean line. The fraction is then a small number, and 1 minus a small number is close to 1, say 90%. A large R² means the line fits well.</p>
+
+      <figure>
+        <div class="fig-scroll">
+          <svg class="dg" viewBox="0 0 680 262" role="img" aria-label="Two panels with the same six points. Left: the fitted line and short dashed residuals from each point to the line. Right: a horizontal line at the mean of y and longer dashed segments from each point to it.">
+            <text class="d-h" x="50" y="18">Residuals: point to fitted line</text>
+            <path class="d-rule" d="M50 34 V220 H292" style="fill: none"/>
+            <line class="d-ln-acc" x1="50" y1="189.9" x2="290" y2="68" style="stroke-width: 2"/>
+            <text class="d-s" x="286" y="60" text-anchor="end" style="fill: var(--accent)">ŷ = θ₀ + θ₁x</text>
+            <path class="d-ln d-dash" d="M84.3 176.3 V172.5 M118.6 139.9 V155.1 M152.9 154.4 V137.6 M187.1 108.3 V120.2 M221.4 118 V102.8 M255.7 76.7 V85.4"/>
+            <circle class="pt-plain" cx="84.3" cy="176.3" r="4.5"/><circle class="pt-plain" cx="118.6" cy="139.9" r="4.5"/><circle class="pt-plain" cx="152.9" cy="154.4" r="4.5"/><circle class="pt-plain" cx="187.1" cy="108.3" r="4.5"/><circle class="pt-plain" cx="221.4" cy="118" r="4.5"/><circle class="pt-plain" cx="255.7" cy="76.7" r="4.5"/>
+            <text class="d-s" x="50" y="242">SSres = Σ(yᵢ − ŷᵢ)² ≈ 1.65</text>
+
+            <line class="d-rule" x1="346" y1="8" x2="346" y2="254"/>
+
+            <text class="d-h" x="400" y="18">Total: point to the mean line</text>
+            <path class="d-rule" d="M400 34 V220 H642" style="fill: none"/>
+            <line class="d-ln-acc" x1="400" y1="128.9" x2="640" y2="128.9" style="stroke-width: 2"/>
+            <text class="d-s" x="640" y="147" text-anchor="end" style="fill: var(--accent)">ȳ = 3.75</text>
+            <path class="d-ln d-dash" d="M434.3 176.3 V128.9 M468.6 139.9 V128.9 M502.9 154.4 V128.9 M537.1 108.3 V128.9 M571.4 118 V128.9 M605.7 76.7 V128.9"/>
+            <circle class="pt-plain" cx="434.3" cy="176.3" r="4.5"/><circle class="pt-plain" cx="468.6" cy="139.9" r="4.5"/><circle class="pt-plain" cx="502.9" cy="154.4" r="4.5"/><circle class="pt-plain" cx="537.1" cy="108.3" r="4.5"/><circle class="pt-plain" cx="571.4" cy="118" r="4.5"/><circle class="pt-plain" cx="605.7" cy="76.7" r="4.5"/>
+            <text class="d-s" x="400" y="242">SStot = Σ(yᵢ − ȳ)² ≈ 10.66</text>
+          </svg>
+        </div>
+        <figcaption><b>The two sums in R²</b> (six illustrative points, made for these notes). The fitted line leaves short residuals, so \(SS_{\text{res}} \approx 1.65\); distances to the mean line are longer, \(SS_{\text{tot}} \approx 10.66\). Then \(R^2 = 1 - 1.65/10.66 \approx 0.84\).</figcaption>
+      </figure>
+
+      <h3>Can R² be negative?</h3>
+      <p>Yes, if the line is worse than predicting the mean everywhere. Then \(SS_{\text{res}} &gt; SS_{\text{tot}}\), the fraction exceeds 1, and R² drops below zero. In practice this does not happen with a sensibly fitted line, since nobody wants a best fit line that does worse than the mean line.</p>
+      <p class="note">Not in the video: for a least-squares line with an intercept, evaluated on its own training data, \(SS_{\text{res}} \le SS_{\text{tot}}\) always holds, so R² lies between 0 and 1. Negative values show up on new data, or for a line that was not fitted by least squares.</p>
+    </section>
+
+    <section id="adjusted-r2">
+      <div class="sec-head">
+        <div class="ts-row">
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=3578s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>59:38</a>
+          <a class="ts" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=3711s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:01:51 the formula</a>
+        </div>
+        <h2>Adjusted R²</h2>
+      </div>
+      <p>R² has a weakness that shows when features are added. Krish's example predicts the price of a house.</p>
+      <div class="tbl-wrap">
+        <table class="mini">
+          <thead><tr><th>Features used</th><th>Related to price?</th><th class="num">R²</th><th class="num">Adjusted R²</th></tr></thead>
+          <tbody>
+            <tr><td>bedrooms</td><td>yes</td><td class="num">85%</td><td class="num">–</td></tr>
+            <tr><td>bedrooms, location</td><td>yes</td><td class="num">90%</td><td class="num">86%</td></tr>
+            <tr><td>bedrooms, location, gender of the occupant</td><td>no</td><td class="num">91%</td><td class="num">82%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Location is correlated with price, so adding it raises R² from 85% to 90%. Whether a man or a woman will live in the house has nothing to do with its price, yet R² still rises, to 91%. The way R² is computed, adding a feature never lowers it, even when the feature is not correlated with the target at all. Choosing models by R² would then pick the three-feature model because of a meaningless feature.</p>
+      <div class="result">
+        <span class="lbl">Adjusted R²</span>
+        \[ R^2_{\text{adj}} = 1 - \frac{\big(1 - R^2\big)\,(N - 1)}{N - P - 1} \]
+        <p>\(N\) is the number of data points and \(P\) the number of features (predictors).</p>
+      </div>
+      <p>The penalty works through \(P\). As \(P\) grows, the denominator \(N - P - 1\) shrinks, so the factor \(\frac{N-1}{N-P-1}\) that multiplies \(1 - R^2\) grows. Unless the new feature raises R² enough to make up for it, adjusted R² falls. A feature strongly correlated with the target raises R² a lot, and adjusted R² goes up as well. A useless one raises R² only a little, and adjusted R² goes down.</p>
+      <p>The adjusted values in the table (86% and 82%) are numbers he picks to show the direction. A consistent version: with \(N = 8\) houses, \(R^2 = 0.90\) and \(P = 2\) give \(1 - 0.10 \times \tfrac75 = 0.86\), while \(R^2 = 0.91\) and \(P = 3\) give \(1 - 0.09 \times \tfrac74 \approx 0.84\). Adjusted R² drops, so the two-feature model wins.</p>
+      <p class="rule-of-thumb">Adjusted R² is never larger than R². One of his students was asked in an interview which of the two is always bigger (R²), and then to explain adjusted R².</p>
+
+      <figure id="r2-fig">
+        <div class="controls">
+          <span style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; flex-shrink: 0; max-width: 100%"><label for="r2-p">Predictors used, \(P\)</label>
+          <input type="range" style="width: 200px; max-width: 100%" id="r2-p" min="1" max="12" step="1" value="2">
+          <output id="r2-p-out" for="r2-p">2</output></span>
+          <span style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; flex-shrink: 0; max-width: 100%"><label for="r2-n">Houses, \(N\)</label>
+          <input type="range" style="width: 200px; max-width: 100%" id="r2-n" min="15" max="60" step="1" value="20">
+          <output id="r2-n-out" for="r2-n">20</output></span>
+        </div>
+        <div class="readouts">
+          <div><span class="k">R²</span><span class="v" id="r2-r">–</span></div>
+          <div><span class="k">Adjusted R²</span><span class="v mine" id="r2-a">–</span></div>
+          <div><span class="k">N − P − 1</span><span class="v" id="r2-df">–</span></div>
+        </div>
+        <div class="status" id="r2-status" aria-live="polite"></div>
+        <div class="chart-wrap"><svg id="r2-svg" viewBox="0 0 640 340" role="img" aria-label="R squared and adjusted R squared plotted against the number of predictors, from 1 to 12, for a least-squares fit of house prices. R squared keeps creeping up; adjusted R squared peaks around two predictors and then falls as unrelated predictors are added."></svg></div>
+        <figcaption><b>Synthetic house prices</b> (60 houses from a seeded generator, made for these notes; price depends on bedrooms and location plus noise). Predictors are added in a fixed order: 1 bedrooms, 2 location, 3 the occupant's gender (random, unrelated), 4–12 columns of random numbers. Each point is a least-squares fit with an intercept on the first \(N\) houses. R² never goes down as \(P\) grows; adjusted R² falls once the added predictors are noise, and falls faster when \(N\) is small.</figcaption>
+      </figure>
+      <p class="note">Up next <a class="ts" style="margin-left:4px" href="https://www.youtube.com/watch?v=JxgmHe2NyeY&amp;t=3975s" target="_blank" rel="noopener"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0.5 L9.5 5 L1 9.5 Z"/></svg>1:06:15</a>: the next session's agenda is Ridge and Lasso regression, the assumptions of linear regression, logistic regression, the confusion matrix, and then practicals for linear, Ridge, Lasso and logistic regression. Ridge, Lasso and logistic regression are in <a href="krish-ml-02.html">Part 2</a>; the regression practicals are in <a href="krish-ml-03.html">Part 3</a>. For the IIT Madras treatment of Ridge and Lasso, see <a href="part-12.html">Part 12 (part-12.html)</a>.</p>
+    </section>
+
+    <!-- ============ REVISION ============ -->
+    <section id="terms">
+      <div class="sec-head"><h2>Key terms</h2></div>
+      <dl class="terms">
+        <div><dt>AI ⊃ ML ⊃ DL</dt><dd>AI: applications that act without human intervention. ML: statistical tools to analyze and predict. DL: multi-layered neural networks that mimic the brain.</dd></div>
+        <div><dt>Data science</dt><dd>Solving a business problem with whichever of analysis, ML or DL it needs; it overlaps all three.</dd></div>
+        <div><dt>Supervised learning</dt><dd>Learning from data with a dependent (output) feature: regression or classification.</dd></div>
+        <div><dt>Unsupervised learning</dt><dd>Learning from data with no output feature: clustering (grouping) or dimensionality reduction.</dd></div>
+        <div><dt>Independent and dependent features</dt><dd>Inputs the model is trained on, and the one output it predicts.</dd></div>
+        <div><dt>Regression vs classification</dt><dd>Continuous output vs a fixed set of categories (binary for two, multiclass for more).</dd></div>
+        <div><dt>Hypothesis \(h_\theta(x)\)</dt><dd>The model; for linear regression the line \(\theta_0 + \theta_1 x\).</dd></div>
+        <div><dt>Intercept and slope</dt><dd>\(\theta_0\): where the line meets the y-axis. \(\theta_1\): change in \(y\) per unit change in \(x\).</dd></div>
+        <div><dt>Cost function \(J\)</dt><dd>Squared error function \(\frac{1}{2m}\sum (h_\theta(x_i) - y_i)^2\), minimized over \(\theta_0, \theta_1\).</dd></div>
+        <div><dt>Convergence algorithm</dt><dd>Gradient descent: repeat \(\theta_j := \theta_j - \alpha\,\partial J/\partial\theta_j\) until \(J\) stops falling.</dd></div>
+        <div><dt>Learning rate \(\alpha\)</dt><dd>Step size of each update; too large overshoots, too small takes forever.</dd></div>
+        <div><dt>Global and local minimum</dt><dd>The lowest point of the cost, and a dip that is lowest only nearby. Linear regression's cost has only the global one.</dd></div>
+        <div><dt>R²</dt><dd>\(1 - SS_{\text{res}}/SS_{\text{tot}}\): how much better the line is than the mean line. Never falls when a feature is added.</dd></div>
+        <div><dt>Adjusted R²</dt><dd>\(1 - (1 - R^2)(N-1)/(N-P-1)\): R² with a charge per predictor; drops when a useless feature is added.</dd></div>
+      </dl>
+    </section>
+
+    <section id="test">
+      <div class="sec-head"><h2>Test yourself</h2></div>
+      <div class="quiz">
+        <details><summary><span class="q">Q1</span><span>Name the problem type: (a) predict a flat's rent in rupees; (b) predict whether a loan will default; (c) group shoppers by spending with no labels; (d) predict which of five genres a song belongs to.</span><span class="tog"></span></summary>
+          <p>(a) Regression, since rent is continuous. (b) Binary classification, two categories. (c) Clustering, an unsupervised problem with no dependent feature. (d) Multiclass classification, more than two categories.</p></details>
+        <details><summary><span class="q">Q2</span><span>For the points \((1,1)\), \((2,2)\), \((3,3)\) with \(\theta_0 = 0\), compute \(J(1.5)\).</span><span class="tog"></span></summary>
+          <p>Predictions 1.5, 3, 4.5; errors 0.5, 1, 1.5; squares 0.25, 1, 2.25. So \(J(1.5) = 3.5/6 \approx 0.58\), the same as \(J(0.5)\), because the cost curve is symmetric about \(\theta_1 = 1\).</p></details>
+        <details><summary><span class="q">Q3</span><span>Why does the cost function square the errors, divide by \(m\), and carry an extra \(\tfrac12\)?</span><span class="tog"></span></summary>
+          <p>Squaring stops positive and negative errors from cancelling. Dividing by \(m\) gives an average. The \(\tfrac12\) cancels the 2 that appears when the square is differentiated, which keeps the update rules clean; it does not change which \(\theta\) minimizes \(J\).</p></details>
+        <details><summary><span class="q">Q4</span><span>Same three points, \(\theta_0 = 0\). Start at \(\theta_1 = 2\) with \(\alpha = 0.1\). What is the slope, and what is \(\theta_1\) after one step?</span><span class="tog"></span></summary>
+          <p>\(dJ/d\theta_1 = \frac13\sum(2x_i - x_i)\,x_i = \frac13(1 + 4 + 9) = \frac{14}{3} \approx 4.67\), positive. So \(\theta_1 := 2 - 0.1 \times 4.67 \approx 1.53\). It moved left, toward 1, and \(J\) fell from 2.33 to about \(\tfrac73(0.53)^2 \approx 0.66\).</p></details>
+        <details><summary><span class="q">Q5</span><span>What goes wrong if the learning rate is too large? Too small?</span><span class="tog"></span></summary>
+          <p>Too large: each update jumps over the minimum to the other side of the curve, possibly further out each time, so it may never reach the global minimum. Too small: the steps are tiny and convergence takes a very long time.</p></details>
+        <details><summary><span class="q">Q6</span><span>Why does the \(\theta_1\) update contain \(x_i\) while the \(\theta_0\) update does not?</span><span class="tog"></span></summary>
+          <p>By the chain rule, the derivative of \((\theta_0 + \theta_1 x_i - y_i)^2\) is \(2(\theta_0 + \theta_1 x_i - y_i)\) times the derivative of the bracket. That inner derivative is 1 with respect to \(\theta_0\) and \(x_i\) with respect to \(\theta_1\).</p></details>
+        <details><summary><span class="q">Q7</span><span>An interviewer asks whether gradient descent for linear regression can get stuck in a local minimum. What do you say?</span><span class="tog"></span></summary>
+          <p>No. The squared-error cost is a single convex bowl, so its only minimum is the global one. Local minima are a problem in deep learning (ANNs), where optimizers such as RMSprop and Adam help.</p></details>
+        <details><summary><span class="q">Q8</span><span>With \(N = 8\) points, a 2-predictor model has \(R^2 = 0.90\). Adding an unrelated third predictor gives \(R^2 = 0.91\). Compute both adjusted R² values. Which model do you keep?</span><span class="tog"></span></summary>
+          <p>\(P = 2\): \(1 - 0.10 \times 7/5 = 0.86\). \(P = 3\): \(1 - 0.09 \times 7/4 \approx 0.84\). Adjusted R² fell, so keep the 2-predictor model; the small R² gain does not pay for the extra predictor.</p></details>
+      </div>
+    </section>
+
+    <!-- PAGER:START --><nav class="pager" aria-label="Previous and next part"><a href="index.html#extra"><span class="dir">← All notes</span><span class="nm">Complete Machine Learning in 6 Hours</span></a><a class="next" href="krish-ml-02.html"><span class="dir">Part 2 →</span><span class="nm">Ridge, Lasso and logistic regression</span></a></nav><!-- PAGER:END -->
+  </main>
+</div>
+
+<footer class="foot">
+  <div class="foot-inner gutter">Written from the YouTube auto-generated captions of Krish Naik's video <i>Complete Machine Learning in 6 Hours</i>. Timestamp links open the video at that moment. This part is whiteboard theory, so it has no code from the video. Charts marked synthetic use data generated for these notes. Not affiliated with Krish Naik or IIT Madras.</div>
+</footer>
+
+<script src="notes.js"></script>
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* panel helper: grid, ticks, axes and a clip rectangle; returns the two scales */
+  const panel = (svg, defs, x0, y0, w, h, xlo, xhi, ylo, yhi, xstep, ystep, clipId) => {
+    const sx = v => x0 + (v - xlo) / (xhi - xlo) * w, sy = v => y0 + h - (v - ylo) / (yhi - ylo) * h;
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let i = Math.ceil(xlo / xstep - 1e-9); i * xstep <= xhi + 1e-9; i++) {
+      const v = i * xstep;
+      mk('line', { x1: sx(v), x2: sx(v), y1: y0, y2: y0 + h }, g);
+      mk('text', { x: sx(v), y: y0 + h + 15, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = +v.toFixed(2);
+    }
+    for (let i = Math.ceil(ylo / ystep - 1e-9); i * ystep <= yhi + 1e-9; i++) {
+      const v = i * ystep;
+      mk('line', { x1: x0, x2: x0 + w, y1: sy(v), y2: sy(v) }, g);
+      mk('text', { x: x0 - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = +v.toFixed(2);
+    }
+    if (ylo < 0 && yhi > 0) mk('line', { x1: x0, x2: x0 + w, y1: sy(0), y2: sy(0), class: 'c-axis' }, svg);
+    else mk('line', { x1: x0, x2: x0 + w, y1: y0 + h, y2: y0 + h, class: 'c-axis' }, svg);
+    if (xlo < 0 && xhi > 0) mk('line', { x1: sx(0), x2: sx(0), y1: y0, y2: y0 + h, class: 'c-axis' }, svg);
+    else mk('line', { x1: x0, x2: x0, y1: y0, y2: y0 + h, class: 'c-axis' }, svg);
+    if (clipId) { const cp = mk('clipPath', { id: clipId }, defs); mk('rect', { x: x0, y: y0, width: w, height: h }, cp); }
+    return { sx, sy };
+  };
+
+  /* ---------- Gradient descent on J(θ₁) for the points (1,1), (2,2), (3,3) ---------- */
+  (() => {
+    const svg = document.getElementById('gd-svg'); if (!svg) return;
+    const X = [1, 2, 3], Y = [1, 2, 3], m = X.length, TMAX = 300;
+    const J = th => X.reduce((s, x, i) => s + (th * x - Y[i]) ** 2, 0) / (2 * m);
+    const dJ = th => X.reduce((s, x, i) => s + (th * x - Y[i]) * x, 0) / m;
+    const defs = mk('defs', {}, svg);
+    const L = panel(svg, defs, 50, 36, 290, 290, 0, 4, -1, 5, 1, 1, 'kml01-gd-clip-l');
+    const R = panel(svg, defs, 440, 36, 290, 290, -1, 3, 0, 10, 0.5, 2, 'kml01-gd-clip-r');
+    mk('text', { x: 50, y: 22, class: 'c-title' }, svg).textContent = 'Data and the current line y = θ₁x';
+    mk('text', { x: 440, y: 22, class: 'c-title' }, svg).textContent = 'Cost J(θ₁) and the gradient descent steps';
+    mk('text', { x: 340, y: 356, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = 'x';
+    mk('text', { x: 730, y: 356, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = 'θ₁';
+    /* legend under the left panel */
+    mk('line', { x1: 50, y1: 374, x2: 74, y2: 374, class: 'c-line', style: 'stroke-dasharray: 6 5' }, svg);
+    mk('text', { x: 80, y: 378, class: 'c-note' }, svg).textContent = 'best line y = x';
+    mk('line', { x1: 190, y1: 374, x2: 214, y2: 374, class: 'c-user' }, svg);
+    mk('text', { x: 220, y: 378, class: 'c-note' }, svg).textContent = 'current line';
+    mk('line', { x1: 440, y1: 374, x2: 464, y2: 374, style: 'stroke: var(--ok); stroke-width: 2' }, svg);
+    mk('text', { x: 470, y: 378, class: 'c-note' }, svg).textContent = 'tangent: its slope is dJ/dθ₁';
+
+    /* left panel content */
+    const gL = mk('g', { 'clip-path': 'url(#kml01-gd-clip-l)' }, svg);
+    mk('line', { x1: L.sx(0), y1: L.sy(0), x2: L.sx(4), y2: L.sy(4), class: 'c-line', style: 'stroke-dasharray: 6 5' }, gL);
+    const gRes = mk('g', { class: 'c-resid' }, gL);
+    const res = X.map(() => mk('line', {}, gRes));
+    const cur = mk('line', { class: 'c-user' }, gL);
+    const gDots = mk('g', { class: 'c-dots' }, svg);
+    X.forEach((x, i) => mk('circle', { cx: L.sx(x), cy: L.sy(Y[i]), r: 5 }, gDots));
+
+    /* right panel content */
+    const gR = mk('g', { 'clip-path': 'url(#kml01-gd-clip-r)' }, svg);
+    let d = '';
+    for (let i = 0; i <= 200; i++) { const t = -1 + 4 * i / 200; d += (i ? ' L' : 'M') + R.sx(t).toFixed(1) + ' ' + R.sy(J(t)).toFixed(1); }
+    mk('path', { d, class: 'c-line', style: 'fill: none' }, gR);
+    mk('line', { x1: R.sx(1), x2: R.sx(1), y1: R.sy(0), y2: R.sy(10), class: 'c-faint' }, gR);
+    mk('text', { x: R.sx(1) + 5, y: R.sy(9.3), class: 'c-note' }, svg).textContent = 'minimum at θ₁ = 1';
+    const trail = mk('g', {}, gR);
+    const past = mk('g', { class: 'c-proj' }, gR);
+    const tan = mk('line', { style: 'stroke: var(--ok); stroke-width: 2' }, gR);
+    const hi = mk('circle', { r: 6, class: 'c-pt-hi' }, gR);
+
+    const aIn = document.getElementById('gd-alpha'), aOut = document.getElementById('gd-alpha-out');
+    const sIn = document.getElementById('gd-start'), sOut = document.getElementById('gd-start-out');
+    const oT = document.getElementById('gd-t'), oTh = document.getElementById('gd-th'), oSl = document.getElementById('gd-sl'), oJ = document.getElementById('gd-j'), status = document.getElementById('gd-status');
+    let alpha = parseFloat(aIn.value), start = parseFloat(sIn.value), t = 0, running = false;
+
+    const trajectory = () => {
+      const ws = [start]; let w = start;
+      for (let k = 0; k < t; k++) { w -= alpha * dJ(w); ws.push(w); if (!isFinite(w) || Math.abs(w) > 1e6) break; }
+      return ws;
+    };
+    const fmt = v => !isFinite(v) ? '∞' : Math.abs(v) >= 1e4 ? v.toExponential(2) : (Math.abs(v) < 5e-4 ? 0 : v).toFixed(3);
+    const cT = v => Math.max(-3, Math.min(5, v)), cJ = v => Math.min(40, v);
+
+    const draw = () => {
+      const ws = trajectory(), T = ws.length - 1, w = ws[T];
+      t = T;
+      const diverged = !isFinite(w) || Math.abs(w) > 1e4;
+      const wd = Math.max(-50, Math.min(50, w));
+      cur.setAttribute('x1', L.sx(0)); cur.setAttribute('y1', L.sy(0)); cur.setAttribute('x2', L.sx(4)); cur.setAttribute('y2', L.sy(4 * wd));
+      X.forEach((x, i) => { res[i].setAttribute('x1', L.sx(x)); res[i].setAttribute('x2', L.sx(x)); res[i].setAttribute('y1', L.sy(Y[i])); res[i].setAttribute('y2', L.sy(Math.max(-5, Math.min(12, wd * x)))); });
+      trail.replaceChildren(); past.replaceChildren();
+      for (let i = Math.max(0, T - 120); i < T; i++) {
+        mk('line', { x1: R.sx(cT(ws[i])), y1: R.sy(cJ(J(ws[i]))), x2: R.sx(cT(ws[i + 1])), y2: R.sy(cJ(J(ws[i + 1]))), class: 'c-err' }, trail);
+        mk('circle', { cx: R.sx(cT(ws[i])), cy: R.sy(cJ(J(ws[i]))), r: 3 }, past);
+      }
+      hi.setAttribute('cx', R.sx(cT(wd))); hi.setAttribute('cy', R.sy(cJ(J(wd))));
+      if (!diverged && Math.abs(w) < 4) {
+        const s = dJ(w), h = 0.45;
+        tan.setAttribute('x1', R.sx(w - h)); tan.setAttribute('y1', R.sy(J(w) - s * h)); tan.setAttribute('x2', R.sx(w + h)); tan.setAttribute('y2', R.sy(J(w) + s * h));
+        tan.style.display = '';
+      } else tan.style.display = 'none';
+      oT.textContent = T; oTh.textContent = fmt(w); oSl.textContent = diverged ? '–' : fmt(dJ(w)); oJ.textContent = fmt(J(w));
+      aOut.textContent = alpha.toFixed(2); sOut.textContent = start.toFixed(1);
+      const a = alpha.toFixed(2);
+      const firstConv = ws.findIndex(v => Math.abs(v - 1) < 5e-4);
+      let msg;
+      if (diverged) msg = `Diverged: with α = ${a}, every jump overshoots θ₁ = 1 by more than the last, and J explodes.`;
+      else if (T === 0) {
+        const s0 = dJ(start);
+        msg = Math.abs(start - 1) < 1e-9 ? 'Starting at the minimum: the slope is 0, so every update leaves θ₁ where it is.'
+          : `Start θ₁ = ${start.toFixed(1)}: the slope is ${s0 > 0 ? 'positive' : 'negative'}, so the first step moves θ₁ ${s0 > 0 ? 'left' : 'right'}. Press One step or Run 10 steps.`;
+      }
+      else if (firstConv >= 0 && firstConv <= T) msg = `Converged: θ₁ reached 1.000 after ${firstConv} step${firstConv === 1 ? '' : 's'}. The line passes through all three points and J = 0.`;
+      else if (alpha < 3 / 14 - 0.004) msg = `α = ${a}: each step moves θ₁ toward 1 without passing it, and J falls every step.` + (alpha <= 0.02 ? ' Steps this small take many iterations.' : '');
+      else if (alpha < 3 / 14 + 0.004) msg = `α = ${a} is close to 3/14 ≈ 0.214, where a single step would land exactly on θ₁ = 1.`;
+      else if (alpha < 3 / 7) msg = `α = ${a}: each step jumps past θ₁ = 1 to the other side, but by less each time, so it still converges.`;
+      else msg = `α = ${a} is above 3/7 ≈ 0.43: each jump overshoots by more than the last, so J grows instead of shrinking.`;
+      status.textContent = msg;
+      return diverged;
+    };
+
+    const stepOnce = () => { if (t < TMAX) t += 1; return draw(); };
+    draw();
+    aIn.addEventListener('input', () => { alpha = parseFloat(aIn.value); draw(); });
+    sIn.addEventListener('input', () => { start = parseFloat(sIn.value); draw(); });
+    document.getElementById('gd-step').addEventListener('click', () => { if (!running) stepOnce(); });
+    document.getElementById('gd-reset').addEventListener('click', () => { if (running) return; t = 0; draw(); });
+    document.getElementById('gd-run').addEventListener('click', () => {
+      if (running) return;
+      if (reduce) { t = Math.min(TMAX, t + 10); draw(); return; }
+      running = true; let left = 10;
+      const tick = () => { const stop = stepOnce(); left -= 1; if (left > 0 && !stop && t < TMAX) setTimeout(tick, 120); else running = false; };
+      tick();
+    });
+  })();
+
+  /* ---------- R² and adjusted R² as predictors are added (synthetic house prices) ---------- */
+  (() => {
+    const svg = document.getElementById('r2-svg'); if (!svg) return;
+    let seed = 1101;
+    const rand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const normal = () => { let u = 0; while (u === 0) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+    const NMAX = 60, PMAX = 12;
+    const bed = [], loc = [], price = [];
+    for (let i = 0; i < NMAX; i++) { bed.push(1 + Math.floor(rand() * 5)); loc.push(10 * rand()); }
+    for (let i = 0; i < NMAX; i++) price.push(40 + 25 * bed[i] + 9 * loc[i] + 14 * normal());
+    const cols = [bed, loc, Array.from({ length: NMAX }, () => (rand() < 0.5 ? 0 : 1))];
+    for (let k = 3; k < PMAX; k++) cols.push(Array.from({ length: NMAX }, () => normal()));
+    const names = ['bedrooms', 'location', 'the occupant’s gender'];
+    for (let k = 1; k <= PMAX - 3; k++) names.push(`random column ${k}`);
+
+    const solve = (A, b) => {
+      const q = b.length; const M = A.map((r, i) => [...r, b[i]]);
+      for (let c = 0; c < q; c++) {
+        let p = c; for (let r = c + 1; r < q; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+        [M[c], M[p]] = [M[p], M[c]];
+        for (let r = 0; r < q; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k <= q; k++) M[r][k] -= f * M[c][k]; }
+      }
+      return M.map((r, i) => r[q] / r[i]);
+    };
+    const fit = (n, p) => {
+      const rows = []; for (let i = 0; i < n; i++) { const r = [1]; for (let j = 0; j < p; j++) r.push(cols[j][i]); rows.push(r); }
+      const q = p + 1;
+      const XtX = Array.from({ length: q }, (_, a) => Array.from({ length: q }, (_, b) => rows.reduce((s, r) => s + r[a] * r[b], 0)));
+      const Xty = Array.from({ length: q }, (_, a) => rows.reduce((s, r, i) => s + r[a] * price[i], 0));
+      const beta = solve(XtX, Xty);
+      let ybar = 0; for (let i = 0; i < n; i++) ybar += price[i] / n;
+      let ssr = 0, sst = 0;
+      rows.forEach((r, i) => { const h = r.reduce((s, v, j) => s + v * beta[j], 0); ssr += (price[i] - h) ** 2; sst += (price[i] - ybar) ** 2; });
+      const r2 = 1 - ssr / sst;
+      return { r2, adj: 1 - (1 - r2) * (n - 1) / (n - p - 1) };
+    };
+
+    const x0 = 70, x1 = 560, y0 = 40, y1 = 290, vlo = 0.4, vhi = 1.0;
+    const sx = p => x0 + (p - 1) / (PMAX - 1) * (x1 - x0), sy = v => y1 - (Math.max(vlo, Math.min(vhi, v)) - vlo) / (vhi - vlo) * (y1 - y0);
+    mk('rect', { x: sx(0.5), y: y0, width: sx(2.5) - sx(0.5), height: y1 - y0, style: 'fill: var(--accent-soft); opacity: .7' }, svg);
+    mk('text', { x: sx(1.5), y: y0 - 7, 'text-anchor': 'middle', class: 'c-note' }, svg).textContent = 'related to price';
+    mk('text', { x: sx(7.5), y: y0 - 7, 'text-anchor': 'middle', class: 'c-note' }, svg).textContent = 'unrelated to price';
+    const g = mk('g', { class: 'c-grid' }, svg);
+    for (let v = 4; v <= 10; v++) { const val = v / 10; mk('line', { x1: x0, x2: x1, y1: sy(val), y2: sy(val) }, g); mk('text', { x: x0 - 8, y: sy(val) + 4, 'text-anchor': 'end', class: 'c-tick' }, svg).textContent = val.toFixed(1); }
+    for (let p = 1; p <= PMAX; p++) { mk('line', { x1: sx(p), x2: sx(p), y1: y0, y2: y1 }, g); mk('text', { x: sx(p), y: y1 + 16, 'text-anchor': 'middle', class: 'c-tick' }, svg).textContent = p; }
+    mk('line', { x1: x0, x2: x1, y1: y1, y2: y1, class: 'c-axis' }, svg);
+    mk('line', { x1: x0, x2: x0, y1: y0, y2: y1, class: 'c-axis' }, svg);
+    mk('text', { x: (x0 + x1) / 2, y: y1 + 36, 'text-anchor': 'middle', class: 'c-title' }, svg).textContent = 'number of predictors P';
+    mk('text', { x: x0, y: 12, class: 'c-title' }, svg).textContent = 'R² and adjusted R² of the least-squares fit';
+    const guide = mk('line', { y1: y0, y2: y1, class: 'c-faint', style: 'stroke-width: 2' }, svg);
+    const lineR = mk('polyline', { class: 'c-user', style: 'fill: none' }, svg);
+    const lineA = mk('polyline', { class: 'c-line', style: 'fill: none; stroke-dasharray: 6 4' }, svg);
+    const dotsR = mk('g', { class: 'c-proj' }, svg), dotsA = mk('g', { class: 'c-dots' }, svg);
+    const hiR = mk('circle', { r: 6.5, class: 'c-pt-hi' }, svg), hiA = mk('circle', { r: 6.5, class: 'c-pt-hi' }, svg);
+    const lblR = mk('text', { class: 'c-lbl' }, svg), lblA = mk('text', { class: 'c-note' }, svg);
+    lblR.textContent = 'R²'; lblA.textContent = 'adjusted R²';
+
+    const pIn = document.getElementById('r2-p'), pOut = document.getElementById('r2-p-out');
+    const nIn = document.getElementById('r2-n'), nOut = document.getElementById('r2-n-out');
+    const oR = document.getElementById('r2-r'), oA = document.getElementById('r2-a'), oDf = document.getElementById('r2-df'), status = document.getElementById('r2-status');
+
+    const draw = () => {
+      const P = parseInt(pIn.value, 10), N = parseInt(nIn.value, 10);
+      const fits = []; for (let p = 1; p <= PMAX; p++) fits.push(fit(N, p));
+      lineR.setAttribute('points', fits.map((f, i) => `${sx(i + 1)},${sy(f.r2)}`).join(' '));
+      lineA.setAttribute('points', fits.map((f, i) => `${sx(i + 1)},${sy(f.adj)}`).join(' '));
+      dotsR.replaceChildren(); dotsA.replaceChildren();
+      fits.forEach((f, i) => { mk('circle', { cx: sx(i + 1), cy: sy(f.r2), r: 3.4 }, dotsR); mk('circle', { cx: sx(i + 1), cy: sy(f.adj), r: 3.4 }, dotsA); });
+      const last = fits[PMAX - 1];
+      lblR.setAttribute('x', sx(PMAX) + 10); lblR.setAttribute('y', sy(last.r2) + 4);
+      lblA.setAttribute('x', sx(PMAX) + 10); lblA.setAttribute('y', Math.max(sy(last.adj) + 4, sy(last.r2) + 18));
+      const f = fits[P - 1];
+      guide.setAttribute('x1', sx(P)); guide.setAttribute('x2', sx(P));
+      hiR.setAttribute('cx', sx(P)); hiR.setAttribute('cy', sy(f.r2)); hiA.setAttribute('cx', sx(P)); hiA.setAttribute('cy', sy(f.adj));
+      pOut.textContent = P; nOut.textContent = N;
+      oR.textContent = f.r2.toFixed(3); oA.textContent = f.adj.toFixed(3); oDf.textContent = N - P - 1;
+      const sgn = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(3);
+      let msg;
+      if (P === 1) msg = `Bedrooms alone: R² = ${f.r2.toFixed(3)}. Move P to 2 to add location.`;
+      else {
+        const prev = fits[P - 2], dR = f.r2 - prev.r2, dA = f.adj - prev.adj;
+        if (P === 2) msg = `Adding location, which affects price, changes R² by ${sgn(dR)} and adjusted R² by ${sgn(dA)}: both go up.`;
+        else if (dA < 0) msg = `Adding ${names[P - 1]}, which is unrelated to price, still nudges R² by ${sgn(dR)}, but adjusted R² changes by ${sgn(dA)}.`;
+        else msg = `Adding ${names[P - 1]} changes R² by ${sgn(dR)} and adjusted R² by ${sgn(dA)}: by chance this random column lines up with some of the noise in the prices.`;
+      }
+      status.textContent = msg;
+    };
+    draw();
+    pIn.addEventListener('input', draw);
+    nIn.addEventListener('input', draw);
+  })();
+})();
+</script>
+</body>
+</html>
